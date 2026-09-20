@@ -634,14 +634,19 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image.network(
-                  song['thumbnail']!,
+                  // BUG-5 fix: use null-safe fallback instead of force-unwrap (!).
+                  // Liked songs persisted before the thumbnail field existed would crash here.
+                  song['thumbnail'] ?? MusicService.getHdThumbnail(song['id'] ?? ''),
                   width: 50,
                   height: 50,
                   fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 50, height: 50, color: Colors.grey[850],
+                  ),
                 ),
               ),
               title: Text(
-                song['title']!,
+                song['title'] ?? 'Unknown Title',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -652,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               subtitle: Text(
-                song['author']!,
+                song['author'] ?? 'Unknown Artist',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

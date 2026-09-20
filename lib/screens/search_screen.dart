@@ -159,11 +159,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (mounted) {
       setState(() {
-        _currentPage = nextPage;
         _isLoadingMore = false;
         if (newResults.isEmpty) {
           _hasMore = false;
+          // BUG-4 fix: do NOT advance _currentPage on empty results.
+          // A transient network failure returning [] would otherwise permanently
+          // lock out pagination for this search session.
         } else {
+          _currentPage = nextPage;
           _searchResults.addAll(newResults);
         }
       });

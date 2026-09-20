@@ -145,6 +145,8 @@ class MusicService extends ChangeNotifier {
         try {
           final url1 = Uri.parse('https://lrclib.net/api/search?q=${Uri.encodeComponent("$cleanTitle $cleanArtist")}');
           final res1 = await http.get(url1, headers: {'User-Agent': 'Mozilla/5.0'}).timeout(const Duration(seconds: 4));
+          // BUG-2 fix: discard result if song changed while we were fetching.
+          if (_cachedLyricsSongId != song.id.value) return;
           if (res1.statusCode == 200) {
             results = json.decode(res1.body);
           }
@@ -156,6 +158,7 @@ class MusicService extends ChangeNotifier {
         try {
           final url2 = Uri.parse('https://lrclib.net/api/search?track_name=${Uri.encodeComponent(cleanTitle)}');
           final res2 = await http.get(url2, headers: {'User-Agent': 'Mozilla/5.0'}).timeout(const Duration(seconds: 4));
+          if (_cachedLyricsSongId != song.id.value) return;
           if (res2.statusCode == 200) {
             results = json.decode(res2.body);
           }
@@ -167,11 +170,14 @@ class MusicService extends ChangeNotifier {
         try {
           final url3 = Uri.parse('https://lrclib.net/api/search?q=${Uri.encodeComponent(cleanTitle)}');
           final res3 = await http.get(url3, headers: {'User-Agent': 'Mozilla/5.0'}).timeout(const Duration(seconds: 4));
+          if (_cachedLyricsSongId != song.id.value) return;
           if (res3.statusCode == 200) {
             results = json.decode(res3.body);
           }
         } catch (_) {}
       }
+
+      if (_cachedLyricsSongId != song.id.value) return;
 
       if (results.isNotEmpty) {
         final first = results.first;
@@ -182,13 +188,17 @@ class MusicService extends ChangeNotifier {
     } catch (e) {
       _cachedLyrics = 'Lyrics temporarily unavailable.';
     } finally {
-      _isFetchingLyrics = false;
-      notifyListeners();
+      if (_cachedLyricsSongId == song.id.value) {
+        _isFetchingLyrics = false;
+        notifyListeners();
+      }
     }
   }
 
   static final Map<String, String> _artworkMap = {};
-  static final Map<String, String> _webStreamUrls = {};
+  // NOTE: Stream URLs (YouTube CDN / JioSaavn) are time-limited (~6 hours).
+  // We intentionally do NOT cache them across plays to prevent stale-URL buffering
+  // in saved/imported playlists. A fresh URL is always resolved at play time.
 
   static String getHdThumbnail(String videoId) {
     if (_artworkMap.containsKey(videoId)) {
@@ -525,7 +535,6 @@ class MusicService extends ChangeNotifier {
               final durationSec = item['duration'] != null ? int.tryParse(item['duration'].toString()) : null;
               final duration = durationSec != null ? Duration(seconds: durationSec) : null;
               final artwork = item['thumbnail'] as String? ?? '';
-              final streamUrl = item['streamUrl'] as String? ?? '';
 
               // Format valid 11-char ID for Video model
               final vidString = songId.length >= 11 ? songId.substring(0, 11) : songId.padRight(11, '0');
@@ -534,10 +543,8 @@ class MusicService extends ChangeNotifier {
                 _artworkMap[songId] = artwork;
                 _artworkMap[vidString] = artwork;
               }
-              if (streamUrl.isNotEmpty) {
-                _webStreamUrls[songId] = streamUrl;
-                _webStreamUrls[vidString] = streamUrl;
-              }
+              // Stream URLs are time-limited — we store artwork only.
+              // The Cloudflare Worker will resolve a fresh URL at play time.
 
               results.add(
                 Video(
@@ -711,6 +718,11 @@ class MusicService extends ChangeNotifier {
         maximumColorCount: 8,
       ).timeout(const Duration(seconds: 3));
 
+      // BUG-1 fix: discard stale palette if the song changed while we were extracting.
+      // Rapid skips can launch multiple concurrent extractions; only apply the result
+      // for the song that is currently playing.
+      if (_currentSong?.id.value != videoId) return;
+
       final dominant = palette.dominantColor?.color ?? palette.vibrantColor?.color ?? const Color(0xFF1E1E2C);
       final vibrant = palette.vibrantColor?.color ?? palette.lightVibrantColor?.color ?? dominant;
 
@@ -728,17 +740,31 @@ class MusicService extends ChangeNotifier {
     _stopAtEndOfTrack = false;
     notifyListeners();
 
+    // BUG-6 fix: only count down while audio is actually playing.
+    // The original code used wall-clock time, so pausing the player did not
+    // pause the countdown — sleep fired earlier than the user expected.
     _sleepCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final isCurrentlyPlaying = kIsWeb ? WebPlayerBridge.isPlaying : _audioPlayer.playing;
+      if (!isCurrentlyPlaying) return; // player is paused — don't advance countdown
+
       if (_sleepRemaining != null && _sleepRemaining!.inSeconds > 0) {
         _sleepRemaining = _sleepRemaining! - const Duration(seconds: 1);
         notifyListeners();
+        if (_sleepRemaining!.inSeconds <= 0) {
+          timer.cancel();
+          _stopPlayback();
+        }
       } else {
         timer.cancel();
       }
     });
 
-    _sleepTimer = Timer(duration, () {
-      _stopPlayback();
+    // Keep the hard-deadline Timer as a safety net but cancel it in cancelSleepTimer
+    _sleepTimer = Timer(duration * 2, () {
+      // Safety fallback in case periodic timer missed stopping playback
+      if (_sleepRemaining != null && _sleepRemaining!.inSeconds <= 0) {
+        _stopPlayback();
+      }
     });
   }
 
@@ -986,6 +1012,17 @@ class MusicService extends ChangeNotifier {
     }
     notifyListeners();
 
+    // Immediately stop the current audio so the old song doesn't keep playing
+    // while the new stream is being resolved. Stream resolution via
+    // youtube_explode_dart can take 5–20 seconds, during which the previous
+    // track would otherwise continue to play even though the UI already shows
+    // the new song — causing the "ghost playback" skip bug.
+    if (kIsWeb) {
+      WebPlayerBridge.pause();
+    } else {
+      await _audioPlayer.stop();
+    }
+
     // Trigger palette extraction asynchronously
     _extractPalette(song.id.value);
 
@@ -1036,17 +1073,20 @@ class MusicService extends ChangeNotifier {
       }
 
       // 2. Web Mode (PWA / Browser):
-      // Dual Engine: Cloudflare Edge Direct Stream (<audio>) + YouTube IFrame Fallback
+      // Always resolve a fresh stream URL via Cloudflare Worker at play time.
+      // We never reuse a previously-cached stream URL because JioSaavn/YouTube
+      // CDN URLs are signed and expire after ~6 hours, which causes buffering
+      // in songs played from saved/imported playlists.
       if (kIsWeb) {
-        final directStreamUrl = _webStreamUrls[song.id.value] ?? ApiConfig.cloudflareStreamUri(song.id.value).toString();
-        debugPrint('[Play][Web] Playing via Web Dual Engine: ${song.id.value} (edge: $directStreamUrl)');
-        _reportClientLog('web_stream_start', {'videoId': song.id.value, 'engine': 'dual'});
+        final freshStreamUrl = ApiConfig.cloudflareStreamUri(song.id.value).toString();
+        debugPrint('[Play][Web] Resolving fresh stream via Cloudflare Worker for: ${song.id.value}');
+        _reportClientLog('web_stream_start', {'videoId': song.id.value, 'engine': 'cloudflare_fresh'});
         WebPlayerBridge.play(
           song.id.value,
           title: song.title,
           artist: song.author,
           artworkUrl: getHdThumbnail(song.id.value),
-          streamUrl: directStreamUrl,
+          streamUrl: freshStreamUrl,
         );
         _isLoading = false;
         notifyListeners();
@@ -1091,11 +1131,17 @@ class MusicService extends ChangeNotifier {
                 break;
               } catch (uriError) {
                 debugPrint('[Play] AudioSource.uri failed ($uriError), trying LockCachingAudioSource…');
-                // 2. Second attempt: LockCachingAudioSource fallback
+                // 2. Second attempt: LockCachingAudioSource fallback.
+                // Always delete any pre-existing temp cache file first.
+                // A stale/partial cache from a previous play attempt (e.g. an expired URL
+                // that wrote a corrupt or incomplete file) will silently cause buffering
+                // if we try to resume it instead of downloading fresh bytes.
                 try {
                   final cacheFile = File('${tempDir.path}/track_${song.id.value}_${candidate.tag}.m4a');
-                  if (await cacheFile.exists() && await cacheFile.length() == 0) {
+                  if (await cacheFile.exists()) {
+                    // Delete stale cache unconditionally so we always fetch fresh CDN bytes.
                     await cacheFile.delete();
+                    debugPrint('[Play] Deleted stale temp-cache file for ${song.id.value} (tag: ${candidate.tag})');
                   }
                   await _audioPlayer.setAudioSource(
                     // ignore: experimental_member_use

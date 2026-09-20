@@ -85,6 +85,7 @@ class PreferencesService extends ChangeNotifier {
   }
 
   Future<void> recordSongPlay(String artist, String title) async {
+    if (!_isInitialized) return; // BUG-3 fix: guard against pre-init calls
     if (artist.trim().isEmpty) return;
 
     final count = (_artistPlayCounts[artist] ?? 0) + 1;
@@ -108,12 +109,14 @@ class PreferencesService extends ChangeNotifier {
   }
 
   Future<void> setCrossfade(bool value) async {
+    if (!_isInitialized) return;
     _crossfadeEnabled = value;
     await _prefs.setBool('crossfade', value);
     notifyListeners();
   }
 
   Future<void> setThemeColor(Color color) async {
+    if (!_isInitialized) return;
     _themeColor = color;
     await _prefs.setInt('themeColor', color.toARGB32());
     notifyListeners();
@@ -138,6 +141,7 @@ class PreferencesService extends ChangeNotifier {
   }
 
   Future<void> addToSearchHistory(String query) async {
+    if (!_isInitialized) return; // BUG-3 fix
     if (query.trim().isEmpty) return;
     _searchHistory.remove(query);
     _searchHistory.insert(0, query);
@@ -161,6 +165,7 @@ class PreferencesService extends ChangeNotifier {
   }
 
   Future<void> addToListeningHistory(Map<String, String> song) async {
+    if (!_isInitialized) return; // BUG-3 fix
     final id = song['id'];
     if (id == null || id.isEmpty) return;
     _listeningHistory.removeWhere((item) => item['id'] == id);
