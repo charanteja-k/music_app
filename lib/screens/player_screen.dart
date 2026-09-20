@@ -324,6 +324,17 @@ class _PlayerScreenState extends State<PlayerScreen>
             Navigator.pop(context);
           }
         },
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null) {
+            if (details.primaryVelocity! < -300) {
+              HapticFeedback.mediumImpact();
+              _musicService.nextSong();
+            } else if (details.primaryVelocity! > 300) {
+              HapticFeedback.mediumImpact();
+              _musicService.previousSong();
+            }
+          }
+        },
         child: Stack(
           children: [
             // 1. Dynamic Living Ambient Gradient Mesh Aura
