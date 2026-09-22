@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ota_update/ota_update.dart';
@@ -545,6 +546,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   trailing: _isCheckingUpdate ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: _prefs.themeColor)) : const Icon(Icons.chevron_right_rounded, color: Colors.white30),
                   onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
                 ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.bug_report_rounded, color: Colors.redAccent, size: 20),
+                  ),
+                  title: const Text('Report a Bug', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                  subtitle: Text('Found an issue? Let us know via Email', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white30),
+                  onTap: _reportBug,
+                ),
               ]),
               const SizedBox(height: 40),
             ],
@@ -600,11 +612,34 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         );
       }
     } finally {
+      if (mounted) setState(() => _isCheckingUpdate = false);
+    }
+  }
+
+  Future<void> _reportBug() async {
+    final String subject = Uri.encodeComponent('Bug Report: DilSe Music App (v$_appVersion)');
+    final String body = Uri.encodeComponent('Please describe the bug you encountered:\n\n\n\n--- App Info ---\nVersion: $_appVersion\nBuild: $_buildNumber\nOS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+    final Uri emailLaunchUri = Uri.parse('mailto:balaamoghraj@gmail.com?subject=$subject&body=$body');
+
+    try {
+      if (await canLaunchUrl(emailLaunchUri)) {
+        await launchUrl(emailLaunchUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open your email client automatically.'), backgroundColor: Colors.redAccent),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        setState(() => _isCheckingUpdate = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        );
       }
     }
   }
+
 
   void _showUpdateSheet(BuildContext context, AppUpdateInfo info) {
     showModalBottomSheet(

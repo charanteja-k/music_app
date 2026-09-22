@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
@@ -183,6 +184,120 @@ class _SpotifyImportScreenState extends State<SpotifyImportScreen> {
     }
   }
 
+  Future<void> _importFromLocalCsv() async {
+    final controller = TextEditingController();
+    final path = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E28),
+        title: const Text('Import from Local CSV', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: r'Paste absolute path (e.g. C:\Users\Amogh\Downloads\English.csv)',
+            hintStyle: TextStyle(color: Colors.white54),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('Import', style: TextStyle(color: Color(0xFF1DB954))),
+          ),
+        ],
+      ),
+    );
+
+    if (path != null && path.trim().isNotEmpty) {
+      final file = File(path.trim().replaceAll('"', ''));
+      if (!await file.exists()) {
+        setState(() => _statusMessage = 'File not found at the specified path.');
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+        _statusMessage = 'Reading CSV file...';
+      });
+
+      try {
+        final lines = await file.readAsLines();
+        if (lines.isEmpty) throw Exception('CSV is empty');
+
+        final header = lines.first.split(',');
+        final trackIdx = header.indexWhere((h) => h.trim().toLowerCase().contains('track name'));
+        final artistIdx = header.indexWhere((h) => h.trim().toLowerCase().contains('artist'));
+
+        if (trackIdx == -1) throw Exception('Could not find "Track Name" column');
+
+        List<String> tracksToSearch = [];
+        for (int i = 1; i < lines.length; i++) {
+          final line = lines[i];
+          if (line.trim().isEmpty) continue;
+          
+          // Simple CSV parsing avoiding commas inside quotes
+          final row = _parseCsvLine(line);
+          if (row.length > trackIdx) {
+            String title = row[trackIdx];
+            String artist = artistIdx != -1 && row.length > artistIdx ? row[artistIdx].split(';').first : '';
+            if (title.isNotEmpty) {
+              tracksToSearch.add('$title $artist'.trim());
+            }
+          }
+        }
+
+        if (tracksToSearch.isEmpty) throw Exception('No valid tracks found in CSV');
+
+        final playlistName = path.split(Platform.pathSeparator).last.replaceAll('.csv', '');
+        final playlistId = MusicService().createPlaylist(playlistName);
+
+        setState(() => _statusMessage = 'Resolving ${tracksToSearch.length} tracks from CSV...');
+
+        int successCount = 0;
+        for (final query in tracksToSearch) {
+          final results = await MusicService().searchSongs(query, page: 1);
+          if (results.isNotEmpty) {
+            MusicService().addSongToPlaylist(playlistId, results.first);
+            successCount++;
+          }
+        }
+
+        setState(() {
+          _statusMessage = 'Successfully imported $successCount out of ${tracksToSearch.length} tracks to $playlistName!';
+        });
+
+      } catch (e) {
+        setState(() => _statusMessage = 'Error: $e');
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  List<String> _parseCsvLine(String line) {
+    List<String> result = [];
+    StringBuffer current = StringBuffer();
+    bool inQuotes = false;
+    for (int i = 0; i < line.length; i++) {
+      String char = line[i];
+      if (char == '"') {
+        inQuotes = !inQuotes;
+      } else if (char == ',' && !inQuotes) {
+        result.add(current.toString().trim());
+        current.clear();
+      } else {
+        current.write(char);
+      }
+    }
+    result.add(current.toString().trim());
+    return result;
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -238,6 +353,18 @@ class _SpotifyImportScreenState extends State<SpotifyImportScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: _isLoading ? null : _importPublicPlaylistFromUrl,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.file_upload),
+                label: const Text('Import from Local CSV'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white30),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _isLoading ? null : _importFromLocalCsv,
               ),
             ] else ...[
               const Text(
