@@ -19,6 +19,7 @@ import 'web_player_bridge.dart';
 import 'canonical_song_dedup.dart';
 import 'youtube_music_client.dart';
 import 'album_color_deriver.dart';
+import 'lyrics_transliteration_service.dart';
 
 enum SearchSuggestionType { artist, song, album, history, query }
 
@@ -77,6 +78,7 @@ class MusicService extends ChangeNotifier {
 
   String? _cachedLyrics;
   String? _cachedLyricsSongId;
+  String? _cachedPronunciationLyrics;
   bool _isFetchingLyrics = false;
 
   // Palette Extraction
@@ -112,7 +114,15 @@ class MusicService extends ChangeNotifier {
   Stream<Duration?> get durationStream => kIsWeb ? WebPlayerBridge.durationStream : _audioPlayer.durationStream;
 
   String? get cachedLyrics => _cachedLyrics;
+  String? get cachedPronunciationLyrics => _cachedPronunciationLyrics;
   bool get isFetchingLyrics => _isFetchingLyrics;
+
+  String? get currentSongLanguage {
+    if (_currentSong == null) return null;
+    return CanonicalSongDedup.getSongLanguage(_currentSong!.id.value) ??
+        CanonicalSongDedup.detectLanguage(_currentSong!.title) ??
+        CanonicalSongDedup.detectLanguage(_currentSong!.author);
+  }
 
   Color get dominantColor => _dominantColor;
   Color get vibrantColor => _vibrantColor;
@@ -179,6 +189,7 @@ class MusicService extends ChangeNotifier {
 
     _isFetchingLyrics = true;
     _cachedLyrics = null;
+    _cachedPronunciationLyrics = null;
     _cachedLyricsSongId = song.id.value;
     notifyListeners();
 
@@ -226,9 +237,17 @@ class MusicService extends ChangeNotifier {
               final plainText = (d['plainLyrics'] as String?)?.trim();
               if (lyricsText != null && lyricsText.isNotEmpty) {
                 _cachedLyrics = lyricsText;
+                if (!LyricsTransliterationService.hasIndicScript(lyricsText) &&
+                    (targetLang == 'telugu' || LyricsTransliterationService.isRomanizedTelugu(lyricsText))) {
+                  _cachedPronunciationLyrics = lyricsText;
+                }
                 return;
               } else if (plainText != null && plainText.isNotEmpty) {
                 _cachedLyrics = plainText;
+                if (!LyricsTransliterationService.hasIndicScript(plainText) &&
+                    (targetLang == 'telugu' || LyricsTransliterationService.isRomanizedTelugu(plainText))) {
+                  _cachedPronunciationLyrics = plainText;
+                }
                 return;
               }
             }
@@ -254,9 +273,17 @@ class MusicService extends ChangeNotifier {
               final plainText = (d['plainLyrics'] as String?)?.trim();
               if (lyricsText != null && lyricsText.isNotEmpty) {
                 _cachedLyrics = lyricsText;
+                if (!LyricsTransliterationService.hasIndicScript(lyricsText) &&
+                    (targetLang == 'telugu' || LyricsTransliterationService.isRomanizedTelugu(lyricsText))) {
+                  _cachedPronunciationLyrics = lyricsText;
+                }
                 return;
               } else if (plainText != null && plainText.isNotEmpty) {
                 _cachedLyrics = plainText;
+                if (!LyricsTransliterationService.hasIndicScript(plainText) &&
+                    (targetLang == 'telugu' || LyricsTransliterationService.isRomanizedTelugu(plainText))) {
+                  _cachedPronunciationLyrics = plainText;
+                }
                 return;
               }
             }
@@ -321,6 +348,11 @@ class MusicService extends ChangeNotifier {
       Map<String, dynamic>? bestCandidate;
       int bestScore = 120; // Strict minimum threshold
 
+      Map<String, dynamic>? bestNativeCandidate;
+      int bestNativeScore = 120;
+      Map<String, dynamic>? bestRomanizedCandidate;
+      int bestRomanizedScore = 120;
+
       for (final item in candidatePool) {
         if (item is! Map) continue;
         final map = Map<String, dynamic>.from(item);
@@ -341,15 +373,49 @@ class MusicService extends ChangeNotifier {
           bestScore = score;
           bestCandidate = map;
         }
+
+        final synced = (map['syncedLyrics'] as String?)?.trim();
+        final plain = (map['plainLyrics'] as String?)?.trim();
+        final text = (synced?.isNotEmpty == true ? synced! : (plain ?? '')).trim();
+        if (text.isNotEmpty && score > 120) {
+          final isNative = LyricsTransliterationService.hasIndicScript(text);
+          if (isNative && score > bestNativeScore) {
+            bestNativeScore = score;
+            bestNativeCandidate = map;
+          } else if (!isNative && score > bestRomanizedScore) {
+            bestRomanizedScore = score;
+            bestRomanizedCandidate = map;
+          }
+        }
       }
 
-      if (bestCandidate != null) {
+      if (bestNativeCandidate != null && bestRomanizedCandidate != null) {
+        final nativeSynced = (bestNativeCandidate['syncedLyrics'] as String?)?.trim();
+        final nativePlain = (bestNativeCandidate['plainLyrics'] as String?)?.trim();
+        final romanSynced = (bestRomanizedCandidate['syncedLyrics'] as String?)?.trim();
+        final romanPlain = (bestRomanizedCandidate['plainLyrics'] as String?)?.trim();
+
+        _cachedLyrics = (nativeSynced != null && nativeSynced.isNotEmpty)
+            ? nativeSynced
+            : (nativePlain != null && nativePlain.isNotEmpty ? nativePlain : null);
+        _cachedPronunciationLyrics = (romanSynced != null && romanSynced.isNotEmpty)
+            ? romanSynced
+            : (romanPlain != null && romanPlain.isNotEmpty ? romanPlain : null);
+      } else if (bestCandidate != null) {
         final synced = (bestCandidate['syncedLyrics'] as String?)?.trim();
         final plain = (bestCandidate['plainLyrics'] as String?)?.trim();
-        _cachedLyrics = (synced != null && synced.isNotEmpty)
+        final text = (synced != null && synced.isNotEmpty)
             ? synced
-            : (plain != null && plain.isNotEmpty ? plain : 'No lyrics available.');
-      } else {
+            : (plain != null && plain.isNotEmpty ? plain : null);
+        _cachedLyrics = text;
+        if (text != null &&
+            !LyricsTransliterationService.hasIndicScript(text) &&
+            (targetLang == 'telugu' || LyricsTransliterationService.isRomanizedTelugu(text))) {
+          _cachedPronunciationLyrics = text;
+        }
+      }
+
+      if (_cachedLyrics == null || _cachedLyrics!.isEmpty) {
         _cachedLyrics = 'No lyrics found for "$cleanTitle".';
       }
     } catch (e) {

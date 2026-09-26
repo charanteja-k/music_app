@@ -280,4 +280,224 @@ class LyricsTransliterationService {
 
     return cleanWords.join(' ');
   }
+
+  // ---------------------------------------------------------------------------
+  // Reverse Transliteration: English Romanization (Tenglish) -> Native Telugu Script
+  // ---------------------------------------------------------------------------
+
+  static final Set<String> _teluguKeywords = {
+    'naa', 'neeku', 'ninnu', 'nannu', 'naatho', 'naaku', 'meeru', 'manaki', 'manaku',
+    'vaadu', 'aame', 'atanu', 'idi', 'adi', 'evaru', 'emi', 'emiti', 'enti', 'enduku',
+    'ippudu', 'appudu', 'eppudu', 'ekkada', 'akkada', 'ela', 'elaaga',
+    'choosi', 'choodu', 'choodangane', 'chuste', 'chusa', 'vachhi', 'vache', 'vastava',
+    'vellu', 'velli', 'vellave', 'undi', 'unnadi', 'unnave', 'undedi', 'ledu', 'leru',
+    'leka', 'cheppu', 'chebutha', 'cheppave', 'telusu', 'telusa', 'thelusaa', 'telisi',
+    'telusunaa', 'anukuni', 'anipisthondi', 'anipistondi', 'kavale', 'kaavali', 'kaavaale',
+    'padipoya', 'poyave', 'kallu', 'kaallu', 'kanulu', 'chupu', 'choopu', 'manasu',
+    'manasulona', 'gundello', 'gundellona', 'prema', 'preme', 'cheliya', 'priya',
+    'priyurala', 'chinni', 'pilla', 'pillada', 'pillagaada', 'bomma', 'lokam',
+    'lokame', 'praanam', 'swasalo', 'kalale', 'kala', 'jaabili', 'vennela', 'maata',
+    'maatallo', 'paata', 'raagam', 'raagamajari', 'muddhu', 'navvu', 'navvula',
+    'kanneeti', 'kanneellu', 'lona', 'kante', 'kanna', 'gaani', 'samajavaragamana',
+    'inthakanna', 'kurchi', 'madathapetti', 'rajamandri', 'mayamma', 'talavanollu',
+    'mestiri', 'chuttamalle', 'chuttestaandi', 'ammu', 'podhu', 'nammu', 'thattaledu',
+    'antukunnadhante', 'polikedi', 'peru', 'choodangaane', 'oorike', 'kaasepu', 'astamaanam',
+    'maimarapu', 'tuntari', 'pattuku', 'vadalanannavi', 'choode', 'tokkuku', 'dayaleda',
+    'asalu', 'subhanallah', 'annaavu'
+  };
+
+  /// Checks if Latin text contains characteristic Romanized Telugu (Tenglish) vocabulary
+  static bool isRomanizedTelugu(String text) {
+    if (text.isEmpty || hasIndicScript(text)) return false;
+    final clean = text.toLowerCase().replaceAll(RegExp(r'[^a-z\s]'), ' ');
+    final words = clean.split(RegExp(r'\s+')).where((w) => w.length >= 2).toSet();
+    int matchCount = 0;
+    for (final word in words) {
+      if (_teluguKeywords.contains(word)) {
+        matchCount++;
+      }
+    }
+    return matchCount >= 2;
+  }
+
+  /// Checks if lyrics are Romanized Indic/Telugu based on content or known target language
+  static bool isRomanizedIndic(String text, [String? targetLang]) {
+    if (text.isEmpty || hasIndicScript(text)) return false;
+    if (targetLang != null && targetLang.isNotEmpty) {
+      final lang = targetLang.toLowerCase();
+      if (lang == 'telugu' || lang == 'hindi' || lang == 'tamil' || lang == 'kannada' || lang == 'malayalam') {
+        return true;
+      }
+    }
+    return isRomanizedTelugu(text);
+  }
+
+  static const Map<String, String> _teluguIndependentVowels = {
+    'aa': 'ఆ', 'a': 'అ',
+    'ee': 'ఈ', 'ii': 'ఈ', 'i': 'ఇ',
+    'oo': 'ఊ', 'uu': 'ఊ', 'u': 'ఉ',
+    'ru': 'ఋ',
+    'ae': 'ఏ', 'ea': 'ఏ', 'e': 'ఎ',
+    'ai': 'ఐ',
+    'oa': 'ఓ', 'o': 'ఒ',
+    'au': 'ఔ', 'ou': 'ఔ',
+  };
+
+  static const Map<String, String> _teluguMatras = {
+    'aa': 'ా',
+    'a': '',
+    'ee': 'ీ', 'ii': 'ీ', 'i': 'ి',
+    'oo': 'ూ', 'uu': 'ూ', 'u': 'ు',
+    'ru': 'ృ',
+    'ae': 'ే', 'ea': 'ే', 'e': 'ె',
+    'ai': 'ై',
+    'oa': 'ో', 'o': 'ొ',
+    'au': 'ౌ', 'ou': 'ౌ',
+  };
+
+  static const List<MapEntry<String, String>> _teluguConsonants = [
+    MapEntry('ksha', 'క్ష'),
+    MapEntry('ksh', 'క్ష్'),
+    MapEntry('chh', 'ఛ'),
+    MapEntry('ch', 'చ'),
+    MapEntry('thh', 'థ'),
+    MapEntry('th', 'త'),
+    MapEntry('dhh', 'ధ'),
+    MapEntry('dh', 'ధ'),
+    MapEntry('kh', 'ఖ'),
+    MapEntry('gh', 'ఘ'),
+    MapEntry('jh', 'ఝ'),
+    MapEntry('bh', 'భ'),
+    MapEntry('ph', 'ఫ'),
+    MapEntry('sh', 'శ'),
+    MapEntry('zh', 'ళ'),
+    MapEntry('k', 'క'),
+    MapEntry('g', 'గ'),
+    MapEntry('j', 'జ'),
+    MapEntry('t', 'ట'),
+    MapEntry('d', 'డ'),
+    MapEntry('n', 'న'),
+    MapEntry('p', 'ప'),
+    MapEntry('f', 'ఫ'),
+    MapEntry('b', 'బ'),
+    MapEntry('m', 'మ'),
+    MapEntry('y', 'య'),
+    MapEntry('r', 'ర'),
+    MapEntry('l', 'ల'),
+    MapEntry('v', 'వ'),
+    MapEntry('w', 'వ'),
+    MapEntry('s', 'స'),
+    MapEntry('h', 'హ'),
+  ];
+
+  /// Transliterates Romanized English pronunciation text into native Telugu script
+  static String toTeluguScript(String text) {
+    if (text.isEmpty) return text;
+    final sb = StringBuffer();
+    final lower = text.toLowerCase();
+    int i = 0;
+    final len = text.length;
+
+    while (i < len) {
+      final code = lower.codeUnitAt(i);
+
+      // Non-letters / whitespace / punctuation
+      if (code < 0x61 || code > 0x7A) {
+        sb.write(text[i]);
+        i++;
+        continue;
+      }
+
+      // Check if start of word or after non-letter -> Independent vowel
+      final isStartOfWord = i == 0 || (lower.codeUnitAt(i - 1) < 0x61 || lower.codeUnitAt(i - 1) > 0x7A);
+      if (isStartOfWord) {
+        bool matchedVowel = false;
+        for (final v in ['aa', 'ee', 'ii', 'oo', 'uu', 'ae', 'ea', 'ai', 'oa', 'au', 'ou', 'ru', 'a', 'i', 'u', 'e', 'o']) {
+          if (lower.startsWith(v, i)) {
+            sb.write(_teluguIndependentVowels[v] ?? v);
+            i += v.length;
+            matchedVowel = true;
+            break;
+          }
+        }
+        if (matchedVowel) continue;
+      }
+
+      // Try matching consonant
+      String? matchedConsonant;
+      int consLen = 0;
+      for (final entry in _teluguConsonants) {
+        if (lower.startsWith(entry.key, i)) {
+          matchedConsonant = entry.value;
+          consLen = entry.key.length;
+          break;
+        }
+      }
+
+      if (matchedConsonant != null) {
+        i += consLen;
+
+        // Check if followed by vowel / matra
+        bool matchedMatra = false;
+        for (final v in ['aa', 'ee', 'ii', 'oo', 'uu', 'ae', 'ea', 'ai', 'oa', 'au', 'ou', 'ru', 'a', 'i', 'u', 'e', 'o']) {
+          if (i < len && lower.startsWith(v, i)) {
+            final matra = _teluguMatras[v]!;
+            sb.write(matchedConsonant);
+            sb.write(matra);
+            i += v.length;
+
+            // Check if followed by anusvara ('m' or 'n' before next consonant or at word end)
+            if (i < len && (lower[i] == 'm' || lower[i] == 'n')) {
+              final nextNext = i + 1 < len ? lower.codeUnitAt(i + 1) : 0;
+              final isNextConsonant = nextNext >= 0x61 && nextNext <= 0x7A && !['a', 'e', 'i', 'o', 'u'].contains(String.fromCharCode(nextNext));
+              final isWordEnd = i + 1 >= len || lower.codeUnitAt(i + 1) < 0x61 || lower.codeUnitAt(i + 1) > 0x7A;
+              if (isNextConsonant && lower[i] != String.fromCharCode(nextNext)) {
+                sb.write('ం');
+                i++;
+              } else if (isWordEnd && v == 'a') {
+                sb.write('ం');
+                i++;
+              }
+            }
+
+            matchedMatra = true;
+            break;
+          }
+        }
+
+        if (!matchedMatra) {
+          // Virama (halant) if no vowel follows
+          sb.write(matchedConsonant);
+          sb.write('్');
+        }
+        continue;
+      }
+
+      sb.write(text[i]);
+      i++;
+    }
+
+    return sb.toString();
+  }
+
+  /// Transliterates an entire synchronized LRC lyrics string from Romanized text to Telugu script
+  static String toTeluguScriptLrc(String lrcText) {
+    if (lrcText.isEmpty) return '';
+    final lines = lrcText.split('\n');
+    final tagRegex = RegExp(r'^(\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\])(.*)$');
+
+    final result = <String>[];
+    for (final line in lines) {
+      final match = tagRegex.firstMatch(line);
+      if (match != null) {
+        final timestamp = match.group(1)!;
+        final rawLyric = match.group(2) ?? '';
+        final telugu = toTeluguScript(rawLyric.trim());
+        result.add('$timestamp $telugu'.trimRight());
+      } else {
+        result.add(toTeluguScript(line));
+      }
+    }
+    return result.join('\n');
+  }
 }

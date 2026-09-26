@@ -114,4 +114,48 @@ void main() {
 
     await positionController.close();
   });
+
+  testWidgets('AnimatedLyrics places Romanized Telugu lyrics in English pronunciation slot and supports modes', (WidgetTester tester) async {
+    const romanizedLrc = '''
+[00:02.00]Rajamandri raagamajari
+[00:05.00]Mayamma peru
+''';
+
+    final positionController = StreamController<Duration>.broadcast();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(primaryColor: const Color(0xFFFA2D48)),
+        home: Scaffold(
+          body: AnimatedLyrics(
+            rawLyrics: romanizedLrc,
+            songLanguage: 'telugu',
+            positionStream: positionController.stream,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Mode toggle bar buttons should be present for Romanized Telugu lyrics
+    expect(find.text('Original'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Dual'), findsOneWidget);
+
+    // English mode is active by default for Romanized Indic songs, showing the English pronunciation lyrics
+    expect(find.text('Rajamandri raagamajari'), findsOneWidget);
+
+    // Switch to Original mode: Native Telugu script should now be visible
+    await tester.tap(find.text('Original'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rajamandri raagamajari'), findsNothing);
+
+    // Switch to Dual mode: Both Telugu script and English pronunciation should be visible
+    await tester.tap(find.text('Dual'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rajamandri raagamajari'), findsOneWidget);
+
+    await positionController.close();
+  });
 }

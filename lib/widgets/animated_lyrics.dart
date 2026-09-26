@@ -20,12 +20,20 @@ class LyricLine {
 
 class AnimatedLyrics extends StatefulWidget {
   final String rawLyrics;
+  final String? pronunciationLyrics;
+  final String? songLanguage;
+  final String? songTitle;
+  final String? songArtist;
   final Stream<Duration> positionStream;
   final void Function(Duration)? onSeek;
 
   const AnimatedLyrics({
     super.key,
     required this.rawLyrics,
+    this.pronunciationLyrics,
+    this.songLanguage,
+    this.songTitle,
+    this.songArtist,
     required this.positionStream,
     this.onSeek,
   });
@@ -42,6 +50,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
   List<LyricLine> _lyrics = [];
   bool _isSynced = false;
   bool _hasIndicScript = false;
+  bool _hasPronunciationLyrics = false;
   int _currentIndex = -1;
   LyricsDisplayMode _displayMode = LyricsDisplayMode.original;
 
@@ -52,19 +61,20 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
   @override
   void initState() {
     super.initState();
-    _initDisplayMode();
     _parseLyrics();
     _subscribeToPosition();
   }
 
-  void _initDisplayMode() {
+  void _initDisplayMode({bool isRomanized = false}) {
     final saved = PreferencesService().lyricsDisplayMode;
     if (saved == 'pronunciation') {
       _displayMode = LyricsDisplayMode.pronunciation;
     } else if (saved == 'dual') {
       _displayMode = LyricsDisplayMode.dual;
-    } else {
+    } else if (saved == 'original') {
       _displayMode = LyricsDisplayMode.original;
+    } else {
+      _displayMode = isRomanized ? LyricsDisplayMode.pronunciation : LyricsDisplayMode.original;
     }
   }
 
@@ -106,7 +116,10 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
     if (oldWidget.positionStream != widget.positionStream) {
       _subscribeToPosition();
     }
-    if (oldWidget.rawLyrics != widget.rawLyrics) {
+    if (oldWidget.rawLyrics != widget.rawLyrics ||
+        oldWidget.pronunciationLyrics != widget.pronunciationLyrics ||
+        oldWidget.songLanguage != widget.songLanguage ||
+        oldWidget.songTitle != widget.songTitle) {
       _lineKeys.clear();
       setState(() {
         _currentIndex = -1;
@@ -131,9 +144,27 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
     _lineKeys.clear();
     _isSynced = false;
     _hasIndicScript = false;
+    _hasPronunciationLyrics = false;
     _currentIndex = -1;
 
     if (widget.rawLyrics.trim().isEmpty) return;
+
+    final hasNativeIndic = LyricsTransliterationService.hasIndicScript(widget.rawLyrics);
+    final lang = widget.songLanguage?.toLowerCase() ?? '';
+    final isTeluguSong = lang == 'telugu' ||
+        LyricsTransliterationService.isRomanizedTelugu(widget.rawLyrics) ||
+        (widget.songTitle != null && (
+            widget.songTitle!.toLowerCase().contains('telugu') ||
+            LyricsTransliterationService.isRomanizedTelugu(widget.songTitle!)
+        ));
+    final bool isRomanized = !hasNativeIndic &&
+        (isTeluguSong || LyricsTransliterationService.isRomanizedIndic(widget.rawLyrics, widget.songLanguage));
+
+    _hasIndicScript = hasNativeIndic || isRomanized;
+    _hasPronunciationLyrics = isRomanized ||
+        (widget.pronunciationLyrics != null && widget.pronunciationLyrics!.trim().isNotEmpty);
+
+    _initDisplayMode(isRomanized: isRomanized);
 
     final lines = widget.rawLyrics.split('\n');
     // Flexible regex matching: [01:23.45], [1:23.456], [01:23:45], [01:23]
@@ -153,11 +184,18 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
         final text = line.replaceAll(tagRegex, '').trim();
         if (text.isEmpty) continue;
 
-        if (!_hasIndicScript && LyricsTransliterationService.hasIndicScript(text)) {
-          _hasIndicScript = true;
-        }
+        final String originalText;
+        final String pronunciationText;
 
-        final romanized = LyricsTransliterationService.transliterateText(text);
+        if (isRomanized) {
+          // Romanized English lyrics ("Rajamandri raagamajari") are placed in the English pronunciation slot
+          pronunciationText = text;
+          originalText = LyricsTransliterationService.toTeluguScript(text);
+        } else {
+          // Native Indic script lyrics ("రాజమండ్రి రాగమంజరి")
+          originalText = text;
+          pronunciationText = LyricsTransliterationService.transliterateText(text);
+        }
 
         for (final m in matches) {
           final minutes = int.parse(m.group(1)!);
@@ -179,7 +217,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
             seconds: seconds,
             milliseconds: milliseconds,
           );
-          parsedSynced.add(LyricLine(duration, text, romanized));
+          parsedSynced.add(LyricLine(duration, originalText, pronunciationText));
         }
       }
     }
@@ -205,11 +243,18 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
             prevWasEmpty = true;
           }
         } else {
-          if (!_hasIndicScript && LyricsTransliterationService.hasIndicScript(line)) {
-            _hasIndicScript = true;
+          final String originalText;
+          final String pronunciationText;
+
+          if (isRomanized) {
+            pronunciationText = line;
+            originalText = LyricsTransliterationService.toTeluguScript(line);
+          } else {
+            originalText = line;
+            pronunciationText = LyricsTransliterationService.transliterateText(line);
           }
-          final romanized = LyricsTransliterationService.transliterateText(line);
-          cleaned.add(LyricLine(Duration.zero, line, romanized));
+
+          cleaned.add(LyricLine(Duration.zero, originalText, pronunciationText));
           prevWasEmpty = false;
         }
       }
@@ -517,7 +562,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
     if (!_isSynced) {
       return Column(
         children: [
-          if (_hasIndicScript) _buildModeToggle(themeColor),
+          if (_hasIndicScript || _hasPronunciationLyrics) _buildModeToggle(themeColor),
           Expanded(
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
@@ -581,7 +626,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
     // Synced Lyrics View
     return Column(
       children: [
-        if (_hasIndicScript) _buildModeToggle(themeColor),
+        if (_hasIndicScript || _hasPronunciationLyrics) _buildModeToggle(themeColor),
         Expanded(
           child: ShaderMask(
             shaderCallback: (bounds) => const LinearGradient(
