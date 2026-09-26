@@ -77,6 +77,7 @@ class PreferencesService extends ChangeNotifier {
   String _cloudflareWorkerUrl = '';
   ArtworkStyle _artworkStyle = ArtworkStyle.card;
   ScrubberStyle _scrubberStyle = ScrubberStyle.waveform;
+  String _lyricsDisplayMode = 'original'; // 'original', 'pronunciation', 'dual'
   String _userName = '';
   bool _hasPromptedName = false;
 
@@ -109,6 +110,7 @@ class PreferencesService extends ChangeNotifier {
   String get cloudflareWorkerUrl => _cloudflareWorkerUrl;
   ArtworkStyle get artworkStyle => _artworkStyle;
   ScrubberStyle get scrubberStyle => _scrubberStyle;
+  String get lyricsDisplayMode => _lyricsDisplayMode;
   String get userName => _userName.isEmpty ? 'Friend' : _userName;
   bool get hasCustomName => _userName.isNotEmpty;
   bool get hasPromptedName => _hasPromptedName;
@@ -163,6 +165,7 @@ class PreferencesService extends ChangeNotifier {
     _artworkStyle = styleStr == 'vinyl' ? ArtworkStyle.vinyl : ArtworkStyle.card;
     final scrubStr = _prefs.getString('scrubberStyle') ?? 'waveform';
     _scrubberStyle = scrubStr == 'classic' ? ScrubberStyle.classic : ScrubberStyle.waveform;
+    _lyricsDisplayMode = _prefs.getString('lyricsDisplayMode') ?? 'original';
 
     final historyJson = _prefs.getString('listeningHistoryJson');
     if (historyJson != null && historyJson.isNotEmpty) {
@@ -246,6 +249,14 @@ class PreferencesService extends ChangeNotifier {
     if (!_isInitialized) return;
     _preferredLanguages = List.from(langs);
     await _prefs.setStringList('preferredLanguages', _preferredLanguages);
+    notifyListeners();
+  }
+
+  Future<void> setLyricsDisplayMode(String mode) async {
+    _lyricsDisplayMode = mode;
+    if (_isInitialized) {
+      await _prefs.setString('lyricsDisplayMode', mode);
+    }
     notifyListeners();
   }
 

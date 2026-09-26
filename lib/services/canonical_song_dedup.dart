@@ -119,6 +119,53 @@ class CanonicalSongDedup {
     return s.toLowerCase();
   }
 
+  /// Extracts primary core song title, secondary context keywords (e.g. movie/album name, composer),
+  /// and resolved artist from YouTube video metadata.
+  static Map<String, dynamic> extractSongContext(String rawTitle, String rawAuthor) {
+    final cleanT = cleanTitle(rawTitle);
+    String cleanA = cleanArtist(rawAuthor);
+
+    final keywords = <String>[];
+    // Split raw title by common delimiters: | : - – — /
+    final parts = rawTitle.split(RegExp(r'\s*[|:–—/]\s*|\s+-\s+'));
+    for (int i = 1; i < parts.length; i++) {
+      var segment = parts[i].trim();
+      segment = segment.replaceAll(_bracketNoise, ' ');
+      segment = segment.replaceAll(_videoNoiseWords, ' ');
+      segment = segment.replaceAll(_punctuation, ' ').replaceAll(_whitespace, ' ').trim();
+      if (segment.length > 2 && !segment.toLowerCase().contains('official')) {
+        keywords.add(segment);
+      }
+    }
+
+    // If channel author was empty/record label, check if any keyword looks like a known artist
+    if (cleanA.isEmpty && keywords.isNotEmpty) {
+      for (final kw in keywords) {
+        final kwLower = kw.toLowerCase();
+        if (kwLower.contains('anirudh') ||
+            kwLower.contains('rahman') ||
+            kwLower.contains('pritam') ||
+            kwLower.contains('arijit') ||
+            kwLower.contains('sriram') ||
+            kwLower.contains('dsp') ||
+            kwLower.contains('thaman') ||
+            kwLower.contains('shreya') ||
+            kwLower.contains('badshah') ||
+            kwLower.contains('arman') ||
+            kwLower.contains('vishal')) {
+          cleanA = kw;
+          break;
+        }
+      }
+    }
+
+    return {
+      'title': cleanT,
+      'artist': cleanA,
+      'contextKeywords': keywords,
+    };
+  }
+
   /// Strict audio validator.
   /// Rejects YouTube videos that are speeches, press meets, trailers, dance performances,
   /// cricket highlights, teasers, or non-song media content.
@@ -235,25 +282,38 @@ class CanonicalSongDedup {
     return null;
   }
 
-  /// Evaluates whether lyrics candidate matches the expected language and artist
+  /// Evaluates whether lyrics candidate matches the expected language, artist, duration, and context
   static int scoreLyricsCandidate({
     required String? targetLang,
     required String targetTitle,
     required String targetArtist,
     int? targetDuration,
     required Map<String, dynamic> candidate,
+    List<String>? contextKeywords,
   }) {
     final synced = candidate['syncedLyrics'] as String?;
     final plain = candidate['plainLyrics'] as String?;
     final lyrics = (synced?.isNotEmpty == true ? synced! : (plain ?? '')).trim();
     if (lyrics.isEmpty) return -9999;
 
+    // Hard reject instrumental or empty placeholders
+    final lowerLyrics = lyrics.toLowerCase();
+    if (lowerLyrics.contains('[instrumental]') ||
+        lowerLyrics == 'instrumental' ||
+        lowerLyrics.contains('lyrics not available') ||
+        lowerLyrics.contains('no lyrics available')) {
+      return -9999;
+    }
+
     // Strip timestamps for script analysis
-    final cleanLyrics = lyrics.replaceAll(RegExp(r'\[\d+:\d+\.?\d*\]'), '');
+    final cleanLyrics = lyrics.replaceAll(RegExp(r'\[\d+:\d+\.?\d*\]'), '').trim();
+    if (cleanLyrics.length < 4) return -9999;
+
     final script = detectScript(cleanLyrics, minCount: 8);
 
     final trackName = (candidate['trackName'] as String? ?? '').toLowerCase();
     final albumName = (candidate['albumName'] as String? ?? '').toLowerCase();
+    final cArtist = candidate['artistName'] as String? ?? '';
     final metaLang = detectLanguage('$albumName $trackName');
 
     final tLang = targetLang?.toLowerCase().trim();
@@ -294,32 +354,46 @@ class CanonicalSongDedup {
       score -= 100;
     }
 
-    // 4. Artist match
-    final cArtist = candidate['artistName'] as String? ?? '';
+    // 4. Strict Artist match (penalize confirmed mismatch to prevent false positives)
     if (targetArtist.isNotEmpty && cArtist.isNotEmpty) {
       final tTokens = tokenize(cleanArtist(targetArtist));
       final cTokens = tokenize(cleanArtist(cArtist));
       if (tTokens.intersection(cTokens).isNotEmpty) {
-        score += 150;
+        score += 180;
       } else if (tTokens.isNotEmpty) {
-        score -= 150;
+        score -= 350; // Heavy penalty: prevents songs by different artists passing on generic titles
       }
     }
 
-    // 5. Duration match
+    // 5. Context Keywords (Movie / Album / Secondary Artists from video title)
+    if (contextKeywords != null && contextKeywords.isNotEmpty) {
+      final candMeta = '$trackName $albumName $cArtist'.toLowerCase();
+      for (final kw in contextKeywords) {
+        final cleanKw = kw.toLowerCase().trim();
+        if (cleanKw.length > 2 && candMeta.contains(cleanKw)) {
+          score += 150;
+          break;
+        }
+      }
+    }
+
+    // 6. Duration match with strict boundaries
     final cDur = (candidate['duration'] as num?)?.toDouble() ?? 0.0;
     if (targetDuration != null && targetDuration > 0 && cDur > 0) {
       final diff = (cDur - targetDuration).abs();
-      if (diff <= 5) {
-        score += 100;
-      } else if (diff <= 12) {
-        score += 50;
-      } else if (diff > 35) {
-        score -= 200;
+      final ratio = diff / targetDuration;
+      if (diff <= 4) {
+        score += 120;
+      } else if (diff <= 10) {
+        score += 60;
+      } else if (diff > 25 || ratio > 0.15) {
+        score -= 300; // Large discrepancy
+      } else if (diff > 45 || ratio > 0.25) {
+        score -= 600; // Completely different song length
       }
     }
 
-    // 6. Synced lyrics preference
+    // 7. Synced lyrics preference
     if (synced != null && synced.trim().isNotEmpty) {
       score += 50;
     }

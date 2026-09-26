@@ -71,6 +71,10 @@ class MusicService extends ChangeNotifier {
   int _shuffleHistoryPointer = -1;
   bool _isGeneratingQueue = false;
 
+  // Multi-artist playlist recommendation state
+  List<String> _seedPlaylistArtists = [];
+  int _playlistArtistRecommendationOffset = 0;
+
   String? _cachedLyrics;
   String? _cachedLyricsSongId;
   bool _isFetchingLyrics = false;
@@ -179,8 +183,14 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final cleanTitle = _cleanSongTitle(song.title);
-      final cleanArtist = _cleanArtistName(song.author);
+      final songCtx = CanonicalSongDedup.extractSongContext(song.title, song.author);
+      final cleanTitle = (songCtx['title'] as String?)?.isNotEmpty == true
+          ? songCtx['title'] as String
+          : _cleanSongTitle(song.title);
+      final cleanArtist = (songCtx['artist'] as String?)?.isNotEmpty == true
+          ? songCtx['artist'] as String
+          : _cleanArtistName(song.author);
+      final contextKeywords = (songCtx['contextKeywords'] as List<String>?) ?? [];
       final durationSec = song.duration?.inSeconds;
 
       // High-precision language detection:
@@ -254,7 +264,7 @@ class MusicService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // Tier 3: Direct lrclib.net fallback with client-side script & language validation
+      // Tier 3: Direct lrclib.net fallback with client-side script, context & language validation
       final safeHeaders = {'Accept': 'application/json'};
       final List<dynamic> candidatePool = [];
 
@@ -270,7 +280,19 @@ class MusicService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // 3B: Clean Title + Clean Artist search
+      // 3B: Clean Title + Context Keyword search (e.g. movie/album name like "Devara")
+      if (cleanTitle.isNotEmpty && contextKeywords.isNotEmpty) {
+        try {
+          final urlCtx = Uri.parse('https://lrclib.net/api/search?q=${Uri.encodeComponent("$cleanTitle ${contextKeywords.first}")}');
+          final resCtx = await http.get(urlCtx, headers: safeHeaders).timeout(const Duration(seconds: 5));
+          if (resCtx.statusCode == 200) {
+            final list = json.decode(resCtx.body);
+            if (list is List) candidatePool.addAll(list);
+          }
+        } catch (_) {}
+      }
+
+      // 3C: Clean Title + Clean Artist search
       if (cleanTitle.isNotEmpty && cleanArtist.isNotEmpty) {
         try {
           final url1 = Uri.parse('https://lrclib.net/api/search?q=${Uri.encodeComponent("$cleanTitle $cleanArtist")}');
@@ -282,7 +304,7 @@ class MusicService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // 3C: Title-only search
+      // 3D: Title-only search
       if (cleanTitle.isNotEmpty) {
         try {
           final url2 = Uri.parse('https://lrclib.net/api/search?track_name=${Uri.encodeComponent(cleanTitle)}');
@@ -294,10 +316,10 @@ class MusicService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // Score all candidates through CanonicalSongDedup to eliminate cross-language dubs
+      // Score all candidates through CanonicalSongDedup with context keywords & strict filtering
       final seenIds = <dynamic>{};
       Map<String, dynamic>? bestCandidate;
-      int bestScore = 99; // Minimum threshold 100
+      int bestScore = 120; // Strict minimum threshold
 
       for (final item in candidatePool) {
         if (item is! Map) continue;
@@ -312,6 +334,7 @@ class MusicService extends ChangeNotifier {
           targetArtist: cleanArtist,
           targetDuration: durationSec,
           candidate: map,
+          contextKeywords: contextKeywords,
         );
 
         if (score > bestScore) {
@@ -1028,6 +1051,9 @@ class MusicService extends ChangeNotifier {
     _currentIndex = startIndex;
     if (_currentIndex < 0 || _currentIndex >= _playlist.length) _currentIndex = 0;
     
+    _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
+    _playlistArtistRecommendationOffset = 0;
+
     // Proactively pre-warm upcoming tracks in background so instant rapid skips never buffer!
     _prewarmUpcomingTracks(_currentIndex, count: 4);
 
@@ -1117,6 +1143,8 @@ class MusicService extends ChangeNotifier {
     _currentIndex = _likedSongs.indexWhere((item) => item['id'] == songData['id']);
     if (_currentIndex == -1) _currentIndex = 0;
     if (_playlist.isNotEmpty) {
+      _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
+      _playlistArtistRecommendationOffset = 0;
       _prewarmUpcomingTracks(_currentIndex, count: 4);
       await playSong(_playlist[_currentIndex], updateQueue: false);
     }
@@ -1631,13 +1659,18 @@ class MusicService extends ChangeNotifier {
   Future<void> playPlaylist(List<Video> playlist, int index) async {
     _playlist = List.from(playlist);
     _currentIndex = index;
+    _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
+    _playlistArtistRecommendationOffset = 0;
     if (_currentIndex >= 0 && _currentIndex < _playlist.length) {
       await playSong(_playlist[_currentIndex], updateQueue: false);
     }
   }
 
   void _checkAndPreloadNextQueue() {
-    // When 5 or fewer songs remain after current playing song, silently load next 20 songs
+    // When repeat mode is on (all or one), do not append recommendations to the queue
+    if (_loopMode == LoopMode.all || _loopMode == LoopMode.one) return;
+
+    // When 5 or fewer songs remain after current playing song, silently load next recommendations
     if ((_playlist.length - (_currentIndex + 1)) <= 5 && _currentSong != null) {
       final seedSong = _playlist.isNotEmpty ? _playlist.last : _currentSong!;
       _fetchNextRecommendations(seedSong);
@@ -1715,6 +1748,15 @@ class MusicService extends ChangeNotifier {
       }
     }
 
+    if (_loopMode == LoopMode.all && _playlist.isNotEmpty) {
+      _currentIndex = 0;
+      final nextTrack = _playlist[_currentIndex];
+      await playSong(nextTrack, updateQueue: false, isCrossfade: isCrossfade);
+      _prewarmUpcomingTracks(_currentIndex + 1, count: 3);
+      _checkAndPreloadNextQueue();
+      return;
+    }
+
     if (_currentSong != null) {
       debugPrint('[Queue] End of queue reached. Fetching next recommendations…');
       _isLoading = true;
@@ -1727,12 +1769,6 @@ class MusicService extends ChangeNotifier {
         if (prevSong != null) {
           reportTrackFinished(prevSong.id.value, nextTrack.id.value);
         }
-        await playSong(nextTrack, updateQueue: false, isCrossfade: isCrossfade);
-        _prewarmUpcomingTracks(_currentIndex + 1, count: 3);
-        _checkAndPreloadNextQueue();
-      } else if (_loopMode == LoopMode.all && _playlist.isNotEmpty) {
-        _currentIndex = 0;
-        final nextTrack = _playlist[_currentIndex];
         await playSong(nextTrack, updateQueue: false, isCrossfade: isCrossfade);
         _prewarmUpcomingTracks(_currentIndex + 1, count: 3);
         _checkAndPreloadNextQueue();
@@ -1911,6 +1947,8 @@ class MusicService extends ChangeNotifier {
       } else {
         _playlist = [song];
         _currentIndex = 0;
+        _seedPlaylistArtists = [];
+        _playlistArtistRecommendationOffset = 0;
         _generate50SongProgressiveQueue(song);
       }
     }
@@ -2436,6 +2474,119 @@ class MusicService extends ChangeNotifier {
     return libraryTracks;
   }
 
+  List<Video> _getLibraryRecommendationsForArtists(List<String> artists, {String? targetLang}) {
+    if (artists.isEmpty) return [];
+    final libraryTracks = <Video>[];
+    final seen = <String>{};
+    for (final s in _playlist) {
+      seen.add(s.id.value);
+      seen.add(CanonicalSongDedup.cleanTitle(s.title));
+    }
+
+    final allLibrarySongs = <Map<String, dynamic>>[];
+    for (final pl in _customPlaylists) {
+      final songs = (pl['songs'] as List<dynamic>?) ?? [];
+      for (final s in songs) {
+        if (s is Map<String, dynamic>) {
+          allLibrarySongs.add(s);
+        }
+      }
+    }
+    for (final s in _likedSongs) {
+      allLibrarySongs.add(Map<String, dynamic>.from(s));
+    }
+
+    if (allLibrarySongs.isEmpty) return [];
+
+    Video toVideo(Map<String, dynamic> item) {
+      final id = (item['id'] as String?) ?? '';
+      return Video(
+        VideoId(id),
+        (item['title'] as String?) ?? 'Unknown Title',
+        (item['author'] as String?) ?? 'Unknown Artist',
+        ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+        DateTime.now(),
+        '',
+        null,
+        '',
+        null,
+        ThumbnailSet(id),
+        null,
+        Engagement(0, null, null),
+        false,
+      );
+    }
+
+    final artistBuckets = <String, List<Video>>{};
+    for (final a in artists) {
+      artistBuckets[a] = [];
+    }
+
+    final random = Random();
+    final shuffledLibrary = List<Map<String, dynamic>>.from(allLibrarySongs)..shuffle(random);
+
+    for (final item in shuffledLibrary) {
+      final id = (item['id'] as String?) ?? '';
+      final title = (item['title'] as String?) ?? '';
+      final author = (item['author'] as String?) ?? '';
+      final cleanT = CanonicalSongDedup.cleanTitle(title);
+      if (seen.contains(id) || seen.contains(cleanT)) continue;
+
+      if (targetLang != null && !CanonicalSongDedup.isLanguageCompatible(targetLang, title)) {
+        continue;
+      }
+
+      final cleanA = CanonicalSongDedup.cleanArtist(author);
+      for (final targetArtist in artists) {
+        if (cleanA == targetArtist || cleanA.contains(targetArtist) || targetArtist.contains(cleanA)) {
+          seen.add(id);
+          seen.add(cleanT);
+          artistBuckets[targetArtist]?.add(toVideo(item));
+          break;
+        }
+      }
+    }
+
+    // Interleave tracks round-robin across artist buckets
+    int maxBucketLen = 0;
+    for (final list in artistBuckets.values) {
+      if (list.length > maxBucketLen) maxBucketLen = list.length;
+    }
+    for (int i = 0; i < maxBucketLen; i++) {
+      for (final targetArtist in artists) {
+        final bucket = artistBuckets[targetArtist];
+        if (bucket != null && i < bucket.length) {
+          libraryTracks.add(bucket[i]);
+        }
+      }
+    }
+
+    return libraryTracks;
+  }
+
+  List<String> _extractArtistsFromSongs(List<Video> songs) {
+    final Map<String, int> frequency = {};
+    for (final song in songs) {
+      final parts = song.author.split(RegExp(r'[,;&/]|(?:\b(?:feat\.?|ft\.?)\b)', caseSensitive: false));
+      for (final rawPart in parts) {
+        final cleaned = CanonicalSongDedup.cleanArtist(rawPart);
+        if (cleaned.isNotEmpty && cleaned.length >= 2) {
+          frequency[cleaned] = (frequency[cleaned] ?? 0) + 1;
+        }
+      }
+    }
+    final sorted = frequency.keys.toList()
+      ..sort((a, b) => frequency[b]!.compareTo(frequency[a]!));
+    return sorted;
+  }
+
+  List<String> _getEffectivePlaylistArtists() {
+    if (_seedPlaylistArtists.isNotEmpty) {
+      return List<String>.from(_seedPlaylistArtists);
+    }
+    return _extractArtistsFromSongs(_playlist);
+  }
+
   Future<void> _generate50SongProgressiveQueue(Video seed) async {
     if (_isGeneratingQueue) return;
     _isGeneratingQueue = true;
@@ -2554,44 +2705,108 @@ class MusicService extends ChangeNotifier {
     if (_isFetchingNextQueue) return;
     _isFetchingNextQueue = true;
     try {
-      debugPrint('[Queue] Fetching chained recommendations for ${song.title}…');
-      final songLang = CanonicalSongDedup.detectLanguage(song.title);
-      final cleanArtist = CanonicalSongDedup.cleanArtist(song.author);
+      debugPrint('[Queue] Fetching chained recommendations across playlist artists…');
+
+      // 1. Detect dominant language across the active playlist (fallback to seed song)
+      final langCounts = <String, int>{};
+      for (final s in _playlist) {
+        final l = CanonicalSongDedup.detectLanguage(s.title);
+        if (l != null) langCounts[l] = (langCounts[l] ?? 0) + 1;
+      }
+      final dominantLang = langCounts.isNotEmpty
+          ? langCounts.entries.reduce((a, b) => a.value >= b.value ? a : b).key
+          : CanonicalSongDedup.detectLanguage(song.title);
+
+      // 2. Extract distinct artists from the active playlist
+      final allPlaylistArtists = _getEffectivePlaylistArtists();
       List<Video> candidates = [];
 
-      // 1. Primary: Library tracks from matching artist / taste matrix
-      final libraryMatches = _getLibraryRecommendationsForSeed(song);
-      candidates.addAll(libraryMatches);
+      if (allPlaylistArtists.length > 1) {
+        // Multi-artist playlist: Fetch popular hit songs from all/multiple artists in the playlist
+        // Select up to 6 distinct artists per batch, rotating across batches so all artists get recommended
+        final int batchSize = min(6, allPlaylistArtists.length);
+        final selectedArtists = <String>[];
+        for (int i = 0; i < batchSize; i++) {
+          final idx = (_playlistArtistRecommendationOffset + i) % allPlaylistArtists.length;
+          selectedArtists.add(allPlaylistArtists[idx]);
+        }
+        _playlistArtistRecommendationOffset = (_playlistArtistRecommendationOffset + batchSize) % allPlaylistArtists.length;
 
-      // 2. Secondary: JioSaavn Studio catalog query if library yielded < 10
-      if (candidates.length < 10) {
-        final query = cleanArtist.isNotEmpty
-            ? (songLang != null ? '$cleanArtist $songLang hits' : '$cleanArtist hits')
-            : (songLang != null ? '$songLang top songs' : 'Top Hits 2026');
-        final jioResults = await http
-            .get(ApiConfig.jioSearchUri(query, limit: 15))
-            .timeout(const Duration(seconds: 4))
-            .then((res) => _parseJioResults(res.body))
-            .catchError((_) => <Video>[]);
-        candidates.addAll(jioResults);
+        debugPrint('[Queue] Blending popular recommendations from artists: ${selectedArtists.join(', ')} (Language: $dominantLang)');
+
+        // Step A: Pull matching tracks directly from user's 12k imported library for all selected artists
+        final libraryMatches = _getLibraryRecommendationsForArtists(selectedArtists, targetLang: dominantLang);
+        candidates.addAll(libraryMatches);
+
+        // Step B: Query JioSaavn concurrently for popular studio hits for each selected artist
+        final artistQueries = selectedArtists.map((artist) {
+          final query = dominantLang != null ? '$artist $dominantLang hits' : '$artist hits';
+          return http
+              .get(ApiConfig.jioSearchUri(query, limit: 8))
+              .timeout(const Duration(seconds: 4))
+              .then((res) => _parseJioResults(res.body))
+              .catchError((_) => <Video>[]);
+        }).toList();
+
+        final artistTrackLists = await Future.wait(artistQueries);
+
+        // Round-robin interleave results so the queue contains an even mix of all playlist artists
+        int maxLen = 0;
+        for (final list in artistTrackLists) {
+          if (list.length > maxLen) maxLen = list.length;
+        }
+        for (int i = 0; i < maxLen; i++) {
+          for (final list in artistTrackLists) {
+            if (i < list.length) {
+              candidates.add(list[i]);
+            }
+          }
+        }
+      } else {
+        // Single-artist or single-track playback: Standard artist query
+        final cleanArtist = allPlaylistArtists.isNotEmpty
+            ? allPlaylistArtists.first
+            : CanonicalSongDedup.cleanArtist(song.author);
+
+        // 1. Primary: Library tracks from matching artist / taste matrix
+        final libraryMatches = _getLibraryRecommendationsForSeed(song);
+        candidates.addAll(libraryMatches);
+
+        // 2. Secondary: JioSaavn Studio catalog query if library yielded < 10
+        if (candidates.length < 10) {
+          final query = cleanArtist.isNotEmpty
+              ? (dominantLang != null ? '$cleanArtist $dominantLang hits' : '$cleanArtist hits')
+              : (dominantLang != null ? '$dominantLang top songs' : 'Top Hits 2026');
+          final jioResults = await http
+              .get(ApiConfig.jioSearchUri(query, limit: 15))
+              .timeout(const Duration(seconds: 4))
+              .then((res) => _parseJioResults(res.body))
+              .catchError((_) => <Video>[]);
+          candidates.addAll(jioResults);
+        }
       }
 
       // 3. Fallback: YouTube Music Radio automix only if still empty
       if (candidates.isEmpty && song.id.value.length == 11) {
         candidates = await YouTubeMusicClient().fetchRadioTracks(song.id.value, limit: 15);
       }
+      if (candidates.isEmpty) {
+        final fallbackQuery = dominantLang != null ? '$dominantLang top hit songs' : 'Top Hits 2026';
+        candidates = await YouTubeMusicClient().searchSongs(fallbackQuery, limit: 15);
+      }
 
       // Filter for genuine songs and language compatibility
       final valid = candidates.where((c) =>
           CanonicalSongDedup.isGenuineSong(c) &&
-          CanonicalSongDedup.isLanguageCompatible(songLang, c.title)
+          (dominantLang == null || CanonicalSongDedup.isLanguageCompatible(dominantLang, c.title))
       ).toList();
 
       final fresh = CanonicalSongDedup.deduplicateList(_playlist, valid);
       if (fresh.isNotEmpty) {
         final balanced = CanonicalSongDedup.balanceArtistDistribution(fresh);
-        _playlist.addAll(balanced.take(10));
-        debugPrint('[Queue] Appended ${balanced.length} chained tracks. Total in queue: ${_playlist.length}');
+        final tracksToAdd = balanced.take(15).toList();
+        _playlist.addAll(tracksToAdd);
+        debugPrint('[Queue] Appended ${tracksToAdd.length} multi-artist recommended tracks. Total in queue: ${_playlist.length}');
         notifyListeners();
       }
     } catch (e) {
