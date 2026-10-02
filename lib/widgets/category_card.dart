@@ -33,6 +33,10 @@ class _CategoryCardState extends State<CategoryCard> {
   Widget build(BuildContext context) {
     final scale = _isPressed ? 0.96 : (_isHovered ? 1.025 : 1.0);
 
+    final solidColor = widget.colors.isNotEmpty
+        ? widget.colors.first
+        : const Color(0xFF8E2DE2);
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
@@ -51,19 +55,17 @@ class _CategoryCardState extends State<CategoryCard> {
           curve: Curves.easeOutCubic,
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF161622),
+              color: solidColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: _isHovered
-                    ? Colors.white.withValues(alpha: 0.24)
-                    : Colors.white.withValues(alpha: 0.10),
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : Colors.white.withValues(alpha: 0.14),
                 width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: _isHovered ? 0.45 : 0.25,
-                  ),
+                  color: solidColor.withValues(alpha: _isHovered ? 0.45 : 0.28),
                   blurRadius: _isHovered ? 16 : 8,
                   offset: Offset(0, _isHovered ? 6 : 3),
                 ),
@@ -98,7 +100,7 @@ class _CategoryCardState extends State<CategoryCard> {
                           widget.icon,
                           size: 78,
                           color: Colors.white.withValues(
-                            alpha: _isHovered ? 0.14 : 0.08,
+                            alpha: _isHovered ? 0.24 : 0.16,
                           ),
                         ),
                       ),

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/album_color_deriver.dart';
 import '../services/lyrics_transliteration_service.dart';
+import '../services/music_service.dart';
 import '../services/preferences_service.dart';
 import '../services/screen_wake_service.dart';
 
@@ -23,6 +25,7 @@ class AnimatedLyrics extends StatefulWidget {
   final String? songArtist;
   final Stream<Duration> positionStream;
   final void Function(Duration)? onSeek;
+  final Color? highlightColor;
 
   const AnimatedLyrics({
     super.key,
@@ -33,6 +36,7 @@ class AnimatedLyrics extends StatefulWidget {
     this.songArtist,
     required this.positionStream,
     this.onSeek,
+    this.highlightColor,
   });
 
   @override
@@ -373,6 +377,9 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
     required Color themeColor,
   }) {
     final isSelected = _displayMode == mode;
+    final isThemeLight = themeColor.computeLuminance() > 0.6;
+    final selectedTextColor = isThemeLight ? Colors.black87 : Colors.white;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -407,7 +414,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
             Icon(
               icon,
               size: 13,
-              color: isSelected ? Colors.white : Colors.white70,
+              color: isSelected ? selectedTextColor : Colors.white70,
             ),
             const SizedBox(width: 5),
             Text(
@@ -415,7 +422,7 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? Colors.white : Colors.white70,
+                color: isSelected ? selectedTextColor : Colors.white70,
                 letterSpacing: 0.2,
               ),
             ),
@@ -616,7 +623,11 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
       );
     }
 
-    final themeColor = Theme.of(context).primaryColor;
+    final themeColor =
+        widget.highlightColor ??
+        AlbumColorDeriver.resolveLyricHighlightColor(
+          MusicService().dominantColor,
+        );
 
     // Unsynced Lyrics View
     if (!_isSynced) {

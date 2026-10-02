@@ -103,4 +103,58 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Outer page navigation keeps Artists tab and Artists content in sync',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final pageController = PageController(initialPage: 1);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PageView(
+              controller: pageController,
+              children: const [
+                SizedBox(key: Key('home_page'), child: Text('Home')),
+                SearchScreen(),
+                SizedBox(key: Key('library_page'), child: Text('Library')),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to Artists tab
+      final artistsTab = find.widgetWithText(InkWell, 'Artists');
+      expect(artistsTab, findsOneWidget);
+      await tester.tap(artistsTab);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Featured Artists'), findsOneWidget);
+      expect(find.text('Browse Categories'), findsNothing);
+
+      // Navigate to Home tab in outer PageView
+      pageController.jumpToPage(0);
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+
+      // Navigate back to Search tab
+      pageController.jumpToPage(1);
+      await tester.pumpAndSettle();
+
+      // Check what is displayed
+      debugPrint(
+        'Found Featured Artists: ${find.text('Featured Artists').evaluate().length}',
+      );
+      debugPrint(
+        'Found Browse Categories: ${find.text('Browse Categories').evaluate().length}',
+      );
+      expect(find.text('Featured Artists'), findsOneWidget);
+      expect(find.text('Browse Categories'), findsNothing);
+    },
+  );
 }

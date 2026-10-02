@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -196,8 +197,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                           },
                           onShuffle: () {
                             HapticFeedback.lightImpact();
-                            _musicService.toggleShuffle();
-                            _musicService.playDownloadedSong(downloaded.first);
+                            _musicService.setShuffle(true);
+                            final randomIndex = Random().nextInt(
+                              downloaded.length,
+                            );
+                            _musicService.playDownloadedSong(
+                              downloaded[randomIndex],
+                            );
                           },
                         );
                       }
@@ -390,8 +396,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                           },
                           onShuffle: () {
                             HapticFeedback.lightImpact();
-                            _musicService.toggleShuffle();
-                            _musicService.playLikedSong(liked.first);
+                            _musicService.setShuffle(true);
+                            final randomIndex = Random().nextInt(liked.length);
+                            _musicService.playLikedSong(liked[randomIndex]);
                           },
                         );
                       }
@@ -552,35 +559,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.add_circle_outline_rounded,
-                                      color: Colors.white70,
-                                      size: 20,
-                                    ),
-                                    tooltip: 'New Playlist',
-                                    onPressed: _showCreatePlaylistDialog,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.queue_music_rounded,
-                                      color: Color(0xFF1DB954),
-                                      size: 20,
-                                    ),
-                                    tooltip: 'Import from Spotify',
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const SpotifyImportScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                                tooltip: 'New Playlist',
+                                onPressed: _showCreatePlaylistDialog,
                               ),
                             ],
                           ),
@@ -663,43 +649,37 @@ class _LibraryScreenState extends State<LibraryScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(
-                                Icons.edit_outlined,
-                                color: Colors.white54,
-                                size: 20,
-                              ),
-                              tooltip: 'Rename playlist',
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                _showRenamePlaylistDialog(id, name);
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.white54,
-                                size: 22,
-                              ),
-                              tooltip: 'Delete playlist',
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                _showDeletePlaylistDialog(id, name);
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
+                              key: ValueKey('playlist_play_$id'),
                               icon: const Icon(
                                 Icons.play_circle_fill_rounded,
                                 color: Colors.white,
                                 size: 36,
                               ),
-
+                              tooltip: 'Play playlist',
                               onPressed: songs.isEmpty
                                   ? null
                                   : () {
                                       HapticFeedback.lightImpact();
                                       _musicService.playCustomPlaylist(id, 0);
                                     },
+                            ),
+                            IconButton(
+                              key: ValueKey('playlist_options_$id'),
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                color: Colors.white70,
+                                size: 22,
+                              ),
+                              tooltip: 'Playlist options',
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _showPlaylistOptionsSheet(
+                                  id: id,
+                                  name: name,
+                                  songCount: songs.length,
+                                  firstThumbnail: firstThumbnail,
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -856,6 +836,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     required VoidCallback onPlayAll,
     required VoidCallback onShuffle,
   }) {
+    final isShuffle = _musicService.isShuffle;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -888,20 +869,27 @@ class _LibraryScreenState extends State<LibraryScreen>
           const SizedBox(width: 12),
           Expanded(
             child: OutlinedButton.icon(
-              icon: const Icon(
+              icon: Icon(
                 Icons.shuffle_rounded,
-                color: Colors.white70,
+                color: isShuffle ? const Color(0xFF1DB954) : Colors.white70,
                 size: 18,
               ),
-              label: const Text(
+              label: Text(
                 'Shuffle',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: isShuffle ? const Color(0xFF1DB954) : Colors.white70,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                backgroundColor: isShuffle
+                    ? const Color(0xFF1DB954).withValues(alpha: 0.12)
+                    : null,
+                side: BorderSide(
+                  color: isShuffle
+                      ? const Color(0xFF1DB954).withValues(alpha: 0.6)
+                      : Colors.white.withValues(alpha: 0.2),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -970,6 +958,284 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _showPlaylistOptionsSheet({
+    required String id,
+    required String name,
+    required int songCount,
+    String? firstThumbnail,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Material(
+          color: const Color(0xFF14141E),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.only(top: 12, bottom: 28),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Pill Handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Playlist Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: _prefs.themeColor.withValues(alpha: 0.16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child:
+                                firstThumbnail != null &&
+                                    firstThumbnail.isNotEmpty
+                                ? Image.network(
+                                    firstThumbnail,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Icon(
+                                      Icons.queue_music_rounded,
+                                      color: _prefs.themeColor.withValues(
+                                        alpha: 0.85,
+                                      ),
+                                      size: 24,
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.queue_music_rounded,
+                                    color: _prefs.themeColor.withValues(
+                                      alpha: 0.85,
+                                    ),
+                                    size: 24,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '$songCount ${songCount == 1 ? "track" : "tracks"}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.55),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    height: 1,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Action: Play Playlist
+                  if (songCount > 0) ...[
+                    ListTile(
+                      key: const ValueKey('option_play_playlist'),
+                      leading: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      title: const Text(
+                        'Play Playlist',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Start playback from the first track',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.45),
+                          fontSize: 12,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        HapticFeedback.lightImpact();
+                        _musicService.playCustomPlaylist(id, 0);
+                      },
+                    ),
+                    ListTile(
+                      key: const ValueKey('option_shuffle_playlist'),
+                      leading: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF1DB954,
+                          ).withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.shuffle_rounded,
+                          color: Color(0xFF1DB954),
+                          size: 20,
+                        ),
+                      ),
+                      title: const Text(
+                        'Shuffle Playlist',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Play tracks in randomized order',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.45),
+                          fontSize: 12,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        HapticFeedback.lightImpact();
+                        _musicService.playCustomPlaylistWithShuffle(id);
+                      },
+                    ),
+                  ],
+
+                  // Action: Rename Playlist
+                  ListTile(
+                    key: const ValueKey('option_rename_playlist'),
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text(
+                      'Rename Playlist',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Change playlist title',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                      _showRenamePlaylistDialog(id, name);
+                    },
+                  ),
+
+                  // Action: Delete Playlist
+                  ListTile(
+                    key: const ValueKey('option_delete_playlist'),
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text(
+                      'Delete Playlist',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Permanently delete this playlist',
+                      style: TextStyle(
+                        color: Colors.redAccent.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                      _showDeletePlaylistDialog(id, name);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

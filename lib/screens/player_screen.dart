@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -1215,6 +1216,60 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
             ),
 
+            // Immersive Full-Screen Blurred Artwork & Ambient Glow (Active in Lyrics Mode)
+            Positioned.fill(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 380),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _showLyrics
+                    ? IgnorePointer(
+                        key: const ValueKey('lyrics_blur_backdrop'),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // Scaled Album Artwork as ambient color texture
+                            Image.network(
+                              MusicService.getHdThumbnail(shownSong.id.value),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Image.network(
+                                shownSong.thumbnails.highResUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) =>
+                                    Container(color: dominantColor),
+                              ),
+                            ),
+                            // Frosted glass blur filter
+                            BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+                              child: Container(
+                                color: Colors.black.withValues(alpha: 0.58),
+                              ),
+                            ),
+                            // Vignette gradient overlay for text readability
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    dominantColor.withValues(alpha: 0.28),
+                                    Colors.black.withValues(alpha: 0.45),
+                                    Colors.black.withValues(alpha: 0.88),
+                                  ],
+                                  stops: const [0.0, 0.45, 1.0],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(
+                        key: ValueKey('normal_player_backdrop'),
+                      ),
+              ),
+            ),
+
             // 2. Main Player Content
             ResponsiveWrapper(
               maxWidth: 680,
@@ -1306,8 +1361,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                     ignoring: _showLyrics,
                                     child: AnimatedOpacity(
                                       duration: const Duration(
-                                        milliseconds: 250,
+                                        milliseconds: 300,
                                       ),
+                                      curve: Curves.easeInOut,
                                       opacity: _showLyrics ? 0.0 : 1.0,
                                       child: NotificationListener<ScrollNotification>(
                                         onNotification: (notification) {
@@ -1535,63 +1591,59 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                     ),
                                   ),
 
-                                  // Layer 2: Synced / Animated Lyrics Overlay (Parallel Layer)
+                                  // Layer 2: Synced / Animated Lyrics Overlay (Parallel Layer, Boxless Floating)
                                   IgnorePointer(
                                     ignoring: !_showLyrics,
                                     child: AnimatedOpacity(
                                       duration: const Duration(
-                                        milliseconds: 250,
+                                        milliseconds: 300,
                                       ),
+                                      curve: Curves.easeInOut,
                                       opacity: _showLyrics ? 1.0 : 0.0,
-                                      child: Container(
+                                      child: SizedBox(
                                         width: double.infinity,
                                         height: constraints.maxHeight,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 20,
-                                          vertical: 16,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.35,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                            24,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white10,
-                                          ),
-                                        ),
-                                        child: _musicService.isFetchingLyrics
-                                            ? Center(
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      color: Theme.of(
-                                                        context,
-                                                      ).primaryColor,
-                                                    ),
-                                              )
-                                            : AnimatedLyrics(
-                                                key: ValueKey(
-                                                  'lyrics_${song.id.value}',
+                                          child: _musicService.isFetchingLyrics
+                                              ? Center(
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Theme.of(
+                                                          context,
+                                                        ).primaryColor,
+                                                      ),
+                                                )
+                                              : AnimatedLyrics(
+                                                  key: ValueKey(
+                                                    'lyrics_${song.id.value}',
+                                                  ),
+                                                  rawLyrics:
+                                                      _musicService
+                                                          .cachedLyrics ??
+                                                      '',
+                                                  pronunciationLyrics: _musicService
+                                                      .cachedPronunciationLyrics,
+                                                  songLanguage: _musicService
+                                                      .currentSongLanguage,
+                                                  songTitle: song.title,
+                                                  songArtist: song.author,
+                                                  positionStream: _musicService
+                                                      .positionStream,
+                                                  onSeek: (targetPosition) {
+                                                    _musicService.seek(
+                                                      targetPosition,
+                                                    );
+                                                  },
+                                                  highlightColor:
+                                                      AlbumColorDeriver.resolveLyricHighlightColor(
+                                                        dominantColor,
+                                                      ),
                                                 ),
-                                                rawLyrics:
-                                                    _musicService
-                                                        .cachedLyrics ??
-                                                    '',
-                                                pronunciationLyrics: _musicService
-                                                    .cachedPronunciationLyrics,
-                                                songLanguage: _musicService
-                                                    .currentSongLanguage,
-                                                songTitle: song.title,
-                                                songArtist: song.author,
-                                                positionStream: _musicService
-                                                    .positionStream,
-                                                onSeek: (targetPosition) {
-                                                  _musicService.seek(
-                                                    targetPosition,
-                                                  );
-                                                },
-                                              ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1699,42 +1751,69 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ],
                       ),
 
-                      const SizedBox(height: 12),
+                      // Apple Music Style Shorter Scrubber (smoothly removed in lyrics mode to expand lyrics canvas)
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          return SizeTransition(
+                            sizeFactor: animation,
+                            alignment: Alignment.topCenter,
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: !_showLyrics
+                            ? Column(
+                                key: const ValueKey('player_scrubber_section'),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    child: RepaintBoundary(
+                                      child: StreamBuilder<Duration>(
+                                        stream: _musicService.positionStream,
+                                        builder: (context, snapshot) {
+                                          final position =
+                                              snapshot.data ?? Duration.zero;
+                                          final duration =
+                                              _musicService.duration ??
+                                              (song.duration ?? Duration.zero);
 
-                      // Apple Music Style Shorter Scrubber (with generous horizontal padding)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: RepaintBoundary(
-                          child: StreamBuilder<Duration>(
-                            stream: _musicService.positionStream,
-                            builder: (context, snapshot) {
-                              final position = snapshot.data ?? Duration.zero;
-                              final duration =
-                                  _musicService.duration ??
-                                  (song.duration ?? Duration.zero);
+                                          if (_prefs.scrubberStyle ==
+                                              ScrubberStyle.classic) {
+                                            return _buildClassicScrubber(
+                                              context,
+                                              position,
+                                              duration,
+                                              vibrantColor,
+                                            );
+                                          }
 
-                              if (_prefs.scrubberStyle ==
-                                  ScrubberStyle.classic) {
-                                return _buildClassicScrubber(
-                                  context,
-                                  position,
-                                  duration,
-                                  vibrantColor,
-                                );
-                              }
-
-                              return WaveformScrubber(
-                                position: position,
-                                duration: duration,
-                                songId: song.id.value,
-                                accentColor: vibrantColor,
-                                onSeek: (newPos) {
-                                  _musicService.seek(newPos);
-                                },
-                              );
-                            },
-                          ),
-                        ),
+                                          return WaveformScrubber(
+                                            position: position,
+                                            duration: duration,
+                                            songId: song.id.value,
+                                            accentColor: vibrantColor,
+                                            onSeek: (newPos) {
+                                              _musicService.seek(newPos);
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey('player_scrubber_collapsed'),
+                              ),
                       ),
 
                       const SizedBox(height: 8),
@@ -2738,6 +2817,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         context,
                         song,
                         vibrantColor,
+                        dominantColor,
                       ),
                     ),
                   ),
@@ -2763,6 +2843,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     BuildContext context,
     Video song,
     Color vibrantColor,
+    Color dominantColor,
   ) {
     if (_landscapeTab == LandscapeActiveTab.lyrics) {
       if (_musicService.isFetchingLyrics) {
@@ -2788,6 +2869,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           songArtist: song.author,
           positionStream: _musicService.positionStream,
           onSeek: (pos) => _musicService.seek(pos),
+          highlightColor: AlbumColorDeriver.resolveLyricHighlightColor(
+            dominantColor,
+          ),
         ),
       );
     }

@@ -24,7 +24,7 @@ class _SearchScreenState extends State<SearchScreen>
   final PreferencesService _prefs = PreferencesService();
   final DynamicArtistService _artistService = DynamicArtistService();
   int _browseTabIndex = 0;
-  final PageController _browsePageController = PageController();
+  late PageController _browsePageController;
 
   @override
   bool get wantKeepAlive => true;
@@ -126,6 +126,7 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void initState() {
     super.initState();
+    _browsePageController = PageController(initialPage: _browseTabIndex);
     _prefs.addListener(_onPrefsChanged);
     _musicService.addListener(_onPrefsChanged);
     _searchController.addListener(_onSearchChanged);
@@ -280,6 +281,20 @@ class _SearchScreenState extends State<SearchScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final history = _prefs.searchHistory;
+
+    if (_browsePageController.hasClients) {
+      final currentPage = _browsePageController.page?.round();
+      if (currentPage != null && currentPage != _browseTabIndex) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _browsePageController.hasClients) {
+            final cur = _browsePageController.page?.round();
+            if (cur != null && cur != _browseTabIndex) {
+              _browsePageController.jumpToPage(_browseTabIndex);
+            }
+          }
+        });
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0F),
@@ -715,6 +730,7 @@ class _SearchScreenState extends State<SearchScreen>
                         // Swappable Grid with PageView matching MainScreen switching animation
                         Expanded(
                           child: PageView(
+                            key: const PageStorageKey('browse_tabs_page_view'),
                             controller: _browsePageController,
                             physics: const ClampingScrollPhysics(),
                             onPageChanged: (index) {
@@ -765,14 +781,7 @@ class _SearchScreenState extends State<SearchScreen>
                 child: Container(
                   margin: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        primaryColor.withValues(alpha: 0.32),
-                        primaryColor.withValues(alpha: 0.18),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: primaryColor.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: primaryColor.withValues(alpha: 0.65),
@@ -780,8 +789,8 @@ class _SearchScreenState extends State<SearchScreen>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.30),
-                        blurRadius: 12,
+                        color: primaryColor.withValues(alpha: 0.25),
+                        blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -830,14 +839,19 @@ class _SearchScreenState extends State<SearchScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          if (_browseTabIndex != index) {
+          final isOutOfSync =
+              _browsePageController.hasClients &&
+              _browsePageController.page?.round() != index;
+          if (_browseTabIndex != index || isOutOfSync) {
             HapticFeedback.lightImpact();
             setState(() => _browseTabIndex = index);
-            _browsePageController.animateToPage(
-              index,
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-            );
+            if (_browsePageController.hasClients) {
+              _browsePageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+              );
+            }
           }
         },
         child: Center(

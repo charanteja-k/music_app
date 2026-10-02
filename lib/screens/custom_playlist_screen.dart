@@ -238,49 +238,123 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
               // Action Buttons & Playlist Stats Header
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                   child: Row(
                     children: [
-                      Text(
-                        '${songs.length} ${songs.length == 1 ? "track" : "tracks"} • Drag handle to reorder',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${songs.length} ${songs.length == 1 ? "track" : "tracks"}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (songs.length > 1) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Drag handle to reorder',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      const Spacer(),
                       if (songs.isNotEmpty) ...[
                         ElevatedButton.icon(
+                          key: const ValueKey('playlist_play_all_button'),
                           icon: const Icon(
                             Icons.play_arrow_rounded,
                             color: Colors.black,
-                            size: 22,
+                            size: 20,
                           ),
                           label: const Text(
-                            'Play',
+                            'Play All',
                             style: TextStyle(
                               color: Colors.black,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              fontSize: 13.5,
+                              letterSpacing: -0.2,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
+                              horizontal: 14,
                               vertical: 9,
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            elevation: 4,
+                            elevation: 3,
                           ),
                           onPressed: () {
                             HapticFeedback.mediumImpact();
                             _musicService.playCustomPlaylist(
                               widget.playlistId,
                               0,
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          key: const ValueKey('playlist_shuffle_button'),
+                          icon: Icon(
+                            Icons.shuffle_rounded,
+                            color: _musicService.isShuffle
+                                ? const Color(0xFF1DB954)
+                                : Colors.white,
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Shuffle',
+                            style: TextStyle(
+                              color: _musicService.isShuffle
+                                  ? const Color(0xFF1DB954)
+                                  : Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _musicService.isShuffle
+                                ? const Color(
+                                    0xFF1DB954,
+                                  ).withValues(alpha: 0.18)
+                                : Colors.white.withValues(alpha: 0.12),
+                            side: BorderSide(
+                              color: _musicService.isShuffle
+                                  ? const Color(
+                                      0xFF1DB954,
+                                    ).withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.20),
+                              width: 1.2,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 9,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            _musicService.playCustomPlaylistWithShuffle(
+                              widget.playlistId,
                             );
                           },
                         ),
@@ -490,12 +564,12 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                           _musicService.currentSong?.id.value == songId;
                       final thumb = song['thumbnail'] as String? ?? '';
 
-                      return Container(
+                      return SizedBox(
                         height: 72.0,
-                        color: isCurrent
-                            ? themeColor.withValues(alpha: 0.12)
-                            : Colors.transparent,
                         child: ListTile(
+                          tileColor: isCurrent
+                              ? themeColor.withValues(alpha: 0.12)
+                              : Colors.transparent,
                           dense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -1060,12 +1134,12 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                               songId,
                             );
                           },
-                          child: Container(
+                          child: SizedBox(
                             height: 72.0,
-                            color: isCurrent
-                                ? themeColor.withValues(alpha: 0.12)
-                                : Colors.transparent,
                             child: ListTile(
+                              tileColor: isCurrent
+                                  ? themeColor.withValues(alpha: 0.12)
+                                  : Colors.transparent,
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,

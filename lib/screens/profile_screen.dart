@@ -769,22 +769,35 @@ class ProfileScreen extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.shuffle_rounded,
-                            color: Colors.white70,
+                            color: music.isShuffle
+                                ? const Color(0xFF1DB954)
+                                : Colors.white70,
                             size: 18,
                           ),
-                          label: const Text(
+                          label: Text(
                             'Shuffle',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: music.isShuffle
+                                  ? const Color(0xFF1DB954)
+                                  : Colors.white70,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
+                            backgroundColor: music.isShuffle
+                                ? const Color(
+                                    0xFF1DB954,
+                                  ).withValues(alpha: 0.12)
+                                : null,
                             side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: music.isShuffle
+                                  ? const Color(
+                                      0xFF1DB954,
+                                    ).withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.2),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -793,6 +806,7 @@ class ProfileScreen extends StatelessWidget {
                           ),
                           onPressed: () {
                             HapticFeedback.lightImpact();
+                            music.setShuffle(true);
                             final shuffled = List<Map<String, dynamic>>.from(
                               prefs.mostPlayedSongs,
                             )..shuffle();

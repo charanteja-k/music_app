@@ -100,4 +100,42 @@ class AlbumColorDeriver {
   static void clearCache() {
     _cache.clear();
   }
+
+  /// Evaluates whether a color is black or perceptually indistinguishable from black on dark surfaces.
+  static bool isBlackOrCloseToBlack(Color color) {
+    final r = (color.r * 255).round();
+    final g = (color.g * 255).round();
+    final b = (color.b * 255).round();
+
+    // 1. All RGB channels are under the near-black floor (~18% brightness)
+    if (r < 48 && g < 48 && b < 48) return true;
+
+    final luminance = color.computeLuminance();
+    final hsl = HSLColor.fromColor(color);
+
+    // 2. Extremely low photometric luminance (< 0.035) with low/medium saturation
+    if (luminance < 0.035 && hsl.saturation < 0.40) return true;
+
+    // 3. Low lightness with muted saturation (dark charcoal / murky gray)
+    if (hsl.lightness < 0.16 && hsl.saturation < 0.25) return true;
+
+    return false;
+  }
+
+  /// Computes the active lyric highlight color respecting the album cover.
+  /// If the dominant color is black or close to black, uses [Colors.white].
+  /// If the color is colored but dark, ensures it has enough lightness (>= 0.55)
+  /// so it radiates legibly with its native hue on the dark player background.
+  static Color resolveLyricHighlightColor(Color dominantColor) {
+    if (isBlackOrCloseToBlack(dominantColor)) {
+      return Colors.white;
+    }
+
+    final hsl = HSLColor.fromColor(dominantColor);
+    if (hsl.lightness < 0.45) {
+      return hsl.withLightness(0.55).toColor();
+    }
+
+    return dominantColor;
+  }
 }

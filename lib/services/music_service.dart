@@ -191,6 +191,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   List<Map<String, String>> get likedSongs => _likedSongs;
   List<Map<String, dynamic>> get customPlaylists => _customPlaylists;
   AudioPlayer get audioPlayer => _activePlayer;
+  AudioPlayer get standbyPlayer => _standbyPlayer;
   AudioPlayer get _audioPlayer => _activePlayer;
   bool get isCrossfading => _isCrossfading;
   ActiveStreamInfo _activeStreamInfo = ActiveStreamInfo.standard;
@@ -1632,11 +1633,20 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> playCustomPlaylist(String playlistId, int startIndex) async {
-    final playlist = _customPlaylists.firstWhere(
-      (p) => p['id'] == playlistId,
-      orElse: () => <String, dynamic>{},
-    );
+  Future<void> playCustomPlaylist(
+    String playlistId,
+    int startIndex, {
+    bool? enableShuffle,
+  }) async {
+    final Map<String, dynamic> playlist;
+    if (playlistId == 'liked') {
+      playlist = {'id': 'liked', 'name': 'Liked Songs', 'songs': _likedSongs};
+    } else {
+      playlist = _customPlaylists.firstWhere(
+        (p) => p['id'] == playlistId,
+        orElse: () => <String, dynamic>{},
+      );
+    }
     if (playlist.isEmpty) return;
 
     final songs = List<Map<String, dynamic>>.from(playlist['songs'] ?? []);
@@ -1652,10 +1662,24 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
+    VideoId safeVideoId(String rawId) {
+      if (rawId.length == 11) {
+        try {
+          return VideoId(rawId);
+        } catch (_) {}
+      }
+      final padded = rawId.padRight(11, '0').substring(0, 11);
+      try {
+        return VideoId(padded);
+      } catch (_) {
+        return VideoId('00000000000');
+      }
+    }
+
     _playlist = songs
         .map(
           (item) => Video(
-            VideoId((item['id'] as String?) ?? ''),
+            safeVideoId((item['id'] as String?) ?? ''),
             (item['title'] as String?) ?? 'Unknown Title',
             (item['author'] as String?) ?? 'Unknown Artist',
             ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
@@ -1677,6 +1701,22 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       _currentIndex = 0;
     }
 
+    if (enableShuffle != null) {
+      _isShuffle = enableShuffle;
+      if (!kIsWeb) {
+        _audioPlayer.setShuffleModeEnabled(_isShuffle);
+      }
+    }
+
+    if (_isShuffle) {
+      _shuffleHistory.clear();
+      _shuffleHistory.add(_currentIndex);
+      _shuffleHistoryPointer = 0;
+    } else {
+      _shuffleHistory.clear();
+      _shuffleHistoryPointer = -1;
+    }
+
     _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
     _playlistArtistRecommendationOffset = 0;
 
@@ -1684,6 +1724,25 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     _prewarmUpcomingTracks(_currentIndex, count: 4);
 
     await playSong(_playlist[_currentIndex], updateQueue: false);
+  }
+
+  Future<void> playCustomPlaylistWithShuffle(String playlistId) async {
+    final Map<String, dynamic> playlist;
+    if (playlistId == 'liked') {
+      playlist = {'id': 'liked', 'name': 'Liked Songs', 'songs': _likedSongs};
+    } else {
+      playlist = _customPlaylists.firstWhere(
+        (p) => p['id'] == playlistId,
+        orElse: () => <String, dynamic>{},
+      );
+    }
+    if (playlist.isEmpty) return;
+
+    final songs = List<Map<String, dynamic>>.from(playlist['songs'] ?? []);
+    if (songs.isEmpty) return;
+
+    final randomIndex = Random().nextInt(songs.length);
+    await playCustomPlaylist(playlistId, randomIndex, enableShuffle: true);
   }
 
   void _prewarmUpcomingTracks(int fromIndex, {int count = 3}) {
@@ -1796,6 +1855,14 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     );
     if (_currentIndex == -1) _currentIndex = 0;
     if (_playlist.isNotEmpty) {
+      if (_isShuffle) {
+        _shuffleHistory.clear();
+        _shuffleHistory.add(_currentIndex);
+        _shuffleHistoryPointer = 0;
+      } else {
+        _shuffleHistory.clear();
+        _shuffleHistoryPointer = -1;
+      }
       _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
       _playlistArtistRecommendationOffset = 0;
       _prewarmUpcomingTracks(_currentIndex, count: 4);
@@ -1811,6 +1878,21 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
+    _shuffleHistory.clear();
+    _shuffleHistoryPointer = -1;
+    if (_isShuffle && _currentIndex >= 0 && _currentIndex < _playlist.length) {
+      _shuffleHistory.add(_currentIndex);
+      _shuffleHistoryPointer = 0;
+    }
+    if (!kIsWeb) {
+      _audioPlayer.setShuffleModeEnabled(_isShuffle);
+    }
+    notifyListeners();
+  }
+
+  void setShuffle(bool enabled) {
+    if (_isShuffle == enabled) return;
+    _isShuffle = enabled;
     _shuffleHistory.clear();
     _shuffleHistoryPointer = -1;
     if (_isShuffle && _currentIndex >= 0 && _currentIndex < _playlist.length) {
@@ -2673,24 +2755,49 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           _shuffleHistoryPointer++;
           _currentIndex = _shuffleHistory[_shuffleHistoryPointer];
         } else {
-          // Select next song avoiding consecutive artist repetition
+          // Select next song avoiding consecutive artist repetition and preferring unplayed songs
           final random = Random();
           final currentArtist = _currentSong != null
               ? CanonicalSongDedup.cleanArtist(_currentSong!.author)
               : '';
 
-          final candidateIndices = <int>[];
+          final playedSet = _shuffleHistory.toSet();
+          final unplayedDiffArtist = <int>[];
+          final unplayedSameArtist = <int>[];
+          final cycleDiffArtist = <int>[];
+          final cycleSameArtist = <int>[];
+
           for (int i = 0; i < _playlist.length; i++) {
             if (i == _currentIndex) continue;
             final artist = CanonicalSongDedup.cleanArtist(_playlist[i].author);
-            if (currentArtist.isEmpty || artist != currentArtist) {
-              candidateIndices.add(i);
+            final isDiffArtist =
+                currentArtist.isEmpty || artist != currentArtist;
+            if (!playedSet.contains(i)) {
+              if (isDiffArtist) {
+                unplayedDiffArtist.add(i);
+              } else {
+                unplayedSameArtist.add(i);
+              }
+            } else {
+              if (isDiffArtist) {
+                cycleDiffArtist.add(i);
+              } else {
+                cycleSameArtist.add(i);
+              }
             }
           }
 
           int nextIdx;
-          if (candidateIndices.isNotEmpty) {
-            nextIdx = candidateIndices[random.nextInt(candidateIndices.length)];
+          if (unplayedDiffArtist.isNotEmpty) {
+            nextIdx =
+                unplayedDiffArtist[random.nextInt(unplayedDiffArtist.length)];
+          } else if (unplayedSameArtist.isNotEmpty) {
+            nextIdx =
+                unplayedSameArtist[random.nextInt(unplayedSameArtist.length)];
+          } else if (cycleDiffArtist.isNotEmpty) {
+            nextIdx = cycleDiffArtist[random.nextInt(cycleDiffArtist.length)];
+          } else if (cycleSameArtist.isNotEmpty) {
+            nextIdx = cycleSameArtist[random.nextInt(cycleSameArtist.length)];
           } else {
             nextIdx =
                 (random.nextInt(_playlist.length - 1) + _currentIndex + 1) %
@@ -4735,6 +4842,14 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     );
     if (_currentIndex == -1) _currentIndex = 0;
     if (_playlist.isNotEmpty) {
+      if (_isShuffle) {
+        _shuffleHistory.clear();
+        _shuffleHistory.add(_currentIndex);
+        _shuffleHistoryPointer = 0;
+      } else {
+        _shuffleHistory.clear();
+        _shuffleHistoryPointer = -1;
+      }
       await playSong(_playlist[_currentIndex], updateQueue: false);
     }
   }
