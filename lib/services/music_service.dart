@@ -164,6 +164,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   List<String> _seedPlaylistArtists = [];
   int _playlistArtistRecommendationOffset = 0;
 
+  // Continuous playback resilience & circuit breaker state
+  int _consecutivePlaybackFailures = 0;
+  static const int _maxPlaybackFailures = 5;
+  bool _isHandlingPlaybackFailure = false;
+
   String? _cachedLyrics;
   String? _cachedLyricsSongId;
   String? _cachedPronunciationLyrics;
@@ -236,7 +241,6 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Duration? get duration {
-    if (_isLoading) return _currentSong?.duration;
     if (kIsWeb) {
       final d = WebPlayerBridge.currentDuration;
       if (d > Duration.zero) return d;
@@ -245,6 +249,54 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     final d = _activePlayer.duration;
     if (d != null && d > Duration.zero) return d;
     return _savedDuration ?? _currentSong?.duration;
+  }
+
+  Video _cloneVideoWithDuration(Video song, Duration dur) {
+    return Video(
+      song.id,
+      song.title,
+      song.author,
+      song.channelId,
+      song.uploadDate,
+      song.uploadDateRaw,
+      song.publishDate,
+      song.description,
+      dur,
+      song.thumbnails,
+      song.keywords,
+      song.engagement,
+      song.isLive,
+    );
+  }
+
+  void _updateResolvedDuration(Duration? resolvedDur, {String? targetVideoId}) {
+    if (resolvedDur != null && resolvedDur > Duration.zero) {
+      if (targetVideoId != null && _currentSong?.id.value != targetVideoId) {
+        return;
+      }
+      final changed =
+          _savedDuration != resolvedDur ||
+          (_currentSong != null && _currentSong!.duration != resolvedDur);
+      _savedDuration = resolvedDur;
+      if (_currentSong != null && _currentSong!.duration != resolvedDur) {
+        _currentSong = _cloneVideoWithDuration(_currentSong!, resolvedDur);
+      }
+      if (_currentIndex >= 0 &&
+          _currentIndex < _playlist.length &&
+          _playlist[_currentIndex].id.value == _currentSong?.id.value) {
+        if (_playlist[_currentIndex].duration != resolvedDur) {
+          _playlist[_currentIndex] = _cloneVideoWithDuration(
+            _playlist[_currentIndex],
+            resolvedDur,
+          );
+        }
+      }
+      _durationBroadcaster.add(resolvedDur);
+      _positionBroadcaster.add(position);
+      if (changed) {
+        notifyListeners();
+      }
+    }
   }
 
   Stream<Duration> get positionStream => _positionBroadcaster.stream;
@@ -803,6 +855,48 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _handleAutoAdvanceOnFailure({String? reason}) {
+    if (_isHandlingPlaybackFailure) return;
+    _isHandlingPlaybackFailure = true;
+    _consecutivePlaybackFailures++;
+    debugPrint(
+      '[ContinuousPlayback] Playback failure ($reason). Failures: $_consecutivePlaybackFailures/$_maxPlaybackFailures',
+    );
+
+    if (_consecutivePlaybackFailures >= _maxPlaybackFailures) {
+      debugPrint(
+        '[ContinuousPlayback] Maximum consecutive playback failures reached ($_maxPlaybackFailures). Halting queue.',
+      );
+      _isLoading = false;
+      _isTransitioning = false;
+      _isCrossfading = false;
+      _isHandlingPlaybackFailure = false;
+      notifyListeners();
+      return;
+    }
+
+    Future.delayed(const Duration(milliseconds: 400), () async {
+      try {
+        if (_consecutivePlaybackFailures == 0) {
+          // Playback recovered or user triggered manual playback
+          return;
+        }
+        if (_playlist.isNotEmpty) {
+          debugPrint(
+            '[ContinuousPlayback] Auto-advancing to next playable track in queue…',
+          );
+          await nextSong();
+        }
+      } catch (e) {
+        debugPrint(
+          '[ContinuousPlayback] Error during auto-advance on failure: $e',
+        );
+      } finally {
+        _isHandlingPlaybackFailure = false;
+      }
+    });
+  }
+
   void _initAudioPlayer() {
     if (!kIsWeb && Platform.isAndroid) {
       _equalizerA = AndroidEqualizer();
@@ -828,9 +922,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       });
       WebPlayerBridge.durationStream.listen((dur) {
         _durationBroadcaster.add(dur);
+        _updateResolvedDuration(dur);
       });
       WebPlayerBridge.onTrackEnded.listen((_) async {
-        if (_isTransitioning || _isCrossfading || _isLoading) return;
+        if (_isTransitioning) return;
         _isTransitioning = true;
         try {
           if (_loopMode == LoopMode.one && _currentSong != null) {
@@ -855,6 +950,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           }
         } catch (e) {
           debugPrint('[WebPlayer] Completion error: $e');
+          _handleAutoAdvanceOnFailure(reason: 'Web completion error: $e');
         } finally {
           _isTransitioning = false;
         }
@@ -866,10 +962,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         debugPrint('[WebPlayer] Error $code encountered. Handling recovery…');
         _isLoading = false;
         notifyListeners();
-        if (_playlist.length > 1 && _currentIndex + 1 < _playlist.length) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          await nextSong();
-        }
+        _handleAutoAdvanceOnFailure(reason: 'Web player error code $code');
       });
 
       PreferencesService.onEqualizerChanged =
@@ -878,6 +971,19 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           };
     } else {
       for (final player in [_playerA, _playerB]) {
+        player.playbackEventStream.listen(
+          (event) {},
+          onError: (Object error, StackTrace stackTrace) {
+            if (identical(player, _activePlayer)) {
+              debugPrint(
+                '[AudioPlayer] Playback stream error on active deck: $error',
+              );
+              _handleAutoAdvanceOnFailure(
+                reason: 'Native player playback error: $error',
+              );
+            }
+          },
+        );
         player.positionStream.listen((pos) {
           if (identical(player, _activePlayer)) {
             _positionBroadcaster.add(pos);
@@ -886,6 +992,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         player.durationStream.listen((dur) {
           if (identical(player, _activePlayer)) {
             _durationBroadcaster.add(dur);
+            _updateResolvedDuration(dur);
           }
         });
         player.playerStateStream.listen((state) async {
@@ -894,19 +1001,18 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
             _syncWidgetPlayback();
           }
           if (state.processingState == ProcessingState.completed) {
-            if (_isTransitioning ||
-                _isCrossfading ||
-                _isLoading ||
-                !identical(player, _activePlayer)) {
+            if (_isTransitioning || !identical(player, _activePlayer)) {
               return;
             }
             final currentPos = player.position;
             final currentDur = player.duration;
-            if (currentDur != null &&
-                currentDur.inSeconds > 5 &&
-                (currentDur - currentPos).inSeconds > 4) {
+            // Guard against startup/reset transient completion glitches where
+            // the decoder momentarily reports completed at position 0:00 before playback begins.
+            if (currentPos < const Duration(seconds: 1) &&
+                (currentDur == null ||
+                    currentDur > const Duration(seconds: 5))) {
               debugPrint(
-                '[AudioPlayer] Ignoring spurious completion event at ${currentPos.inSeconds}s / ${currentDur.inSeconds}s',
+                '[AudioPlayer] Ignoring startup transient completion event at $currentPos',
               );
               return;
             }
@@ -940,6 +1046,9 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               }
             } catch (e) {
               debugPrint('[AudioPlayer] Error handling song completion: $e');
+              _handleAutoAdvanceOnFailure(
+                reason: 'Native completion handling error: $e',
+              );
             } finally {
               _isTransitioning = false;
             }
@@ -1081,9 +1190,9 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         try {
           await incomingPlayer.setVolume(1.0);
         } catch (_) {}
-        _isCrossfading = false;
         debugPrint('[Crossfade] Native crossfade completed successfully.');
       }
+      _isCrossfading = false;
     }
   }
 
@@ -1887,8 +1996,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void seekRelative(Duration offset) {
+    if (_currentSong == null) return;
     final current = position;
-    final target = current + offset;
+    final max = duration ?? current;
+    var target = current + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > max) target = max;
     seek(target);
   }
 
@@ -2022,8 +2135,9 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           artist: author,
         );
         final album = item['album'] as String? ?? '';
-        final durationSec = item['duration'] != null
-            ? int.tryParse(item['duration'].toString())
+        final rawDur = item['duration'] ?? item['more_info']?['duration'];
+        final durationSec = rawDur != null
+            ? int.tryParse(rawDur.toString())
             : null;
         final duration = durationSec != null
             ? Duration(seconds: durationSec)
@@ -2322,6 +2436,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     String? ytmVideoId;
     final isJioSynthetic =
         seed.id.value.endsWith('000') ||
+        seed.id.value.endsWith('00') ||
         _webStreamUrls.containsKey(seed.id.value) ||
         !CanonicalSongDedup.isLikelyYouTubeId(seed.id.value);
 
@@ -2503,8 +2618,9 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               final videoId = item['id'] as String;
               final title = item['title'] as String? ?? 'Unknown Title';
               final author = item['author'] as String? ?? 'Unknown Artist';
-              final durationSec = item['duration'] != null
-                  ? int.tryParse(item['duration'].toString())
+              final rawDur = item['duration'] ?? item['more_info']?['duration'];
+              final durationSec = rawDur != null
+                  ? int.tryParse(rawDur.toString())
                   : null;
               final duration = durationSec != null
                   ? Duration(seconds: durationSec)
@@ -2980,6 +3096,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _stopPlayback() {
+    _consecutivePlaybackFailures = 0;
+    _isHandlingPlaybackFailure = false;
     persistPlaybackSession(force: true);
     if (kIsWeb) {
       WebPlayerBridge.pause();
@@ -2994,6 +3112,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> playPlaylist(List<Video> playlist, int index) async {
+    _consecutivePlaybackFailures = 0;
+    _isHandlingPlaybackFailure = false;
     _playlist = List.from(playlist);
     _currentIndex = index;
     _seedPlaylistArtists = _extractArtistsFromSongs(_playlist);
@@ -3006,6 +3126,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   /// Starts an instant smart radio seeded by [song], resetting the queue and
   /// populating a 50-song progressive queue scored by TasteMatrixScorer.
   Future<void> startSongRadio(Video song) async {
+    _consecutivePlaybackFailures = 0;
+    _isHandlingPlaybackFailure = false;
     _playlist = [song];
     _currentIndex = 0;
     _seedPlaylistArtists = [];
@@ -3120,6 +3242,19 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       if (_currentIndex + 1 < _playlist.length) {
         final prevSong = _currentSong;
         _currentIndex++;
+        final nextTrack = _playlist[_currentIndex];
+        if (prevSong != null) {
+          reportTrackFinished(prevSong.id.value, nextTrack.id.value);
+        }
+        await playSong(nextTrack, updateQueue: false, isCrossfade: isCrossfade);
+        _prewarmUpcomingTracks(_currentIndex + 1, count: 3);
+        _checkAndPreloadNextQueue();
+      } else if (_playlist.isNotEmpty) {
+        debugPrint(
+          '[Queue] Recommendations unavailable. Looping back to first track in queue…',
+        );
+        final prevSong = _currentSong;
+        _currentIndex = 0;
         final nextTrack = _playlist[_currentIndex];
         if (prevSong != null) {
           reportTrackFinished(prevSong.id.value, nextTrack.id.value);
@@ -3611,10 +3746,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     bool isCrossfade = false,
   }) async {
     _savedPosition = null;
-    _savedDuration = null;
+    _savedDuration = (song.duration != null && song.duration! > Duration.zero)
+        ? song.duration
+        : null;
     _positionBroadcaster.add(Duration.zero);
-    if (song.duration != null && song.duration! > Duration.zero) {
-      _durationBroadcaster.add(song.duration);
+    if (_savedDuration != null) {
+      _durationBroadcaster.add(_savedDuration);
     }
 
     if (!isCrossfade) {
@@ -3651,6 +3788,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     _hasRepeatedOnce = false;
 
     if (updateQueue) {
+      _consecutivePlaybackFailures = 0;
+      _isHandlingPlaybackFailure = false;
       final existingIndex = _playlist.indexWhere((item) => item.id == song.id);
       if (existingIndex != -1) {
         _currentIndex = existingIndex;
@@ -3778,9 +3917,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
             debugPrint(
               '[Play] Playing locally downloaded file: ${localFile.path}',
             );
-            await targetPlayer.setAudioSource(
+            final resolvedDur = await targetPlayer.setAudioSource(
               AudioSource.uri(Uri.file(localFile.path), tag: mediaItem),
             );
+            _updateResolvedDuration(resolvedDur, targetVideoId: song.id.value);
+            _consecutivePlaybackFailures = 0;
             if (isCrossfade) {
               await _startDualDeckCrossfade();
             } else {
@@ -3809,7 +3950,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       if (kIsWeb) {
         final directStreamUrl = _webStreamUrls[song.id.value] ?? '';
         String webVideoId = song.id.value;
-        final isSyntheticId = !CanonicalSongDedup.isLikelyYouTubeId(webVideoId);
+        final isSyntheticId =
+            webVideoId.endsWith('000') ||
+            webVideoId.endsWith('00') ||
+            _webStreamUrls.containsKey(webVideoId) ||
+            !CanonicalSongDedup.isLikelyYouTubeId(webVideoId);
 
         // If direct stream URL is empty, resolve genuine YouTube ID for web fallback
         if (directStreamUrl.isEmpty) {
@@ -3921,9 +4066,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         });
         try {
           if (_currentSong?.id.value != song.id.value) return;
-          await targetPlayer.setAudioSource(
+          final resolvedDur = await targetPlayer.setAudioSource(
             AudioSource.uri(Uri.parse(adaptedStreamUrl), tag: mediaItem),
           );
+          _updateResolvedDuration(resolvedDur, targetVideoId: song.id.value);
+          _consecutivePlaybackFailures = 0;
           if (_currentSong?.id.value != song.id.value) return;
           if (isCrossfade) {
             await _startDualDeckCrossfade();
@@ -4069,9 +4216,13 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
             // 1. First attempt: Direct native AudioSource.uri (fastest, progressive hardware decoding)
             try {
-              await targetPlayer.setAudioSource(
+              final resolvedDur = await targetPlayer.setAudioSource(
                 AudioSource.uri(Uri.parse(candidate.url), tag: mediaItem),
                 preload: true,
+              );
+              _updateResolvedDuration(
+                resolvedDur,
+                targetVideoId: song.id.value,
               );
               playbackSourceSet = true;
               recordActiveCandidate(candidate);
@@ -4092,7 +4243,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
                 if (await cacheFile.exists() && await cacheFile.length() == 0) {
                   await cacheFile.delete();
                 }
-                await targetPlayer.setAudioSource(
+                final resolvedDur = await targetPlayer.setAudioSource(
                   // ignore: experimental_member_use
                   LockCachingAudioSource(
                     Uri.parse(candidate.url),
@@ -4100,6 +4251,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
                     tag: mediaItem,
                   ),
                   preload: true,
+                );
+                _updateResolvedDuration(
+                  resolvedDur,
+                  targetVideoId: song.id.value,
                 );
                 playbackSourceSet = true;
                 recordActiveCandidate(candidate);
@@ -4134,10 +4289,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           debugPrint(
             '[Play] Fallback 1: Setting audio source to Cloudflare edge stream: $cfStreamUri',
           );
-          await targetPlayer.setAudioSource(
+          final resolvedDur = await targetPlayer.setAudioSource(
             AudioSource.uri(cfStreamUri, tag: mediaItem),
             preload: true,
           );
+          _updateResolvedDuration(resolvedDur, targetVideoId: song.id.value);
           playbackSourceSet = true;
         } catch (cfError) {
           debugPrint('[Play] Cloudflare edge stream error: $cfError');
@@ -4153,7 +4309,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           final backendUrl = await _fetchStreamUrl(song.id.value);
           if (_currentSong?.id.value != song.id.value) return;
           if (backendUrl != null) {
-            await targetPlayer.setAudioSource(
+            final resolvedDur = await targetPlayer.setAudioSource(
               AudioSource.uri(
                 Uri.parse(backendUrl),
                 headers: _ytHeaders,
@@ -4161,6 +4317,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               ),
               preload: true,
             );
+            _updateResolvedDuration(resolvedDur, targetVideoId: song.id.value);
             playbackSourceSet = true;
           }
         } catch (backendUrlError) {
@@ -4177,10 +4334,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           '[Play] Fallback 3: Setting audio source to proxy: $proxyUri',
         );
         try {
-          await targetPlayer.setAudioSource(
+          final resolvedDur = await targetPlayer.setAudioSource(
             AudioSource.uri(proxyUri, tag: mediaItem),
             preload: true,
           );
+          _updateResolvedDuration(resolvedDur, targetVideoId: song.id.value);
           playbackSourceSet = true;
         } catch (proxyError) {
           debugPrint('[Play] Proxy error: $proxyError');
@@ -4191,15 +4349,19 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
       if (!playbackSourceSet) {
         debugPrint(
-          '[Play] Could not resolve audio source for "${song.title}".',
+          '[Play] Could not resolve audio source for "${song.title}". Auto-advancing…',
         );
         _isLoading = false;
         _isCrossfading = false;
         notifyListeners();
+        _handleAutoAdvanceOnFailure(
+          reason: 'Could not resolve audio source for "${song.title}"',
+        );
         return;
       }
 
       debugPrint('[Play] Starting playback…');
+      _consecutivePlaybackFailures = 0;
       if (!kIsWeb && isCrossfade) {
         await _startDualDeckCrossfade();
       } else {
@@ -4227,6 +4389,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
       debugPrint('[Play] Error playing song: $e\n$st');
+      _handleAutoAdvanceOnFailure(reason: 'Exception playing song: $e');
     } finally {
       if (_currentSong?.id.value == song.id.value) {
         _isLoading = false;
@@ -5529,9 +5692,29 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     _currentSong = null;
     _playlist.clear();
     _currentIndex = 0;
+    _consecutivePlaybackFailures = 0;
+    _isHandlingPlaybackFailure = false;
     _savedPosition = null;
     _savedDuration = null;
     _lastSessionSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  @visibleForTesting
+  int get consecutivePlaybackFailures => _consecutivePlaybackFailures;
+
+  @visibleForTesting
+  void handleAutoAdvanceOnFailureForTesting({String? reason}) {
+    _handleAutoAdvanceOnFailure(reason: reason);
+  }
+
+  @visibleForTesting
+  void updateResolvedDurationForTesting(Duration dur, {String? targetVideoId}) {
+    _updateResolvedDuration(dur, targetVideoId: targetVideoId);
+  }
+
+  @visibleForTesting
+  void setIsLoadingForTesting(bool value) {
+    _isLoading = value;
   }
 
   void _syncWidgetPlayback() {

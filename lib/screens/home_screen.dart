@@ -1139,17 +1139,19 @@ class _HomeScreenState extends State<HomeScreen>
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              if (album.artwork.isNotEmpty)
-                                Image.network(
-                                  album.artwork,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: 320,
-                                  cacheHeight: 320,
-                                  errorBuilder: (_, _, _) =>
-                                      _buildAlbumFallbackCover(album),
-                                )
-                              else
-                                _buildAlbumFallbackCover(album),
+                              Hero(
+                                tag: 'album-art-${album.id}',
+                                child: album.artwork.isNotEmpty
+                                    ? Image.network(
+                                        album.artwork,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 320,
+                                        cacheHeight: 320,
+                                        errorBuilder: (_, _, _) =>
+                                            _buildAlbumFallbackCover(album),
+                                      )
+                                    : _buildAlbumFallbackCover(album),
+                              ),
                               // Song count pill badge
                               Positioned(
                                 top: 8,

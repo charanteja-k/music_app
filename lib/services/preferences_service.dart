@@ -224,6 +224,9 @@ class PreferencesService extends ChangeNotifier {
   // Search History
   List<String> _searchHistory = [];
 
+  // Followed Artists (100% offline, zero cloud tracking)
+  final Set<String> _followedArtists = {};
+
   // Listening History
   List<Map<String, String>> _listeningHistory = [];
 
@@ -340,6 +343,13 @@ class PreferencesService extends ChangeNotifier {
     _customServerUrl = _prefs.getString('customServerUrl') ?? '';
     _cloudflareWorkerUrl = _prefs.getString('cloudflareWorkerUrl') ?? '';
     _searchHistory = _prefs.getStringList('searchHistory') ?? [];
+    final followedList = _prefs.getStringList('followedArtists') ?? [];
+    _followedArtists.clear();
+    _followedArtists.addAll(
+      followedList
+          .map((e) => e.trim().toLowerCase())
+          .where((e) => e.isNotEmpty),
+    );
     _mostPlayedArtist = _prefs.getString('mostPlayedArtist') ?? '';
     _userName = _prefs.getString('userName') ?? '';
     _hasPromptedName = _prefs.getBool('hasPromptedName') ?? false;
@@ -699,6 +709,30 @@ class PreferencesService extends ChangeNotifier {
     );
     if (_mostPlayedArtist.isNotEmpty) {
       await _prefs.setString('mostPlayedArtist', _mostPlayedArtist);
+    }
+    notifyListeners();
+  }
+
+  /// Set of followed artist canonical names (lowercase)
+  Set<String> get followedArtists => Set.unmodifiable(_followedArtists);
+
+  /// Checks if an artist is marked as followed
+  bool isArtistFollowed(String artistName) {
+    final clean = CanonicalSongDedup.cleanArtist(artistName).toLowerCase();
+    return _followedArtists.contains(clean);
+  }
+
+  /// Toggles follow status for an artist with offline SharedPreferences persistence
+  Future<void> toggleFollowArtist(String artistName) async {
+    final clean = CanonicalSongDedup.cleanArtist(artistName).toLowerCase();
+    if (clean.isEmpty) return;
+    if (_followedArtists.contains(clean)) {
+      _followedArtists.remove(clean);
+    } else {
+      _followedArtists.add(clean);
+    }
+    if (_isInitialized) {
+      await _prefs.setStringList('followedArtists', _followedArtists.toList());
     }
     notifyListeners();
   }

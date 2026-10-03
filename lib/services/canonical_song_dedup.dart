@@ -942,9 +942,11 @@ class CanonicalSongDedup {
   }
 
   /// Validates whether an ID string is a genuine 11-character YouTube video ID.
-  /// Purely numeric 11-character IDs or non-11 char IDs are synthetic IDs (e.g. from JioSaavn catalogs).
+  /// Purely numeric 11-character IDs, IDs padded with synthetic trailing zeros
+  /// (from JioSaavn catalogs), or non-11 char IDs are synthetic IDs.
   static bool isLikelyYouTubeId(String id) {
     if (id.length != 11) return false;
+    if (id.endsWith('000') || id.endsWith('00')) return false;
     if (RegExp(r'^\d{11}$').hasMatch(id)) return false;
     return RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(id);
   }

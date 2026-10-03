@@ -18,6 +18,8 @@ import '../widgets/bug_report_button.dart';
 import '../services/bug_report_service.dart';
 import '../services/screen_wake_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import '../widgets/dilse_tooltip.dart';
+import 'artist_profile_screen.dart';
 
 enum LandscapeActiveTab { none, lyrics, queue, more }
 
@@ -1633,17 +1635,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 Row(
                                   children: [
                                     Flexible(
-                                      child: Text(
-                                        song.author,
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.7,
+                                      child: DilSeTooltip(
+                                        message: 'View ${song.author} profile',
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    ArtistProfileScreen(
+                                                      artistName: song.author,
+                                                    ),
+                                              ),
+                                            );
+                                          },
+                                          child: Text(
+                                            song.author,
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.7,
+                                              ),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                              decorationColor: Colors.white24,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -1706,12 +1728,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: RepaintBoundary(
                           child: StreamBuilder<Duration>(
+                            initialData: _musicService.position,
                             stream: _musicService.positionStream,
                             builder: (context, snapshot) {
-                              final position = snapshot.data ?? Duration.zero;
+                              final position =
+                                  snapshot.data ?? _musicService.position;
                               final duration =
                                   _musicService.duration ??
-                                  (song.duration ?? Duration.zero);
+                                  (shownSong.duration ??
+                                      song.duration ??
+                                      Duration.zero);
 
                               if (_prefs.scrubberStyle ==
                                   ScrubberStyle.classic) {
@@ -2505,15 +2531,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                       const SizedBox(height: 3),
                       // Centered Artist Name
-                      Text(
-                        song.author,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                      DilSeTooltip(
+                        message: 'View ${song.author} profile',
+                        child: GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ArtistProfileScreen(
+                                  artistName: song.author,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            song.author,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline,
+                              decorationColor: Colors.white24,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -3232,6 +3276,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     Color accentColor,
   ) {
     return StreamBuilder<Duration>(
+      initialData: _musicService.position,
       stream: _musicService.positionStream,
       builder: (context, snapshot) {
         final position = snapshot.data ?? _musicService.position;
@@ -3301,6 +3346,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget _buildLandscapeMiniScrubber(Color accentColor) {
     final song = _musicService.currentSong;
     return StreamBuilder<Duration>(
+      initialData: _musicService.position,
       stream: _musicService.positionStream,
       builder: (context, snapshot) {
         final position = snapshot.data ?? _musicService.position;
@@ -3411,62 +3457,67 @@ class _PlayerScreenState extends State<PlayerScreen> {
     required double size,
     required double iconSize,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          _musicService.togglePlayPause();
-        },
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFFFFFFF), Color(0xFFEFF2F6)],
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.90),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: vibrantColor.withValues(alpha: 0.50),
-                blurRadius: 18,
-                spreadRadius: 2,
-                offset: const Offset(0, 3),
+    return DilSeTooltip(
+      message: isPlaying ? 'Pause' : 'Play',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _musicService.togglePlayPause();
+          },
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFFFFF), Color(0xFFEFF2F6)],
               ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.5,
               ),
-            ],
-          ),
-          child: isLoading
-              ? Center(
-                  child: SizedBox(
-                    width: size * 0.44,
-                    height: size * 0.44,
-                    child: const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF0F141C),
+              boxShadow: [
+                BoxShadow(
+                  color: vibrantColor.withValues(alpha: 0.50),
+                  blurRadius: 18,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: isLoading
+                ? Center(
+                    child: SizedBox(
+                      width: size * 0.44,
+                      height: size * 0.44,
+                      child: const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF0F141C),
+                        ),
+                        strokeWidth: 2.5,
                       ),
-                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Center(
+                    child: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: const Color(0xFF0F141C),
+                      size: iconSize,
                     ),
                   ),
-                )
-              : Center(
-                  child: Icon(
-                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: const Color(0xFF0F141C),
-                    size: iconSize,
-                  ),
-                ),
+          ),
         ),
       ),
     );

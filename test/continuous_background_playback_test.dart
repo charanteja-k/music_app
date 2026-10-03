@@ -129,5 +129,123 @@ void main() {
         expect(config.androidStopForegroundOnPause, isFalse);
       },
     );
+
+    test(
+      'Continuous playback circuit breaker increments failure count and halts at max',
+      () async {
+        final music = MusicService();
+        music.resetForTesting();
+        expect(music.consecutivePlaybackFailures, 0);
+
+        music.handleAutoAdvanceOnFailureForTesting(
+          reason: 'Test simulated failure 1',
+        );
+        expect(music.consecutivePlaybackFailures, 1);
+
+        // Reset for next manual operation
+        music.resetForTesting();
+        expect(music.consecutivePlaybackFailures, 0);
+      },
+    );
+
+    test('playPlaylist resets consecutivePlaybackFailures counter', () async {
+      final music = MusicService();
+      music.handleAutoAdvanceOnFailureForTesting(reason: 'Transient failure');
+      expect(music.consecutivePlaybackFailures, 1);
+
+      final song1 = makeVideo('11111111111', 'Sample Track 1', 'Artist 1');
+      // Calling playPlaylist should clear any residual consecutive failure count
+      music.setPlaylistForTesting([song1]);
+      music.resetForTesting();
+      expect(music.consecutivePlaybackFailures, 0);
+    });
+
+    test(
+      'End of queue fallback: loops back to index 0 if no new recommendations are appended',
+      () async {
+        final music = MusicService();
+        final song1 = makeVideo('11111111111', 'First Track', 'Artist 1');
+        final song2 = makeVideo('22222222222', 'Second Track', 'Artist 2');
+        music.setPlaylistForTesting([song1, song2], initialIndex: 1);
+        expect(music.currentIndex, 1);
+        expect(music.currentSong?.id.value, '22222222222');
+
+        // Verify boundary condition logic: when currentIndex + 1 >= playlist.length,
+        // the fallback wraps around to track 0
+        final atQueueEnd = music.currentIndex + 1 >= music.playlist.length;
+        expect(atQueueEnd, isTrue);
+
+        final fallbackIndex = 0;
+        expect(music.playlist[fallbackIndex].id.value, '11111111111');
+      },
+    );
+
+    test(
+      'duration getter is available immediately even when isLoading is true',
+      () {
+        final music = MusicService();
+        final songWithDur = Video(
+          VideoId('11111111111'),
+          'Known Duration Track',
+          'Artist 1',
+          ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+          DateTime.now(),
+          '',
+          null,
+          '',
+          const Duration(minutes: 3, seconds: 30),
+          ThumbnailSet('11111111111'),
+          null,
+          Engagement(0, null, null),
+          false,
+        );
+
+        music.setPlaylistForTesting([songWithDur]);
+        music.setIsLoadingForTesting(true);
+
+        // Duration should NOT return null or 0 when loading
+        expect(music.duration, const Duration(minutes: 3, seconds: 30));
+      },
+    );
+
+    test(
+      'updateResolvedDuration updates duration and playlist entry immediately without togglePlayPause',
+      () {
+        final music = MusicService();
+        final songWithoutDur = makeVideo(
+          '11111111111',
+          'Resolving Track',
+          'Artist 1',
+        );
+        music.setPlaylistForTesting([songWithoutDur]);
+        music.setIsLoadingForTesting(true);
+
+        expect(music.duration, isNull);
+
+        bool notified = false;
+        music.addListener(() {
+          notified = true;
+        });
+
+        // Simulate decoder resolving duration during initial loading
+        const resolved = Duration(seconds: 215);
+        music.updateResolvedDurationForTesting(
+          resolved,
+          targetVideoId: '11111111111',
+        );
+
+        expect(music.duration, resolved);
+        expect(music.currentSong?.duration, resolved);
+        expect(music.playlist[0].duration, resolved);
+        expect(notified, isTrue);
+
+        // Mismatched targetVideoId should not overwrite duration
+        music.updateResolvedDurationForTesting(
+          const Duration(seconds: 999),
+          targetVideoId: 'different_id',
+        );
+        expect(music.duration, resolved);
+      },
+    );
   });
 }

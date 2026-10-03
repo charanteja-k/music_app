@@ -6,6 +6,9 @@ import '../models/jio_album.dart';
 import '../services/music_service.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/animated_equalizer.dart';
+import '../widgets/song_options_bottom_sheet.dart';
+import '../widgets/dilse_tooltip.dart';
+import 'artist_profile_screen.dart';
 
 class AlbumScreen extends StatefulWidget {
   /// Provide either [album] (full) or [albumId] + [albumTitle] (for lazy load).
@@ -160,24 +163,12 @@ class _AlbumScreenState extends State<AlbumScreen>
     _music.playPlaylist(shuffled, 0);
   }
 
-  void _addToQueue(int index) {
+  void _showTrackOptions(int index) {
     if (_album == null) return;
     HapticFeedback.lightImpact();
     final videos = _music.albumSongsToVideos(_album!);
     if (index >= videos.length) return;
-    _music.addToQueue(videos[index]);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Added "${_album!.songs[index]['title']}" to queue',
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF1A1A2E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showSongOptionsBottomSheet(context, videos[index]);
   }
 
   String _fmtDuration(int sec) {
@@ -481,16 +472,40 @@ class _AlbumScreenState extends State<AlbumScreen>
                     ),
                     if (artist.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        artist,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                      DilSeTooltip(
+                        message: 'View $artist profile',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ArtistProfileScreen(artistName: artist),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              artist,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                                decorationColor: Colors.white24,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
@@ -579,7 +594,9 @@ class _AlbumScreenState extends State<AlbumScreen>
     final title = s['title'] as String? ?? 'Unknown';
     final artist = s['author'] as String? ?? '';
     final dur = s['duration'] as int? ?? 0;
-    final trackNum = s['trackNumber'] as int? ?? (index + 1);
+    final trackNum = (s['trackNumber'] is int && (s['trackNumber'] as int) > 0)
+        ? (s['trackNumber'] as int)
+        : (index + 1);
 
     return AnimatedBuilder(
       animation: _music,
@@ -653,8 +670,8 @@ class _AlbumScreenState extends State<AlbumScreen>
                   color: Colors.white38,
                   size: 18,
                 ),
-                onPressed: () => _addToQueue(index),
-                tooltip: 'Add to queue',
+                onPressed: () => _showTrackOptions(index),
+                tooltip: 'Song options',
               ),
             ],
           ),

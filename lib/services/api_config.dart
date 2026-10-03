@@ -57,16 +57,19 @@ class ApiConfig {
     return Uri.parse('$cloudflareWorkerUrl/stream?v=$videoId');
   }
 
-  /// Primary JioSaavn catalog search via Cloudflare Edge Worker (instant, zero cold start).
-  static Uri jioSearchUri(String query, {int limit = 50, int page = 1}) {
+  static String get _edgeBaseUrl {
     final customUrl = PreferencesService().customServerUrl;
-    final base = customUrl.isNotEmpty
+    return customUrl.isNotEmpty
         ? (customUrl.endsWith('/')
               ? customUrl.substring(0, customUrl.length - 1)
               : customUrl)
         : cloudflareWorkerUrl;
+  }
+
+  /// Primary JioSaavn catalog search via Cloudflare Edge Worker (instant, zero cold start).
+  static Uri jioSearchUri(String query, {int limit = 50, int page = 1}) {
     return Uri.parse(
-      '$base/jio/search?q=${Uri.encodeComponent(query)}&limit=$limit&page=$page',
+      '$_edgeBaseUrl/jio/search?q=${Uri.encodeComponent(query)}&limit=$limit&page=$page',
     );
   }
 
@@ -99,14 +102,14 @@ class ApiConfig {
   /// Returns a list of album metadata objects (id, title, artist, artwork, year, songCount).
   static Uri jioAlbumSearchUri(String query, {int limit = 12}) {
     return Uri.parse(
-      '$cloudflareWorkerUrl/jio/albums?q=${Uri.encodeComponent(query)}&limit=$limit',
+      '$_edgeBaseUrl/jio/albums?q=${Uri.encodeComponent(query)}&limit=$limit',
     );
   }
 
   /// JioSaavn album detail — all songs with decrypted 320k stream URLs.
   static Uri jioAlbumDetailUri(String albumId) {
     return Uri.parse(
-      '$cloudflareWorkerUrl/jio/album?id=${Uri.encodeComponent(albumId)}',
+      '$_edgeBaseUrl/jio/album?id=${Uri.encodeComponent(albumId)}',
     );
   }
 
@@ -116,27 +119,15 @@ class ApiConfig {
     String language = 'telugu',
     int limit = 20,
   }) {
-    final customUrl = PreferencesService().customServerUrl;
-    final base = customUrl.isNotEmpty
-        ? (customUrl.endsWith('/')
-              ? customUrl.substring(0, customUrl.length - 1)
-              : customUrl)
-        : cloudflareWorkerUrl;
     return Uri.parse(
-      '$base/jio/recommendations?q=${Uri.encodeComponent(query)}&language=${Uri.encodeComponent(language)}&limit=$limit',
+      '$_edgeBaseUrl/jio/recommendations?q=${Uri.encodeComponent(query)}&language=${Uri.encodeComponent(language)}&limit=$limit',
     );
   }
 
   /// Autocomplete search suggestions via Cloudflare Edge Worker (< 100ms response).
   static Uri jioSuggestionsUri(String query, {int limit = 8}) {
-    final customUrl = PreferencesService().customServerUrl;
-    final base = customUrl.isNotEmpty
-        ? (customUrl.endsWith('/')
-              ? customUrl.substring(0, customUrl.length - 1)
-              : customUrl)
-        : cloudflareWorkerUrl;
     return Uri.parse(
-      '$base/jio/suggestions?q=${Uri.encodeComponent(query)}&limit=$limit',
+      '$_edgeBaseUrl/jio/suggestions?q=${Uri.encodeComponent(query)}&limit=$limit',
     );
   }
 
@@ -147,13 +138,9 @@ class ApiConfig {
     String? title,
     String? artist,
   }) {
-    final customUrl = PreferencesService().customServerUrl;
-    final base = customUrl.isNotEmpty
-        ? (customUrl.endsWith('/')
-              ? customUrl.substring(0, customUrl.length - 1)
-              : customUrl)
-        : cloudflareWorkerUrl;
-    final buffer = StringBuffer('$base/ytm/radio?v=$videoId&limit=$limit');
+    final buffer = StringBuffer(
+      '$_edgeBaseUrl/ytm/radio?v=$videoId&limit=$limit',
+    );
     if (title != null && title.isNotEmpty) {
       buffer.write('&title=${Uri.encodeComponent(title)}');
     }
@@ -165,14 +152,8 @@ class ApiConfig {
 
   /// Cloudflare Edge Worker fallback for YouTube Music official song search (0ms cold start, CORS bypassed).
   static Uri ytmSearchUri(String query, {int limit = 20}) {
-    final customUrl = PreferencesService().customServerUrl;
-    final base = customUrl.isNotEmpty
-        ? (customUrl.endsWith('/')
-              ? customUrl.substring(0, customUrl.length - 1)
-              : customUrl)
-        : cloudflareWorkerUrl;
     return Uri.parse(
-      '$base/ytm/search?q=${Uri.encodeComponent(query)}&limit=$limit',
+      '$_edgeBaseUrl/ytm/search?q=${Uri.encodeComponent(query)}&limit=$limit',
     );
   }
 

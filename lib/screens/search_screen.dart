@@ -11,6 +11,7 @@ import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/category_card.dart';
 import '../widgets/artist_card.dart';
 import '../widgets/animated_equalizer.dart';
+import '../widgets/dilse_tooltip.dart';
 import 'artist_profile_screen.dart';
 import 'album_screen.dart';
 
@@ -161,6 +162,12 @@ class _SearchScreenState extends State<SearchScreen>
     if (query.isEmpty) {
       setState(() {
         _suggestions = [];
+        _searchResults.clear();
+        _albumResults.clear();
+        _currentQuery = '';
+        _isSearching = false;
+        _isArtistSearchActive = false;
+        _searchTabIndex = 0;
       });
       return;
     }
@@ -193,6 +200,21 @@ class _SearchScreenState extends State<SearchScreen>
     super.dispose();
   }
 
+  void _clearSearchAndReturnToBrowse() {
+    HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
+    _searchController.clear();
+    setState(() {
+      _searchResults.clear();
+      _albumResults.clear();
+      _suggestions.clear();
+      _currentQuery = '';
+      _isSearching = false;
+      _isArtistSearchActive = false;
+      _searchTabIndex = 0;
+    });
+  }
+
   void _performSearch(String query, {bool isArtist = false}) async {
     if (query.trim().isEmpty) return;
     _debounceTimer?.cancel();
@@ -216,24 +238,36 @@ class _SearchScreenState extends State<SearchScreen>
       _searchTabIndex = 0;
     });
 
-    // Fire song search + album search in parallel
-    final futures = await Future.wait([
-      isArtistSearch
-          ? _musicService.fetchArtistDiscography(effectiveQuery, page: 1)
-          : _musicService.searchSongs(effectiveQuery, page: 1, limit: 50),
-      if (!isArtistSearch)
-        _musicService.searchAlbums(effectiveQuery, limit: 12)
-      else
-        Future.value(<JioAlbum>[]),
-    ]);
+    try {
+      // Fire song search + album search in parallel
+      final futures = await Future.wait([
+        isArtistSearch
+            ? _musicService.fetchArtistDiscography(effectiveQuery, page: 1)
+            : _musicService.searchSongs(effectiveQuery, page: 1, limit: 50),
+        if (!isArtistSearch)
+          _musicService.searchAlbums(effectiveQuery, limit: 12)
+        else
+          Future.value(<JioAlbum>[]),
+      ]);
 
-    if (mounted) {
-      setState(() {
-        _searchResults = futures[0] as List<Video>;
-        _albumResults = futures[1] as List<JioAlbum>;
-        _isSearching = false;
-        _hasMore = _searchResults.isNotEmpty;
-      });
+      if (mounted) {
+        final songs = futures[0] as List<Video>;
+        final albums = futures[1] as List<JioAlbum>;
+        setState(() {
+          _searchResults = songs;
+          _albumResults = albums;
+          _searchTabIndex = (songs.isEmpty && albums.isNotEmpty) ? 1 : 0;
+          _isSearching = false;
+          _hasMore = _searchResults.isNotEmpty;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _hasMore = false;
+        });
+      }
     }
   }
 
@@ -303,560 +337,629 @@ class _SearchScreenState extends State<SearchScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final history = _prefs.searchHistory;
+    final bool hasActiveSearch =
+        _searchController.text.isNotEmpty ||
+        _searchResults.isNotEmpty ||
+        _albumResults.isNotEmpty ||
+        _currentQuery.isNotEmpty ||
+        _isSearching;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
+    return PopScope(
+      canPop: !hasActiveSearch,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && hasActiveSearch) {
+          _clearSearchAndReturnToBrowse();
+        }
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFF0B0B0F),
-        elevation: 0,
-        title: const Text(
-          'Search',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.8,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0B0B0F),
+          elevation: 0,
+          title: const Text(
+            'Search',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.8,
+            ),
           ),
         ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Modern Frosted Search Field
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF161622),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 1,
+        body: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Modern Frosted Search Field
+              Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF161622),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                onSubmitted: (val) {
-                  HapticFeedback.lightImpact();
-                  _performSearch(val);
-                },
-                textInputAction: TextInputAction.search,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Artists, Songs, Lyrics, and More',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.38),
-                    fontSize: 14,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                    color: Colors.white60,
-                    size: 22,
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(
-                            Icons.clear_rounded,
-                            color: Colors.white60,
-                            size: 18,
-                          ),
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            _searchController.clear();
-                            setState(() {
-                              _searchResults.clear();
-                              _suggestions.clear();
-                              _currentQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Content Area: Either Searching, Live Suggestions, Search Results, or Browse Categories
-            Expanded(
-              child: _isSearching
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    )
-                  : (_searchController.text.trim().isNotEmpty &&
-                        _suggestions.isNotEmpty &&
-                        _searchController.text.trim() != _currentQuery)
-                  ? ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 160),
-                      itemCount: _suggestions.length,
-                      itemBuilder: (context, index) {
-                        final suggestion = _suggestions[index];
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 4,
-                          ),
-                          leading: _buildSuggestionLeading(suggestion.type),
-                          title: Text(
-                            suggestion.text,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: suggestion.subtitle.isNotEmpty
-                              ? Text(
-                                  suggestion.subtitle,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.45),
-                                    fontSize: 12,
-                                  ),
-                                )
-                              : null,
-                          trailing: const Icon(
-                            Icons.north_west_rounded,
-                            color: Colors.white38,
-                            size: 18,
-                          ),
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            if (suggestion.type ==
-                                SearchSuggestionType.artist) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ArtistProfileScreen(
-                                    artistName: suggestion.text,
-                                  ),
+                child: TextField(
+                  controller: _searchController,
+                  onSubmitted: (val) {
+                    HapticFeedback.lightImpact();
+                    _performSearch(val);
+                  },
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Artists, Songs, Lyrics, and More',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.38),
+                      fontSize: 14,
+                    ),
+                    prefixIcon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: hasActiveSearch
+                          ? DilSeTooltip(
+                              key: const ValueKey('search_back_button'),
+                              message: 'Back to browse',
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 44,
+                                  minHeight: 44,
                                 ),
-                              );
-                            } else {
-                              _searchController.text = suggestion.text;
-                              _performSearch(suggestion.text, isArtist: false);
-                            }
-                          },
-                        );
-                      },
-                    )
-                  : _searchResults.isNotEmpty || _albumResults.isNotEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_albumResults.isNotEmpty && !_isArtistSearchActive)
-                          _buildSearchTabBar(),
-                        Expanded(
-                          child:
-                              _searchTabIndex == 1 &&
-                                  _albumResults.isNotEmpty &&
-                                  !_isArtistSearchActive
-                              ? _buildAlbumsGrid()
-                              : ListView.builder(
-                                  controller: _scrollController,
-                                  padding: const EdgeInsets.only(bottom: 160),
-                                  itemCount:
-                                      _searchResults.length +
-                                      (_isArtistSearchActive ? 1 : 0) +
-                                      (_isLoadingMore ? 1 : 0),
-                                  itemBuilder: (context, index) {
-                                    final int headerOffset =
-                                        _isArtistSearchActive ? 1 : 0;
-                                    if (_isArtistSearchActive && index == 0) {
-                                      return Container(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          16,
-                                          8,
-                                          16,
-                                          12,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.library_music_rounded,
-                                              color: Color(0xFF1DB954),
-                                              size: 18,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '${_searchResults.length} Tracks • Discography',
-                                                style: const TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  letterSpacing: 0.2,
-                                                ),
-                                              ),
-                                            ),
-                                            InkWell(
-                                              onTap: () {
-                                                HapticFeedback.lightImpact();
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        ArtistProfileScreen(
-                                                          artistName:
-                                                              _searchController
-                                                                  .text
-                                                                  .trim(),
-                                                        ),
-                                                  ),
-                                                );
-                                              },
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      'Filters',
-                                                      style: TextStyle(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).primaryColor,
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 2),
-                                                    Icon(
-                                                      Icons
-                                                          .arrow_forward_ios_rounded,
-                                                      size: 10,
-                                                      color: Theme.of(
-                                                        context,
-                                                      ).primaryColor,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            if (_isLoadingMore) ...[
-                                              const SizedBox(width: 8),
-                                              const SizedBox(
-                                                width: 14,
-                                                height: 14,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: Color(0xFF1DB954),
-                                                    ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      );
-                                    }
+                                icon: const Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                onPressed: _clearSearchAndReturnToBrowse,
+                                splashRadius: 20,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.search_rounded,
+                              key: ValueKey('search_icon'),
+                              color: Colors.white60,
+                              size: 22,
+                            ),
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(
+                              Icons.clear_rounded,
+                              color: Colors.white60,
+                              size: 18,
+                            ),
+                            onPressed: _clearSearchAndReturnToBrowse,
+                            tooltip: 'Clear search',
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
-                                    final songIndex = index - headerOffset;
-                                    if (songIndex == _searchResults.length) {
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                            color: Theme.of(
-                                              context,
-                                            ).primaryColor,
-                                            strokeWidth: 2.5,
-                                          ),
-                                        ),
-                                      );
-                                    }
-
-                                    final video = _searchResults[songIndex];
-                                    final hdThumbnail =
-                                        MusicService.getHdThumbnail(
-                                          video.id.value,
-                                        );
-                                    final isCurrentSong =
-                                        _musicService.currentSong?.id.value ==
-                                        video.id.value;
-
-                                    return ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                          ),
-                                      leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          hdThumbnail,
-                                          width: 52,
-                                          height: 52,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, _, _) =>
-                                              Image.network(
-                                                video.thumbnails.lowResUrl,
-                                                width: 52,
-                                                height: 52,
-                                                fit: BoxFit.cover,
-                                              ),
-                                        ),
+              // Content Area: Either Searching, Live Suggestions, Search Results, or Browse Categories
+              Expanded(
+                child: _isSearching
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      )
+                    : (_searchController.text.trim().isNotEmpty &&
+                          _suggestions.isNotEmpty &&
+                          _searchController.text.trim() != _currentQuery)
+                    ? ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 160),
+                        itemCount: _suggestions.length,
+                        itemBuilder: (context, index) {
+                          final suggestion = _suggestions[index];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                            leading: _buildSuggestionLeading(suggestion.type),
+                            title: Text(
+                              suggestion.text,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: suggestion.subtitle.isNotEmpty
+                                ? Text(
+                                    suggestion.subtitle,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.45,
                                       ),
-                                      title: Text(
-                                        video.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                      fontSize: 12,
+                                    ),
+                                  )
+                                : null,
+                            trailing: const Icon(
+                              Icons.north_west_rounded,
+                              color: Colors.white38,
+                              size: 18,
+                            ),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              if (suggestion.type ==
+                                  SearchSuggestionType.artist) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ArtistProfileScreen(
+                                      artistName: suggestion.text,
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                _searchController.text = suggestion.text;
+                                _performSearch(
+                                  suggestion.text,
+                                  isArtist: false,
+                                );
+                              }
+                            },
+                          );
+                        },
+                      )
+                    : _searchResults.isNotEmpty || _albumResults.isNotEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_albumResults.isNotEmpty &&
+                              !_isArtistSearchActive)
+                            _buildSearchTabBar(),
+                          Expanded(
+                            child:
+                                _searchTabIndex == 1 &&
+                                    _albumResults.isNotEmpty &&
+                                    !_isArtistSearchActive
+                                ? _buildAlbumsGrid()
+                                : (_searchResults.isEmpty &&
+                                      _albumResults.isNotEmpty &&
+                                      !_isArtistSearchActive)
+                                ? Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 32,
+                                      ),
+                                      child: Text(
+                                        'No individual songs found. Switch to Albums tab above.',
+                                        textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: isCurrentSong
-                                              ? Theme.of(context).primaryColor
-                                              : Colors.white,
-                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.5,
+                                          ),
                                           fontSize: 14,
                                         ),
                                       ),
-                                      subtitle: Text(
-                                        video.author,
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          color: isCurrentSong
-                                              ? Theme.of(context).primaryColor
-                                                    .withValues(alpha: 0.8)
-                                              : Colors.grey[400],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (isCurrentSong)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 8,
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    controller: _scrollController,
+                                    padding: const EdgeInsets.only(bottom: 160),
+                                    itemCount:
+                                        _searchResults.length +
+                                        (_isArtistSearchActive ? 1 : 0) +
+                                        (_isLoadingMore ? 1 : 0),
+                                    itemBuilder: (context, index) {
+                                      final int headerOffset =
+                                          _isArtistSearchActive ? 1 : 0;
+                                      if (_isArtistSearchActive && index == 0) {
+                                        return Container(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            16,
+                                            8,
+                                            16,
+                                            12,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.library_music_rounded,
+                                                color: Color(0xFF1DB954),
+                                                size: 18,
                                               ),
-                                              child: AnimatedEqualizer(
-                                                isPlaying:
-                                                    _musicService.isPlaying,
-                                                barCount: 3,
-                                                color: Theme.of(
-                                                  context,
-                                                ).primaryColor,
-                                                size: 16,
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  '${_searchResults.length} Tracks • Discography',
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: 0.2,
+                                                  ),
+                                                ),
                                               ),
+                                              InkWell(
+                                                onTap: () {
+                                                  HapticFeedback.lightImpact();
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          ArtistProfileScreen(
+                                                            artistName:
+                                                                _searchController
+                                                                    .text
+                                                                    .trim(),
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        'Filters',
+                                                        style: TextStyle(
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).primaryColor,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 2),
+                                                      Icon(
+                                                        Icons
+                                                            .arrow_forward_ios_rounded,
+                                                        size: 10,
+                                                        color: Theme.of(
+                                                          context,
+                                                        ).primaryColor,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              if (_isLoadingMore) ...[
+                                                const SizedBox(width: 8),
+                                                const SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Color(
+                                                          0xFF1DB954,
+                                                        ),
+                                                      ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        );
+                                      }
+
+                                      final songIndex = index - headerOffset;
+                                      if (songIndex == _searchResults.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              color: Theme.of(
+                                                context,
+                                              ).primaryColor,
+                                              strokeWidth: 2.5,
                                             ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.more_horiz,
-                                              color: Colors.white54,
+                                          ),
+                                        );
+                                      }
+
+                                      final video = _searchResults[songIndex];
+                                      final hdThumbnail =
+                                          MusicService.getHdThumbnail(
+                                            video.id.value,
+                                          );
+                                      final isCurrentSong =
+                                          _musicService.currentSong?.id.value ==
+                                          video.id.value;
+
+                                      return ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              vertical: 4,
                                             ),
-                                            onPressed: () =>
-                                                showSongOptionsBottomSheet(
-                                                  context,
-                                                  video,
+                                        leading: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Image.network(
+                                            hdThumbnail,
+                                            width: 52,
+                                            height: 52,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) =>
+                                                Image.network(
+                                                  video.thumbnails.lowResUrl,
+                                                  width: 52,
+                                                  height: 52,
+                                                  fit: BoxFit.cover,
                                                 ),
                                           ),
-                                        ],
-                                      ),
-                                      onTap: () {
-                                        if (_isArtistSearchActive) {
-                                          _musicService.playPlaylist(
-                                            _searchResults,
-                                            songIndex,
-                                          );
-                                        } else {
-                                          _musicService.startSongRadio(video);
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (history.isNotEmpty) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(5),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.08,
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(
-                                        Icons.history_rounded,
-                                        size: 16,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Flexible(
-                                      child: Text(
-                                        'Recent Searches',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: -0.3,
+                                        title: Text(
+                                          video.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: isCurrentSong
+                                                ? Theme.of(context).primaryColor
+                                                : Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              TextButton.icon(
-                                onPressed: () {
-                                  HapticFeedback.lightImpact();
-                                  _prefs.clearSearchHistory();
-                                  setState(() {});
-                                },
-                                icon: Icon(
-                                  Icons.delete_sweep_rounded,
-                                  size: 15,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                label: Text(
-                                  'Clear All',
-                                  style: TextStyle(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: history.map((item) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF161622),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(20),
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      _searchController.text = item;
-                                      _performSearch(item);
+                                        subtitle: Text(
+                                          video.author,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            color: isCurrentSong
+                                                ? Theme.of(context).primaryColor
+                                                      .withValues(alpha: 0.8)
+                                                : Colors.grey[400],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isCurrentSong)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  right: 8,
+                                                ),
+                                                child: AnimatedEqualizer(
+                                                  isPlaying:
+                                                      _musicService.isPlaying,
+                                                  barCount: 3,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).primaryColor,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.more_horiz,
+                                                color: Colors.white54,
+                                              ),
+                                              onPressed: () =>
+                                                  showSongOptionsBottomSheet(
+                                                    context,
+                                                    video,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () {
+                                          if (_isArtistSearchActive) {
+                                            _musicService.playPlaylist(
+                                              _searchResults,
+                                              songIndex,
+                                            );
+                                          } else {
+                                            _musicService.startSongRadio(video);
+                                          }
+                                        },
+                                      );
                                     },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 7,
+                                  ),
+                          ),
+                        ],
+                      )
+                    : (_currentQuery.trim().isNotEmpty && !_isSearching)
+                    ? _buildSearchEmptyState()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (history.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.history_rounded,
+                                          size: 16,
+                                          color: Colors.white70,
+                                        ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.search_rounded,
-                                            size: 14,
-                                            color: Theme.of(context)
-                                                .primaryColor
-                                                .withValues(alpha: 0.8),
+                                      const SizedBox(width: 8),
+                                      const Flexible(
+                                        child: Text(
+                                          'Recent Searches',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: -0.3,
                                           ),
-                                          const SizedBox(width: 6),
-                                          ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 180,
-                                            ),
-                                            child: Text(
-                                              item,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          GestureDetector(
-                                            behavior: HitTestBehavior.opaque,
-                                            onTap: () {
-                                              HapticFeedback.selectionClick();
-                                              _prefs.removeFromSearchHistory(
-                                                item,
-                                              );
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.all(2),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.white12,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.close_rounded,
-                                                size: 12,
-                                                color: Colors.white70,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    HapticFeedback.lightImpact();
+                                    _prefs.clearSearchHistory();
+                                    setState(() {});
+                                  },
+                                  icon: Icon(
+                                    Icons.delete_sweep_rounded,
+                                    size: 15,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                  label: Text(
+                                    'Clear All',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: history.map((item) {
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF161622),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        _searchController.text = item;
+                                        _performSearch(item);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 7,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.search_rounded,
+                                              size: 14,
+                                              color: Theme.of(context)
+                                                  .primaryColor
+                                                  .withValues(alpha: 0.8),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 180,
+                                              ),
+                                              child: Text(
+                                                item,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onTap: () {
+                                                HapticFeedback.selectionClick();
+                                                _prefs.removeFromSearchHistory(
+                                                  item,
+                                                );
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white12,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close_rounded,
+                                                  size: 12,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+                          // Three Boxes Switcher: Categories, Albums, Artists
+                          _buildBrowseTabsHeader(context),
                           const SizedBox(height: 14),
-                        ],
-                        // Three Boxes Switcher: Categories, Albums, Artists
-                        _buildBrowseTabsHeader(context),
-                        const SizedBox(height: 14),
-                        // Swappable Grid with PageView matching MainScreen switching animation
-                        Expanded(
-                          child: PageView(
-                            controller: _browsePageController,
-                            physics: const ClampingScrollPhysics(),
-                            onPageChanged: (index) {
-                              setState(() => _browseTabIndex = index);
-                            },
-                            children: [
-                              _buildCategoriesGrid(),
-                              _buildAlbumsBrowseGrid(),
-                              _buildArtistsGrid(),
-                            ],
+                          // Swappable Grid with PageView matching MainScreen switching animation
+                          Expanded(
+                            child: PageView(
+                              controller: _browsePageController,
+                              physics: const ClampingScrollPhysics(),
+                              onPageChanged: (index) {
+                                setState(() => _browseTabIndex = index);
+                              },
+                              children: [
+                                _buildCategoriesGrid(),
+                                _buildAlbumsBrowseGrid(),
+                                _buildArtistsGrid(),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-            ),
-          ],
+                        ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1496,6 +1599,81 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  Widget _buildSearchEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 36,
+                color: Colors.white54,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'No results found',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'We couldn\'t find any songs or albums matching "$_currentQuery".',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                _searchController.clear();
+                setState(() {
+                  _currentQuery = '';
+                  _searchResults.clear();
+                  _albumResults.clear();
+                  _searchTabIndex = 0;
+                });
+              },
+              icon: const Icon(Icons.clear_rounded, size: 16),
+              label: const Text('Clear Search'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─── Albums Search Results Grid ───────────────────────────────────────────
   Widget _buildAlbumsGrid() {
     return GridView.builder(
@@ -1548,7 +1726,7 @@ class _SearchScreenState extends State<SearchScreen>
               child: Stack(
                 children: [
                   Hero(
-                    tag: '$heroPrefix-art-${album.id}',
+                    tag: 'album-art-${album.id}',
                     child: album.artwork.isNotEmpty
                         ? Image.network(
                             album.artwork,

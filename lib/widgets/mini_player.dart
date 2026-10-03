@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/music_service.dart';
 import '../screens/player_screen.dart';
+import '../screens/artist_profile_screen.dart';
 
 class MiniPlayer extends StatefulWidget {
   const MiniPlayer({super.key});
@@ -233,15 +234,30 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                song?.author ?? '',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.65),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
+                              GestureDetector(
+                                onTap: song != null && song.author.isNotEmpty
+                                    ? () {
+                                        HapticFeedback.lightImpact();
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ArtistProfileScreen(
+                                              artistName: song.author,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    : null,
+                                child: Text(
+                                  song?.author ?? '',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.65),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -252,6 +268,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
+                              tooltip: 'Previous track',
                               icon: const Icon(
                                 Icons.skip_previous_rounded,
                                 color: Colors.white,
@@ -284,6 +301,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     ),
                                   )
                                 : IconButton(
+                                    tooltip: isPlaying ? 'Pause' : 'Play',
                                     icon: Icon(
                                       isPlaying
                                           ? Icons.pause_rounded
@@ -304,6 +322,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                   ),
                             const SizedBox(width: 2),
                             IconButton(
+                              tooltip: 'Next track',
                               icon: const Icon(
                                 Icons.skip_next_rounded,
                                 color: Colors.white,
@@ -332,11 +351,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     right: 0,
                     bottom: 0,
                     child: StreamBuilder<Duration>(
+                      initialData: _musicService.position,
                       stream: _musicService.positionStream,
                       builder: (context, snapshot) {
-                        final position = snapshot.data ?? Duration.zero;
+                        final position =
+                            snapshot.data ?? _musicService.position;
                         final duration =
-                            _musicService.duration ?? Duration.zero;
+                            _musicService.duration ??
+                            (_musicService.currentSong?.duration ??
+                                Duration.zero);
                         double progress = 0.0;
                         if (duration.inMilliseconds > 0) {
                           progress =

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../services/music_service.dart';
+import '../screens/artist_profile_screen.dart';
 
 /// Shows an Apple Music / Spotify-inspired frosted glass options sheet for a song.
 void showSongOptionsBottomSheet(BuildContext context, Video song) {
@@ -100,7 +101,25 @@ void showSongOptionsBottomSheet(BuildContext context, Video song) {
             const Divider(color: Colors.white10, height: 1),
             const SizedBox(height: 6),
 
-            // Action 0: Start Song Radio
+            // Action 0: View Artist Profile
+            _buildActionTile(
+              icon: Icons.person_rounded,
+              iconColor: const Color(0xFF1DB954),
+              title: 'View Artist Profile',
+              subtitle: 'Explore full discography for ${song.author}',
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ArtistProfileScreen(artistName: song.author),
+                  ),
+                );
+              },
+            ),
+
+            // Action 1: Start Song Radio
             _buildActionTile(
               icon: Icons.auto_awesome_rounded,
               iconColor: const Color(0xFF6C5CE7),

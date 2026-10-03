@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import '../models/jio_album.dart';
 import '../services/music_service.dart';
+import '../services/preferences_service.dart';
 import '../services/dynamic_artist_service.dart';
 import '../services/canonical_song_dedup.dart';
 import '../widgets/responsive_wrapper.dart';
@@ -9,6 +11,11 @@ import '../widgets/animated_equalizer.dart';
 import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/artist/artist_header.dart';
+import '../widgets/artist/artist_action_deck.dart';
+import '../widgets/artist/artist_popular_tracks.dart';
+import '../widgets/artist/artist_albums_section.dart';
+import '../widgets/artist/artist_about_card.dart';
 
 /// Dedicated Artist Profile & Discography Screen with deep multi-language,
 /// movie range, and filmography filters.
@@ -25,6 +32,7 @@ class ArtistProfileScreen extends StatefulWidget {
 class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
   final MusicService _musicService = MusicService();
   final DynamicArtistService _artistService = DynamicArtistService();
+  final PreferencesService _prefs = PreferencesService();
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
@@ -42,7 +50,9 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
   ];
 
   List<Video> _allSongs = [];
+  List<JioAlbum> _albums = [];
   bool _isLoading = true;
+  bool _isLoadingAlbums = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
   int _currentPage = 1;
@@ -71,8 +81,10 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
 
     _scrollController.addListener(_onScroll);
     _musicService.addListener(_onMusicServiceChanged);
+    _prefs.addListener(_onMusicServiceChanged);
 
     _loadInitialDiscography();
+    _loadAlbums();
   }
 
   @override
@@ -80,6 +92,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
     _scrollController.dispose();
     _searchController.dispose();
     _musicService.removeListener(_onMusicServiceChanged);
+    _prefs.removeListener(_onMusicServiceChanged);
     super.dispose();
   }
 
@@ -124,6 +137,24 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadAlbums() async {
+    setState(() => _isLoadingAlbums = true);
+    try {
+      final results = await _musicService.searchAlbums(
+        _canonicalName,
+        limit: 16,
+      );
+      if (mounted) {
+        setState(() {
+          _albums = results;
+          _isLoadingAlbums = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAlbums = false);
     }
   }
 
@@ -192,19 +223,27 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
 
     final lower = song.title.toLowerCase();
 
-    // Check year in title if present
-    final yearMatch = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(lower);
-    if (yearMatch != null) {
-      final year = int.tryParse(yearMatch.group(1) ?? '');
-      if (year != null) {
-        if (era == '2020–2025') return year >= 2020 && year <= 2025;
-        if (era == '2010–2019') return year >= 2010 && year <= 2019;
-        if (era == '2000–2009') return year >= 2000 && year <= 2009;
-        if (era == 'Classics') return year < 2000;
-      }
+    // 1. Check YouTube upload date if present
+    int? year;
+    if (song.uploadDate != null) {
+      year = song.uploadDate!.year;
     }
 
-    // Secondary semantic checks
+    // 2. Check year in title if present (e.g. "Song Name (1999)")
+    final yearMatch = RegExp(r'\b(19\d{2}|20\d{2})\b').firstMatch(lower);
+    if (yearMatch != null) {
+      final parsed = int.tryParse(yearMatch.group(1) ?? '');
+      if (parsed != null) year = parsed;
+    }
+
+    if (year != null) {
+      if (era == '2020–2025') return year >= 2020;
+      if (era == '2010–2019') return year >= 2010 && year <= 2019;
+      if (era == '2000–2009') return year >= 2000 && year <= 2009;
+      if (era == 'Classics') return year < 2000;
+    }
+
+    // Secondary semantic checks for Classics
     if (era == 'Classics') {
       return lower.contains('classic') ||
           lower.contains('old') ||
@@ -212,7 +251,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
           lower.contains('golden');
     }
 
-    return true;
+    return false;
   }
 
   /// Client-side filtered songs based on Language, Movie, Era, and In-Artist Search
@@ -224,11 +263,36 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
       // 1. Language Filter
       if (_selectedLanguage != 'All') {
         final lang = _selectedLanguage.toLowerCase();
-        final matchesLang =
+        final cachedLang = CanonicalSongDedup.getSongLanguage(
+          song.id.value,
+        )?.toLowerCase();
+        final detectedTitleLang = CanonicalSongDedup.detectLanguage(
+          song.title,
+        )?.toLowerCase();
+        final detectedAuthorLang = CanonicalSongDedup.detectLanguage(
+          song.author,
+        )?.toLowerCase();
+
+        final explicitMatch =
+            cachedLang == lang ||
+            detectedTitleLang == lang ||
+            detectedAuthorLang == lang ||
             title.contains(lang) ||
-            author.contains(lang) ||
-            (_artistItem != null && _artistItem.language.toLowerCase() == lang);
-        if (!matchesLang) return false;
+            author.contains(lang);
+
+        if (explicitMatch) {
+          // Explicitly matched selected language
+        } else if (_artistItem != null &&
+            _artistItem.language.toLowerCase() == lang) {
+          // If artist is primarily of this language, match unless song is detected as another language
+          final detectedOther =
+              detectedTitleLang ?? detectedAuthorLang ?? cachedLang;
+          if (detectedOther != null && detectedOther != lang) {
+            return false;
+          }
+        } else {
+          return false;
+        }
       }
 
       // 2. Movie Filter
@@ -268,304 +332,36 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
               controller: _scrollController,
               slivers: [
                 // 1. Hero AppBar with Artist Avatar & Back Action
-                SliverAppBar(
-                  backgroundColor: const Color(0xFF0B0B0F),
-                  expandedHeight: 280.0,
-                  pinned: true,
-                  elevation: 0,
-                  leading: IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Ambient gradient background derived from artist portrait
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                themeColor.withValues(alpha: 0.35),
-                                const Color(0xFF141420),
-                                const Color(0xFF0B0B0F),
-                              ],
-                            ),
-                          ),
-                        ),
-                        SafeArea(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 12),
-                              // High-Resolution Artist Circle Avatar
-                              Container(
-                                width: 104,
-                                height: 104,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: themeColor.withValues(alpha: 0.4),
-                                      blurRadius: 28,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipOval(
-                                  child:
-                                      _artistItem != null &&
-                                          _artistItem.imageUrl.isNotEmpty
-                                      ? Image.network(
-                                          _artistItem.imageUrl,
-                                          fit: BoxFit.cover,
-                                          cacheWidth: 240,
-                                          cacheHeight: 240,
-                                          errorBuilder: (_, _, _) =>
-                                              _buildAvatarFallback(),
-                                        )
-                                      : _buildAvatarFallback(),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // Artist Canonical Name
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                ),
-                                child: Text(
-                                  _canonicalName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.4,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              // Tagline & Badge
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_artistItem != null &&
-                                        _artistItem.badge.isNotEmpty) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: themeColor.withValues(
-                                            alpha: 0.2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          border: Border.all(
-                                            color: themeColor.withValues(
-                                              alpha: 0.5,
-                                            ),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _artistItem.badge,
-                                          style: TextStyle(
-                                            color: themeColor,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    Flexible(
-                                      child: Text(
-                                        _artistItem?.genre ??
-                                            'Official Discography',
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.65,
-                                          ),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                ArtistHeader(
+                  canonicalName: _canonicalName,
+                  artistItem: _artistItem,
+                  themeColor: themeColor,
+                  onBack: () => Navigator.pop(context),
+                ),
+
+                // 2. Action Deck: Play All, Shuffle, Radio & Follow
+                SliverToBoxAdapter(
+                  child: ArtistActionDeck(
+                    artistName: _canonicalName,
+                    songs: filtered,
+                    themeColor: themeColor,
                   ),
                 ),
 
-                // 2. Action Deck: Play All & Shuffle Buttons
+                // 3. Official Soundtracks & Albums Carousel
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: Row(
-                      children: [
-                        // Play All Primary Button
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: filtered.isEmpty
-                                ? null
-                                : () {
-                                    HapticFeedback.mediumImpact();
-                                    _musicService.playPlaylist(filtered, 0);
-                                  },
-                            icon: const Icon(
-                              Icons.play_arrow_rounded,
-                              size: 24,
-                            ),
-                            label: Text(
-                              'Play All (${filtered.length})',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: themeColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 4,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Shuffle Button
-                        ElevatedButton.icon(
-                          onPressed: filtered.isEmpty
-                              ? null
-                              : () {
-                                  HapticFeedback.mediumImpact();
-                                  final shuffled = List<Video>.from(filtered)
-                                    ..shuffle();
-                                  _musicService.playPlaylist(shuffled, 0);
-                                },
-                          icon: const Icon(Icons.shuffle_rounded, size: 20),
-                          label: const Text(
-                            'Shuffle',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E1E2C),
-                            foregroundColor: Colors.white70,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Smart Artist Radio Button
-                        ElevatedButton.icon(
-                          onPressed: filtered.isEmpty
-                              ? null
-                              : () async {
-                                  HapticFeedback.mediumImpact();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Starting ${widget.artistName} Smart Radio…',
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                      backgroundColor: themeColor.withValues(
-                                        alpha: 0.9,
-                                      ),
-                                    ),
-                                  );
-                                  final topSong = filtered.first;
-                                  final radioTracks = await _musicService
-                                      .fetchRadioTracksForSong(
-                                        topSong,
-                                        limit: 40,
-                                      );
-                                  if (radioTracks.isNotEmpty) {
-                                    _musicService.playPlaylist([
-                                      topSong,
-                                      ...radioTracks,
-                                    ], 0);
-                                  } else {
-                                    _musicService.playPlaylist(filtered, 0);
-                                  }
-                                },
-                          icon: const Icon(
-                            Icons.auto_awesome_rounded,
-                            size: 18,
-                          ),
-                          label: const Text(
-                            'Radio',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E1E2C),
-                            foregroundColor: themeColor,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: themeColor.withValues(alpha: 0.45),
-                                width: 1.2,
-                              ),
-                            ),
-                            elevation: 2,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: ArtistAlbumsSection(
+                    albums: _albums,
+                    isLoading: _isLoadingAlbums,
+                    themeColor: themeColor,
+                  ),
+                ),
+
+                // 4. Top 5 Popular Tracks
+                SliverToBoxAdapter(
+                  child: ArtistPopularTracks(
+                    songs: filtered,
+                    themeColor: themeColor,
                   ),
                 ),
 
@@ -1073,6 +869,15 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                     }, childCount: filtered.length),
                   ),
                   SliverToBoxAdapter(
+                    child: ArtistAboutCard(
+                      canonicalName: _canonicalName,
+                      artistItem: _artistItem,
+                      languages: _languages,
+                      totalTracks: _allSongs.length,
+                      themeColor: themeColor,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 20, bottom: 160),
                       child: Center(
@@ -1164,13 +969,6 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAvatarFallback() {
-    return Container(
-      color: const Color(0xFF1E1E2C),
-      child: const Icon(Icons.person_rounded, size: 52, color: Colors.white54),
     );
   }
 }

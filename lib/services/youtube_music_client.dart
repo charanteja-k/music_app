@@ -61,12 +61,7 @@ class YouTubeMusicClient {
 
     try {
       final uri = Uri.parse('$_baseUrl/search');
-      final payload = {
-        'context': _context,
-        'query': query.trim(),
-        // Song filter parameter to restrict to official studio releases
-        'params': 'Eg-KAQwIABAAGAEgASgAMABqChAMEAMQBBAJEAo%3D',
-      };
+      final payload = {'context': _context, 'query': query.trim()};
 
       final response = await http
           .post(uri, headers: _headers, body: json.encode(payload))
@@ -80,19 +75,35 @@ class YouTubeMusicClient {
       final data = json.decode(response.body);
       final List<Video> songs = [];
 
-      // Navigate through InnerTube sections to extract musicResponsiveListItemRenderer items
+      // Navigate through InnerTube sections to extract music items
       final contents =
-          data['contents']?['tabbedSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] ??
+          data['contents']?['tabbedSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+              as List<dynamic>? ??
           [];
 
+      // 1. Check Top Result Card if it is a studio song
+      if (contents.isNotEmpty &&
+          contents[0]['musicCardShelfRenderer'] != null) {
+        final card =
+            contents[0]['musicCardShelfRenderer'] as Map<String, dynamic>;
+        final cardSong = _parseCardShelfRenderer(card);
+        if (cardSong != null) {
+          songs.add(cardSong);
+        }
+      }
+
+      // 2. Scan sections for official studio songs
       for (final section in contents) {
-        final items = section['musicShelfRenderer']?['contents'] ?? [];
+        final items =
+            section['itemSectionRenderer']?['contents'] as List<dynamic>? ??
+            section['musicShelfRenderer']?['contents'] as List<dynamic>? ??
+            [];
         for (final item in items) {
           final renderer = item['musicResponsiveListItemRenderer'];
           if (renderer == null) continue;
 
           final song = _parseListItemRenderer(renderer);
-          if (song != null) {
+          if (song != null && !songs.any((s) => s.id.value == song.id.value)) {
             songs.add(song);
             if (songs.length >= limit) break;
           }
@@ -107,6 +118,61 @@ class YouTubeMusicClient {
     } catch (e) {
       debugPrint('[YTM] Search error: $e');
       return [];
+    }
+  }
+
+  Video? _parseCardShelfRenderer(Map<String, dynamic> card) {
+    try {
+      final vid =
+          card['onTap']?['watchEndpoint']?['videoId'] as String? ??
+          card['buttons']?[0]?['buttonRenderer']?['command']?['watchEndpoint']?['videoId']
+              as String?;
+      if (vid == null || vid.length != 11) return null;
+
+      final title = card['title']?['runs']?[0]?['text'] as String? ?? '';
+      if (title.isEmpty) return null;
+
+      final subRuns = card['subtitle']?['runs'] as List<dynamic>? ?? [];
+      final artistRun = subRuns.firstWhere(
+        (r) =>
+            r['navigationEndpoint']?['browseEndpoint']?['browseId']
+                ?.toString()
+                .startsWith('UC') ==
+            true,
+        orElse: () => null,
+      );
+      final rawAuthor = artistRun != null
+          ? (artistRun['text'] as String? ?? 'Various Artists')
+          : (subRuns.length > 2
+                ? (subRuns[2]['text'] as String? ?? 'Various Artists')
+                : 'Various Artists');
+
+      final cleanA = CanonicalSongDedup.cleanArtist(rawAuthor);
+      final author = cleanA.isNotEmpty ? cleanA : rawAuthor;
+      final cleanTitle = CanonicalSongDedup.sanitizeDisplayTitle(
+        title,
+        artist: author,
+      );
+
+      final track = Video(
+        VideoId(vid),
+        cleanTitle,
+        author,
+        ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+        DateTime.now(),
+        '',
+        null,
+        '',
+        const Duration(seconds: 210),
+        ThumbnailSet(vid),
+        null,
+        Engagement(0, null, null),
+        false,
+      );
+
+      return CanonicalSongDedup.isGenuineSong(track) ? track : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -267,6 +333,11 @@ class YouTubeMusicClient {
         videoId = titleNav?['watchEndpoint']?['videoId'] as String?;
       }
 
+      if (videoId == null) {
+        final onT = renderer['onTap'];
+        videoId = onT?['watchEndpoint']?['videoId'] as String?;
+      }
+
       if (videoId == null || videoId.isEmpty) return null;
 
       // 3. Artist & Duration
@@ -278,7 +349,20 @@ class YouTubeMusicClient {
             flexColumns[1]['musicResponsiveListItemFlexColumnRenderer'];
         final subRuns = subColumn?['text']?['runs'] as List<dynamic>? ?? [];
         if (subRuns.isNotEmpty) {
-          rawAuthor = subRuns[0]['text'] as String? ?? 'Unknown Artist';
+          final firstText = (subRuns[0]['text'] as String? ?? '').toLowerCase();
+          if (firstText == 'song' && subRuns.length > 2) {
+            rawAuthor = subRuns[2]['text'] as String? ?? 'Unknown Artist';
+          } else {
+            final artistRun = subRuns.firstWhere(
+              (r) =>
+                  r['navigationEndpoint']?['browseEndpoint']?['browseId']
+                      ?.toString()
+                      .startsWith('UC') ==
+                  true,
+              orElse: () => subRuns[0],
+            );
+            rawAuthor = artistRun['text'] as String? ?? 'Unknown Artist';
+          }
         }
 
         // Duration is often the last text run
@@ -295,7 +379,7 @@ class YouTubeMusicClient {
         artist: author,
       );
 
-      return Video(
+      final track = Video(
         VideoId(videoId),
         title,
         author,
@@ -310,6 +394,8 @@ class YouTubeMusicClient {
         Engagement(0, null, null),
         false,
       );
+
+      return CanonicalSongDedup.isGenuineSong(track) ? track : null;
     } catch (_) {
       return null;
     }
