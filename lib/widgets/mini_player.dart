@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import '../services/music_service.dart';
 import '../screens/player_screen.dart';
 import '../constants/app_theme_tokens.dart';
+import 'dilse_image.dart';
 
 class MiniPlayer extends StatefulWidget {
   const MiniPlayer({super.key});
@@ -29,12 +30,31 @@ class MiniPlayer extends StatefulWidget {
 
 class _MiniPlayerState extends State<MiniPlayer> {
   final MusicService _musicService = MusicService();
+  String? _lastEnrichedSongId;
 
   @override
   void initState() {
     super.initState();
     _musicService.addListener(_onMusicStateChanged);
     MiniPlayer.isVisible.addListener(_onVisibilityChanged);
+    _maybeEnrichArtwork();
+  }
+
+  void _maybeEnrichArtwork() {
+    final isTesting = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
+    if (isTesting) return;
+
+    final song = _musicService.currentSong;
+    if (song != null && song.id.value != _lastEnrichedSongId) {
+      _lastEnrichedSongId = song.id.value;
+      final hdThumbnail = MusicService.getHdThumbnail(song.id.value);
+      if (hdThumbnail.isEmpty ||
+          hdThumbnail.startsWith('https://i.ytimg.com/')) {
+        _musicService.enrichArtworkForSongs([song]);
+      }
+    }
   }
 
   @override
@@ -59,6 +79,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   void _onMusicStateChanged() {
+    _maybeEnrichArtwork();
     if (mounted) setState(() {});
   }
 
@@ -118,6 +139,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
     final hdThumbnail = song != null
         ? MusicService.getHdThumbnail(song.id.value)
         : '';
+    final thumbUrl = hdThumbnail.isNotEmpty
+        ? hdThumbnail
+        : (song?.thumbnails.highResUrl ?? '');
 
     if (song == null && !isLoading) {
       return const SizedBox.shrink();
@@ -177,18 +201,28 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         child: SizedBox(
                           width: 44,
                           height: 44,
-                          child: (hdThumbnail.isNotEmpty)
-                              ? Image.network(
-                                  hdThumbnail,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: 120,
-                                  cacheHeight: 120,
-                                  errorBuilder: (_, _, _) => Container(
-                                    color: const Color(0xFF1E1E28),
-                                    child: const Icon(
-                                      Icons.music_note_rounded,
-                                      color: Colors.white38,
-                                      size: 20,
+                          child: thumbUrl.isNotEmpty
+                              ? Transform.scale(
+                                  // YouTube audio uploads often have letterbox/pillarbox margins; crop flush to fill the 44x44 square
+                                  scale:
+                                      thumbUrl.startsWith(
+                                        'https://i.ytimg.com/',
+                                      )
+                                      ? 1.35
+                                      : 1.0,
+                                  child: DilSeImage(
+                                    key: ValueKey(thumbUrl),
+                                    imageUrl: thumbUrl,
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorWidget: Container(
+                                      color: const Color(0xFF1E1E28),
+                                      child: const Icon(
+                                        Icons.music_note_rounded,
+                                        color: Colors.white38,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
                                 )

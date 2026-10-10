@@ -44,6 +44,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   LandscapeActiveTab _landscapeTab = LandscapeActiveTab.none;
   int? _doubleTapSeekDirection;
   Timer? _doubleTapSeekTimer;
+  int _doubleTapSeekCounter = 0;
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _doubleTapSeekTimer?.cancel();
     setState(() {
       _doubleTapSeekDirection = direction;
+      _doubleTapSeekCounter++;
     });
     _doubleTapSeekTimer = Timer(const Duration(milliseconds: 650), () {
       if (mounted) {
@@ -1956,42 +1958,91 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                                                 0.18,
                                                                           ),
                                                                     ),
-                                                                    child: Column(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .center,
-                                                                      children: [
-                                                                        Icon(
-                                                                          _doubleTapSeekDirection ==
-                                                                                  -1
-                                                                              ? Icons.replay_10_rounded
-                                                                              : Icons.forward_10_rounded,
-                                                                          color:
-                                                                              Colors.white,
-                                                                          size:
-                                                                              42,
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              6,
-                                                                        ),
-                                                                        Text(
-                                                                          _doubleTapSeekDirection ==
-                                                                                  -1
-                                                                              ? '-10 sec'
-                                                                              : '+10 sec',
-                                                                          style: const TextStyle(
+                                                                    child: TweenAnimationBuilder<double>(
+                                                                      key: ValueKey(
+                                                                        'seek_${_doubleTapSeekDirection}_$_doubleTapSeekCounter',
+                                                                      ),
+                                                                      tween: Tween<double>(
+                                                                        begin:
+                                                                            0.0,
+                                                                        end:
+                                                                            1.0,
+                                                                      ),
+                                                                      duration: const Duration(
+                                                                        milliseconds:
+                                                                            320,
+                                                                      ),
+                                                                      curve: Curves
+                                                                          .easeOutBack,
+                                                                      builder:
+                                                                          (
+                                                                            context,
+                                                                            animValue,
+                                                                            child,
+                                                                          ) {
+                                                                            final dir =
+                                                                                _doubleTapSeekDirection ==
+                                                                                    -1
+                                                                                ? -1.0
+                                                                                : 1.0;
+                                                                            final slideX =
+                                                                                dir *
+                                                                                (1.0 -
+                                                                                    animValue) *
+                                                                                14.0;
+                                                                            final scale =
+                                                                                0.82 +
+                                                                                (0.18 *
+                                                                                    animValue);
+                                                                            return Transform.translate(
+                                                                              offset: Offset(
+                                                                                slideX,
+                                                                                0,
+                                                                              ),
+                                                                              child: Transform.scale(
+                                                                                scale: scale,
+                                                                                child: Opacity(
+                                                                                  opacity: animValue.clamp(
+                                                                                    0.0,
+                                                                                    1.0,
+                                                                                  ),
+                                                                                  child: child,
+                                                                                ),
+                                                                              ),
+                                                                            );
+                                                                          },
+                                                                      child: Column(
+                                                                        mainAxisAlignment:
+                                                                            MainAxisAlignment.center,
+                                                                        children: [
+                                                                          Icon(
+                                                                            _doubleTapSeekDirection ==
+                                                                                    -1
+                                                                                ? Icons.replay_10_rounded
+                                                                                : Icons.forward_10_rounded,
                                                                             color:
                                                                                 Colors.white,
-                                                                            fontWeight:
-                                                                                FontWeight.bold,
-                                                                            fontSize:
-                                                                                13,
-                                                                            letterSpacing:
-                                                                                0.3,
+                                                                            size:
+                                                                                42,
                                                                           ),
-                                                                        ),
-                                                                      ],
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                6,
+                                                                          ),
+                                                                          Text(
+                                                                            _doubleTapSeekDirection ==
+                                                                                    -1
+                                                                                ? '-10 sec'
+                                                                                : '+10 sec',
+                                                                            style: const TextStyle(
+                                                                              color: Colors.white,
+                                                                              fontWeight: FontWeight.bold,
+                                                                              fontSize: 13,
+                                                                              letterSpacing: 0.3,
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
                                                                     ),
                                                                   ),
                                                                 ),
@@ -2277,103 +2328,95 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Center(
-                                child: _BorderlessScaleButton(
-                                  scaleDown: 0.88,
-                                  onTap: () {
-                                    HapticFeedback.mediumImpact();
-                                    _musicService.previousSong();
-                                  },
-                                  child: const SizedBox(
-                                    width: 58,
-                                    height: 58,
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.skip_previous_rounded,
-                                        color: Colors.white,
-                                        size: 42,
-                                      ),
-                                    ),
+                            const Spacer(flex: 2),
+                            _BorderlessScaleButton(
+                              scaleDown: 0.88,
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                _musicService.previousSong();
+                              },
+                              child: const SizedBox(
+                                width: 54,
+                                height: 54,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.skip_previous_rounded,
+                                    color: Colors.white,
+                                    size: 42,
                                   ),
                                 ),
                               ),
                             ),
-                            Expanded(
-                              child: Center(
-                                child: _BorderlessScaleButton(
-                                  scaleDown: 0.92,
-                                  onTap: () {
-                                    HapticFeedback.mediumImpact();
-                                    _musicService.togglePlayPause();
-                                  },
-                                  child: SizedBox(
-                                    width: 76,
-                                    height: 76,
-                                    child: isLoading
-                                        ? const Center(
-                                            child: SizedBox(
-                                              width: 32,
-                                              height: 32,
-                                              child: CircularProgressIndicator(
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                      Color
-                                                    >(Colors.white),
-                                                strokeWidth: 3,
-                                              ),
-                                            ),
-                                          )
-                                        : Center(
-                                            child: AnimatedSwitcher(
-                                              duration: const Duration(
-                                                milliseconds: 220,
-                                              ),
-                                              transitionBuilder:
-                                                  (child, animation) =>
-                                                      ScaleTransition(
-                                                        scale: animation,
-                                                        child: FadeTransition(
-                                                          opacity: animation,
-                                                          child: child,
-                                                        ),
-                                                      ),
-                                              child: Icon(
-                                                isPlaying
-                                                    ? Icons.pause_rounded
-                                                    : Icons.play_arrow_rounded,
-                                                key: ValueKey<bool>(isPlaying),
-                                                color: Colors.white,
-                                                size: 58,
-                                              ),
-                                            ),
+                            const Spacer(flex: 1),
+                            _BorderlessScaleButton(
+                              scaleDown: 0.92,
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                _musicService.togglePlayPause();
+                              },
+                              child: SizedBox(
+                                width: 84,
+                                height: 84,
+                                child: isLoading
+                                    ? const Center(
+                                        child: SizedBox(
+                                          width: 36,
+                                          height: 36,
+                                          child: CircularProgressIndicator(
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
+                                            strokeWidth: 3,
                                           ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Center(
-                                child: _BorderlessScaleButton(
-                                  scaleDown: 0.88,
-                                  onTap: () {
-                                    HapticFeedback.mediumImpact();
-                                    _musicService.nextSong();
-                                  },
-                                  child: const SizedBox(
-                                    width: 58,
-                                    height: 58,
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.skip_next_rounded,
-                                        color: Colors.white,
-                                        size: 42,
+                                        ),
+                                      )
+                                    : Center(
+                                        child: AnimatedSwitcher(
+                                          duration: const Duration(
+                                            milliseconds: 220,
+                                          ),
+                                          transitionBuilder:
+                                              (child, animation) =>
+                                                  ScaleTransition(
+                                                    scale: animation,
+                                                    child: FadeTransition(
+                                                      opacity: animation,
+                                                      child: child,
+                                                    ),
+                                                  ),
+                                          child: Icon(
+                                            isPlaying
+                                                ? Icons.pause_rounded
+                                                : Icons.play_arrow_rounded,
+                                            key: ValueKey<bool>(isPlaying),
+                                            color: Colors.white,
+                                            size: 68,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                              ),
+                            ),
+                            const Spacer(flex: 1),
+                            _BorderlessScaleButton(
+                              scaleDown: 0.88,
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                _musicService.nextSong();
+                              },
+                              child: const SizedBox(
+                                width: 54,
+                                height: 54,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.skip_next_rounded,
+                                    color: Colors.white,
+                                    size: 42,
                                   ),
                                 ),
                               ),
                             ),
+                            const Spacer(flex: 2),
                           ],
                         ),
                       ),

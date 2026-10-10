@@ -314,6 +314,10 @@ class _HomeScreenState extends State<HomeScreen>
           if (albums.isNotEmpty) _trendingAlbums = albums;
           _isLoadingCharts = false;
         });
+        // Asynchronously enrich home cards with genuine JioSaavn album artwork
+        _musicService.enrichArtworkForSongs(charts);
+        _musicService.enrichArtworkForSongs(trending);
+        _musicService.enrichArtworkForSongs(circadian);
       }
     } catch (e) {
       if (mounted && !hadCache) {
@@ -1570,16 +1574,22 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.network(
-                            hdThumbnail,
-                            fit: BoxFit.cover,
-                            cacheWidth: 320,
-                            cacheHeight: 320,
-                            errorBuilder: (_, _, _) => Image.network(
-                              song.thumbnails.highResUrl,
+                          Transform.scale(
+                            scale:
+                                hdThumbnail.startsWith('https://i.ytimg.com/')
+                                ? 1.35
+                                : 1.0,
+                            child: Image.network(
+                              hdThumbnail,
                               fit: BoxFit.cover,
                               cacheWidth: 320,
                               cacheHeight: 320,
+                              errorBuilder: (_, _, _) => Image.network(
+                                song.thumbnails.highResUrl,
+                                fit: BoxFit.cover,
+                                cacheWidth: 320,
+                                cacheHeight: 320,
+                              ),
                             ),
                           ),
                           Positioned(
