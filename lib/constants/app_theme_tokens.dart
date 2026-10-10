@@ -11,7 +11,7 @@ class AppThemeTokens {
 
   // Backgrounds & Surfaces
   static const Color oledBackground = Color(0xFF09090C);
-  static const Color surfaceCard = Color(0xFF141419);
+  static const Color surfaceCard = Color(0xFF121218);
   static const Color surfaceElevated = Color(0xFF1A1A22);
   static const Color floatingDockSurface = Color(0xFF16161D);
 

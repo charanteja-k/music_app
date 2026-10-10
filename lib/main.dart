@@ -1,6 +1,7 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'constants/app_theme_tokens.dart';
 import 'services/audio_handler.dart';
 import 'screens/intro_splash_screen.dart';
 import 'services/preferences_service.dart';
@@ -54,19 +55,19 @@ class MusicApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               theme: ThemeData(
                 brightness: Brightness.dark,
-                scaffoldBackgroundColor: const Color(0xFF121212),
+                scaffoldBackgroundColor: AppThemeTokens.oledBackground,
                 primaryColor: effectiveThemeColor,
                 colorScheme: ColorScheme.dark(
                   primary: effectiveThemeColor,
-                  surface: const Color(0xFF121212),
+                  surface: AppThemeTokens.oledBackground,
                 ),
                 bottomNavigationBarTheme: BottomNavigationBarThemeData(
-                  backgroundColor: Colors.black,
+                  backgroundColor: AppThemeTokens.oledBackground,
                   selectedItemColor: effectiveThemeColor,
                   unselectedItemColor: Colors.white54,
                 ),
                 appBarTheme: const AppBarTheme(
-                  backgroundColor: Color(0xFF121212),
+                  backgroundColor: AppThemeTokens.oledBackground,
                   elevation: 0,
                 ),
                 useMaterial3: true,

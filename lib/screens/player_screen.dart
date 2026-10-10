@@ -17,6 +17,7 @@ import '../widgets/animated_lyrics.dart';
 import '../services/bug_report_service.dart';
 import '../services/screen_wake_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import '../constants/app_theme_tokens.dart';
 import 'album_screen.dart';
 import 'artist_profile_screen.dart';
 import '../services/dynamic_artist_service.dart';
@@ -1508,7 +1509,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                       Color.alphaBlend(
                         darkVibrantColor.withValues(alpha: 0.20),
-                        const Color(0xFF07070A),
+                        AppThemeTokens.oledBackground,
                       ),
                     ],
                     stops: const [0.0, 0.52, 1.0],
@@ -2732,7 +2733,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
                     Color.alphaBlend(
                       darkVibrantColor.withValues(alpha: 0.20),
-                      const Color(0xFF07070A),
+                      AppThemeTokens.oledBackground,
                     ),
                   ],
                   stops: const [0.0, 0.52, 1.0],

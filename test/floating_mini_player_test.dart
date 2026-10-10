@@ -78,5 +78,40 @@ void main() {
       await tester.pumpAndSettle();
       expect(MiniPlayer.isVisible.value, isTrue);
     });
+
+    testWidgets('Dynamically reflects theme accent color updates', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: MiniPlayer())),
+      );
+      await tester.pump();
+
+      // Initially default accent
+      final initialColor = PreferencesService().legibleThemeColor;
+
+      // Verify progress bar container has initial accent color
+      final barFinder = find.descendant(
+        of: find.byType(FractionallySizedBox),
+        matching: find.byType(Container),
+      );
+      expect(barFinder, findsOneWidget);
+      Container barContainer = tester.widget(barFinder);
+      expect(
+        (barContainer.decoration as BoxDecoration).color,
+        equals(initialColor),
+      );
+
+      // Change accent color dynamically
+      const newAccent = Color(0xFF00E5FF);
+      await PreferencesService().setThemeColor(newAccent);
+      await tester.pumpAndSettle();
+
+      barContainer = tester.widget(barFinder);
+      expect(
+        (barContainer.decoration as BoxDecoration).color,
+        equals(newAccent),
+      );
+    });
   });
 }

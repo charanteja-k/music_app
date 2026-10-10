@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/music_service.dart';
+import '../services/preferences_service.dart';
 import '../screens/player_screen.dart';
 import '../constants/app_theme_tokens.dart';
 import 'dilse_image.dart';
@@ -37,7 +38,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
     super.initState();
     _musicService.addListener(_onMusicStateChanged);
     MiniPlayer.isVisible.addListener(_onVisibilityChanged);
+    PreferencesService().addListener(_onPreferencesChanged);
     _maybeEnrichArtwork();
+  }
+
+  void _onPreferencesChanged() {
+    if (mounted) setState(() {});
   }
 
   void _maybeEnrichArtwork() {
@@ -61,6 +67,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   void dispose() {
     _musicService.removeListener(_onMusicStateChanged);
     MiniPlayer.isVisible.removeListener(_onVisibilityChanged);
+    PreferencesService().removeListener(_onPreferencesChanged);
     super.dispose();
   }
 
@@ -143,6 +150,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
         ? hdThumbnail
         : (song?.thumbnails.highResUrl ?? '');
 
+    final accentColor = PreferencesService().legibleThemeColor;
+
     if (song == null && !isLoading) {
       return const SizedBox.shrink();
     }
@@ -177,7 +186,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
               AppThemeTokens.radiusFloatingDock,
             ),
             border: Border.all(
-              color: AppThemeTokens.floatingDockBorder,
+              color: isPlaying
+                  ? accentColor.withValues(alpha: 0.28)
+                  : AppThemeTokens.floatingDockBorder,
               width: 1,
             ),
             boxShadow: AppThemeTokens.dockShadow,
@@ -281,7 +292,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     ? Icons.favorite_rounded
                                     : Icons.favorite_border_rounded,
                                 color: _musicService.isLiked(song.id.value)
-                                    ? AppThemeTokens.brandRuby
+                                    ? accentColor
                                     : Colors.white60,
                                 size: 20,
                               ),
@@ -299,8 +310,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                             ),
                           const SizedBox(width: 2),
                           isLoading
-                              ? const Padding(
-                                  padding: EdgeInsets.symmetric(
+                              ? Padding(
+                                  padding: const EdgeInsets.symmetric(
                                     horizontal: 6.0,
                                   ),
                                   child: SizedBox(
@@ -308,7 +319,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
+                                      color: accentColor,
                                     ),
                                   ),
                                 )
@@ -386,9 +397,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                             widthFactor: progress,
                             child: Container(
                               height: 2.0,
-                              decoration: const BoxDecoration(
-                                color: AppThemeTokens.brandRuby,
-                              ),
+                              decoration: BoxDecoration(color: accentColor),
                             ),
                           );
                         },

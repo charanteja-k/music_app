@@ -965,7 +965,7 @@ class SearchScreenState extends State<SearchScreen>
                                   }
                                   return Container(
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF161622),
+                                      color: AppThemeTokens.surfaceCard,
                                       borderRadius: BorderRadius.circular(18),
                                       border: Border.all(
                                         color: Colors.white.withValues(

@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/dilse_capsule_data.dart';
 import '../services/capsule_service.dart';
 import '../services/preferences_service.dart';
+import '../constants/app_theme_tokens.dart';
 
 /// Full-screen, interactive on-device "DilSe Capsule" Story Experience.
 /// Generates and renders a private, Spotify Wrapped-style journey completely locally.
@@ -223,7 +224,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07070B),
+      backgroundColor: AppThemeTokens.oledBackground,
       body: Stack(
         children: [
           // Dynamic Ambient Mesh Background
@@ -719,25 +720,29 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                           color: const Color(0xFF1DB954),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.workspace_premium_rounded,
-                              color: Colors.black,
-                              size: 12,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '#1 MOST PLAYED',
-                              style: TextStyle(
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.workspace_premium_rounded,
                                 color: Colors.black,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
+                                size: 12,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 4),
+                              Text(
+                                '#1 MOST PLAYED',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -941,25 +946,29 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            color: Color(0xFFFF80AB),
-                            size: 14,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'YOUR #1 ARTIST',
-                            style: TextStyle(
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
                               color: Color(0xFFFF80AB),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
+                              size: 14,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4),
+                            Text(
+                              'YOUR #1 ARTIST',
+                              style: TextStyle(
+                                color: Color(0xFFFF80AB),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
