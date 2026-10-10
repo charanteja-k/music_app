@@ -863,6 +863,28 @@ void main() {
           ranked.last.id.value,
           'vid_movie_1',
         ); // Movie soundtrack downranked #3
+
+        // Compound Title + Artist query: "perfect ed sheeran"
+        final rankedEdSheeran = musicService.rankSearchResults(
+          testSongs,
+          'perfect ed sheeran',
+        );
+        expect(
+          rankedEdSheeran.first.id.value,
+          'vid_exact_1',
+          reason: 'Ed Sheeran - Perfect must be #1 for "perfect ed sheeran"',
+        );
+
+        // Compound Title + Artist query without space: "perfect edsheeran"
+        final rankedEdNoSpace = musicService.rankSearchResults(
+          testSongs,
+          'perfect edsheeran',
+        );
+        expect(
+          rankedEdNoSpace.first.id.value,
+          'vid_exact_1',
+          reason: 'Ed Sheeran - Perfect must be #1 for "perfect edsheeran"',
+        );
       },
     );
   });

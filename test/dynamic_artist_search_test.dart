@@ -361,5 +361,22 @@ void main() {
           .length;
       expect(bloodySweetCount, equals(1));
     });
+
+    test(
+      'fetchEntitySuggestions returns artist suggestion for known curated artist',
+      () async {
+        final suggestions = await MusicService().fetchEntitySuggestions(
+          'Ed Sheeran',
+        );
+        expect(
+          suggestions.any(
+            (s) =>
+                s.type == SearchSuggestionType.artist &&
+                s.text.toLowerCase().contains('ed sheeran'),
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 }

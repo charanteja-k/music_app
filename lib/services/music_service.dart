@@ -3037,6 +3037,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       _rankSearchResults(songs, rawQuery);
 
   /// Spotify-grade Search Relevance & Quality Re-ranking
+  /// Spotify-grade Search Relevance & Quality Re-ranking
   List<Video> _rankSearchResults(List<Video> songs, String rawQuery) {
     if (songs.isEmpty || rawQuery.trim().isEmpty) return songs;
 
@@ -3048,6 +3049,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
     final q = rawQuery.trim().toLowerCase();
     final cleanQ = CanonicalSongDedup.cleanTitle(rawQuery);
+    final cleanQCompact = cleanQ.replaceAll(RegExp(r'\s+'), '');
     final queryTokens = q
         .split(RegExp(r'\s+'))
         .where((t) => t.isNotEmpty)
@@ -3060,8 +3062,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       final song = dedupedSongs[i];
       final title = song.title.toLowerCase();
       final cleanT = CanonicalSongDedup.cleanTitle(song.title);
+      final cleanTCompact = cleanT.replaceAll(RegExp(r'\s+'), '');
       final author = song.author.toLowerCase();
       final cleanA = CanonicalSongDedup.cleanArtist(song.author);
+      final cleanACompact = cleanA.replaceAll(RegExp(r'\s+'), '');
 
       final dedupKey = '$cleanT|$cleanA';
       if (!seenKeys.add(dedupKey)) {
@@ -3070,41 +3074,99 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
       double score = 0.0;
 
-      // 1. Exact Title Match (e.g. "Perfect" == "perfect")
-      if (cleanT == cleanQ || title == q) {
-        score += 1000.0;
-      } else if (cleanT.startsWith(cleanQ)) {
-        score += 500.0;
-      } else if (cleanT.contains(cleanQ)) {
-        score += 250.0;
+      // 0. Compound Title + Artist Match:
+      // When the user specifies both the song title AND the artist (e.g. "perfect ed sheeran", "perfect edsheeran", "shape of you ed sheeran")
+      final songTitleTokens = cleanT
+          .split(RegExp(r'\s+'))
+          .where((t) => t.isNotEmpty)
+          .toSet();
+      final songArtistTokens = cleanA
+          .split(RegExp(r'\s+'))
+          .where((t) => t.isNotEmpty)
+          .toSet();
+
+      final bool hasTitleMatch =
+          (cleanT.isNotEmpty && cleanQ.contains(cleanT)) ||
+          (cleanTCompact.isNotEmpty && cleanQCompact.contains(cleanTCompact)) ||
+          (songTitleTokens.isNotEmpty &&
+              songTitleTokens.every(
+                (t) => cleanQ.contains(t) || queryTokens.contains(t),
+              ));
+
+      final bool hasArtistMatch =
+          (cleanA.isNotEmpty && cleanQ.contains(cleanA)) ||
+          (cleanACompact.isNotEmpty && cleanQCompact.contains(cleanACompact)) ||
+          (songArtistTokens.isNotEmpty &&
+              songArtistTokens.every(
+                (t) => cleanQ.contains(t) || queryTokens.contains(t),
+              ));
+
+      if (hasTitleMatch && hasArtistMatch) {
+        score += 2500.0;
       }
 
-      // 2. Token overlap score
+      // 1. Exact Title Match (e.g. "Perfect" == "perfect")
+      if (cleanT == cleanQ || title == q) {
+        score += 1200.0;
+      } else if (cleanT.startsWith(cleanQ)) {
+        score += 600.0;
+      } else if (cleanT.contains(cleanQ)) {
+        score += 300.0;
+      }
+
+      // 2. Token overlap score (both Title and Artist tokens)
       for (final token in queryTokens) {
-        if (cleanT.contains(token) || title.contains(token)) {
-          score += 100.0;
+        if (token.length >= 2) {
+          if (cleanT.contains(token) || title.contains(token)) {
+            score += 100.0;
+          }
+          if (cleanA.contains(token) || author.contains(token)) {
+            score += 80.0;
+          }
         }
       }
 
       // 3. Artist Match (user searched artist name e.g. "Ed Sheeran", "SPB")
       if (cleanA == cleanQ || author == q) {
-        score += 600.0;
-      } else if (cleanA.contains(cleanQ) || author.contains(q)) {
-        score += 300.0;
+        score += 800.0;
+      } else if (cleanA.contains(cleanQ) ||
+          author.contains(q) ||
+          (cleanA.isNotEmpty && cleanQ.contains(cleanA))) {
+        score += 400.0;
       }
 
-      // 4. Standalone Song vs Movie Tag penalty:
+      // 4. Standalone Song vs Movie Tag / Remix / Version penalty:
       // If user searched a simple standalone title like "perfect", penalize noisy tags like (From "...")
-      if (cleanQ.split(' ').length <= 2) {
-        if (title.contains('from "') ||
-            title.contains("from '") ||
-            title.contains('soundtrack')) {
-          score -= 150.0;
+      final isMovieTag =
+          title.contains('from "') ||
+          title.contains("from '") ||
+          title.contains('soundtrack') ||
+          title.contains('ost');
+      if (isMovieTag) {
+        final hasMovieQuery = queryTokens.any(
+          (t) =>
+              t.length > 2 &&
+              title.contains(t) &&
+              !cleanT.contains(t) &&
+              !cleanA.contains(t),
+        );
+        if (!hasMovieQuery) {
+          score -= 300.0;
         }
-        if (title.contains('remix') ||
-            title.contains('dj mix') ||
-            title.contains('dsp mix')) {
-          score -= 100.0;
+      }
+
+      final isAlternativeVersion =
+          title.contains('remix') ||
+          title.contains('dj mix') ||
+          title.contains('dsp mix') ||
+          title.contains('acoustic') ||
+          title.contains('cover');
+      if (isAlternativeVersion) {
+        final hasVersionQuery = queryTokens.any(
+          (t) => t == 'remix' || t == 'acoustic' || t == 'cover' || t == 'mix',
+        );
+        if (!hasVersionQuery) {
+          score -= 200.0;
         }
       }
 
@@ -3112,12 +3174,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       final lengthPenalty = (cleanT.length - cleanQ.length).clamp(0, 50) * 2.0;
       score -= lengthPenalty;
 
-      // 6. Studio Quality Bonus: JioSaavn 320k studio tracks get overwhelming priority
+      // 6. Studio Quality Bonus: JioSaavn 320k studio tracks get quality priority when relevance is equal
       final bool isJioStudio =
           _artworkMap.containsKey(song.id.value) ||
           _webStreamUrls.containsKey(song.id.value);
       if (isJioStudio) {
-        score += 800.0;
+        score += 350.0;
       }
 
       // 7. Video Noise Penalty: Heavily penalize YouTube video uploads and non-music clips
@@ -3152,15 +3214,18 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     String query, {
     int limit = 8,
   }) async {
-    if (query.trim().isEmpty) return [];
+    final cleanQ = query.trim();
+    if (cleanQ.isEmpty) return [];
 
     final suggestions = <SearchSuggestion>[];
-    final qLower = query.toLowerCase().trim();
+    final seen = <String>{};
+    final qLower = cleanQ.toLowerCase();
 
     // 1. Instant Local Search History (🕒)
     final history = PreferencesService().searchHistory;
     for (final item in history) {
-      if (item.toLowerCase().contains(qLower)) {
+      final itemLower = item.toLowerCase();
+      if (itemLower.contains(qLower) && seen.add(itemLower)) {
         suggestions.add(
           SearchSuggestion(
             text: item,
@@ -3172,10 +3237,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    // 2. Instant Local Top Artists (👤)
+    // 2. Instant Curated & Listening Top Artists (👤)
     final topArtists = PreferencesService().getTopArtists(limit: 10);
     for (final artist in topArtists) {
-      if (artist.toLowerCase().contains(qLower)) {
+      final aLower = artist.toLowerCase();
+      if (aLower.contains(qLower) && seen.add(aLower)) {
         suggestions.add(
           SearchSuggestion(
             text: artist,
@@ -3187,61 +3253,64 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    // 3. JioSaavn Autocomplete API (clean entity categorization)
-    try {
-      final response = await http
-          .get(ApiConfig.jioSuggestionsUri(query, limit: limit))
-          .timeout(const Duration(seconds: 3));
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonList = json.decode(response.body);
-        for (var item in jsonList) {
-          final text = item.toString().trim();
-          if (text.isEmpty ||
-              suggestions.any(
-                (s) => s.text.toLowerCase() == text.toLowerCase(),
-              )) {
-            continue;
-          }
+    // Also check DynamicArtistService curated catalog for instant artist match
+    final matchedArtist = DynamicArtistService().findArtist(cleanQ);
+    if (matchedArtist != null && seen.add(matchedArtist.name.toLowerCase())) {
+      suggestions.insert(
+        suggestions.length > 2 ? 2 : suggestions.length,
+        SearchSuggestion(
+          text: matchedArtist.name,
+          subtitle: 'Artist • ${matchedArtist.genre}',
+          type: SearchSuggestionType.artist,
+        ),
+      );
+    }
 
-          final isArtist = topArtists.any(
-            (a) => a.toLowerCase() == text.toLowerCase(),
-          );
+    // 3. Dynamic Global Suggestions (Google/YouTube & JioSaavn Edge)
+    if (suggestions.length < limit) {
+      final remaining = limit - suggestions.length;
+      final rawSuggestions = await fetchSuggestions(
+        cleanQ,
+        limit: remaining * 2,
+      );
+      for (final text in rawSuggestions) {
+        final textLower = text.toLowerCase();
+        if (text.isEmpty || !seen.add(textLower)) continue;
+
+        final isKnownArtist =
+            DynamicArtistService().isKnownArtist(text) ||
+            topArtists.any((a) => a.toLowerCase() == textLower);
+
+        if (isKnownArtist) {
           suggestions.add(
             SearchSuggestion(
               text: text,
-              subtitle: isArtist ? 'Artist' : 'Song',
-              type: isArtist
-                  ? SearchSuggestionType.artist
-                  : SearchSuggestionType.song,
+              subtitle: 'Artist',
+              type: SearchSuggestionType.artist,
             ),
           );
-          if (suggestions.length >= limit) break;
+        } else if (textLower.contains('song') ||
+            textLower.contains('lyrics') ||
+            textLower.contains('track')) {
+          suggestions.add(
+            SearchSuggestion(
+              text: text,
+              subtitle: 'Song',
+              type: SearchSuggestionType.song,
+            ),
+          );
+        } else {
+          suggestions.add(
+            SearchSuggestion(
+              text: text,
+              subtitle: 'Search',
+              type: SearchSuggestionType.query,
+            ),
+          );
         }
-      }
-    } catch (_) {}
 
-    // 4. Fill with YouTube suggestions if still sparse
-    if (suggestions.length < limit) {
-      try {
-        final rawStrings = await fetchSuggestions(
-          query,
-          limit: limit - suggestions.length,
-        );
-        for (final str in rawStrings) {
-          if (!suggestions.any(
-            (s) => s.text.toLowerCase() == str.toLowerCase(),
-          )) {
-            suggestions.add(
-              SearchSuggestion(
-                text: str,
-                subtitle: 'Search',
-                type: SearchSuggestionType.query,
-              ),
-            );
-            if (suggestions.length >= limit) break;
-          }
-        }
-      } catch (_) {}
+        if (suggestions.length >= limit) break;
+      }
     }
 
     return suggestions;
@@ -3249,34 +3318,87 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Live query suggestions while typing (up to [limit] suggestions)
   Future<List<String>> fetchSuggestions(String query, {int limit = 8}) async {
-    if (query.trim().isEmpty) return [];
+    final cleanQ = query.trim();
+    if (cleanQ.isEmpty) return [];
 
-    // 1. Primary: JioSaavn Instant Edge Suggestions (both Mobile and Web)
+    final suggestionsSet = <String>{};
+
+    // Parallel fetch: Google/YouTube Instant Complete + JioSaavn Edge
     try {
-      final response = await http
-          .get(ApiConfig.jioSuggestionsUri(query, limit: limit))
-          .timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonList = json.decode(response.body);
-        final list = jsonList.map((e) => e.toString()).toList();
-        if (list.isNotEmpty) return list;
+      final futures = await Future.wait([
+        // 1. Google / YouTube Complete Search (global catalog, keyless, <50ms)
+        http
+            .get(
+              Uri.parse(
+                'https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${Uri.encodeComponent(cleanQ)}',
+              ),
+            )
+            .timeout(const Duration(seconds: 3))
+            .then((res) {
+              if (res.statusCode == 200) {
+                final List<dynamic> jsonList = json.decode(res.body);
+                if (jsonList.length > 1 && jsonList[1] is List) {
+                  return (jsonList[1] as List)
+                      .map((e) => e.toString().trim())
+                      .toList();
+                }
+              }
+              return <String>[];
+            })
+            .catchError((_) => <String>[]),
+
+        // 2. JioSaavn Instant Edge Suggestions (Indian catalog supplement)
+        http
+            .get(ApiConfig.jioSuggestionsUri(cleanQ, limit: limit))
+            .timeout(const Duration(seconds: 3))
+            .then((res) {
+              if (res.statusCode == 200) {
+                final List<dynamic> jsonList = json.decode(res.body);
+                return jsonList.map((e) => e.toString().trim()).toList();
+              }
+              return <String>[];
+            })
+            .catchError((_) => <String>[]),
+      ]);
+
+      final List<String> ytList = futures[0];
+      final List<String> jioList = futures[1];
+
+      // Interleave/merge ensuring high relevance and no duplicates
+      for (final item in ytList) {
+        if (item.isNotEmpty && suggestionsSet.length < limit) {
+          suggestionsSet.add(item);
+        }
       }
-    } catch (e) {
-      debugPrint('jioSuggestions error: $e');
+      for (final item in jioList) {
+        if (item.isNotEmpty && suggestionsSet.length < limit) {
+          suggestionsSet.add(item);
+        }
+      }
+    } catch (_) {}
+
+    if (suggestionsSet.isNotEmpty) {
+      return suggestionsSet.toList();
     }
 
-    // 2. Secondary fallback
-    try {
-      final response = await http
-          .get(ApiConfig.suggestionsUri(query, limit: limit))
-          .timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonList = json.decode(response.body);
-        return jsonList.map((e) => e.toString()).toList();
+    // 3. Fallback: Secondary cloud backend if configured
+    if (PreferencesService().customServerUrl.isNotEmpty) {
+      try {
+        final response = await http
+            .get(ApiConfig.suggestionsUri(cleanQ, limit: limit))
+            .timeout(const Duration(seconds: 3));
+        if (response.statusCode == 200) {
+          final List<dynamic> jsonList = json.decode(response.body);
+          return jsonList
+              .map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('fetchSuggestions fallback error: $e');
       }
-    } catch (e) {
-      debugPrint('fetchSuggestions error: $e');
     }
+
     return [];
   }
 
