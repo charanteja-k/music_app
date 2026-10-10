@@ -17,6 +17,9 @@ import '../widgets/animated_equalizer.dart';
 import 'artist_profile_screen.dart';
 import 'album_screen.dart';
 import 'curated_playlist_screen.dart';
+import 'downloads_screen.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/offline_barrier.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, this.isActive = true});
@@ -32,6 +35,7 @@ class SearchScreenState extends State<SearchScreen>
   final MusicService _musicService = MusicService();
   final PreferencesService _prefs = PreferencesService();
   final DynamicArtistService _artistService = DynamicArtistService();
+  final ConnectivityService _connectivity = ConnectivityService();
   late final FocusNode _searchFocusNode;
   DateTime? _lastBackHandledTimestamp;
 
@@ -182,6 +186,7 @@ class SearchScreenState extends State<SearchScreen>
     _searchFocusNode.addListener(_onFocusChanged);
     _prefs.addListener(_onPrefsChanged);
     _musicService.addListener(_onPrefsChanged);
+    _connectivity.addListener(_onPrefsChanged);
     _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -255,6 +260,7 @@ class SearchScreenState extends State<SearchScreen>
     _debounceTimer?.cancel();
     _prefs.removeListener(_onPrefsChanged);
     _musicService.removeListener(_onPrefsChanged);
+    _connectivity.removeListener(_onPrefsChanged);
     _searchController.removeListener(_onSearchChanged);
     _searchFocusNode.removeListener(_onFocusChanged);
     _searchFocusNode.dispose();
@@ -279,6 +285,16 @@ class SearchScreenState extends State<SearchScreen>
     final String effectiveQuery = isArtistSearch
         ? (_artistService.findArtist(query)?.name ?? query)
         : query;
+
+    if (_connectivity.isOffline) {
+      setState(() {
+        _isSearching = false;
+        _currentQuery = effectiveQuery;
+        _searchResults.clear();
+        _albumResults.clear();
+      });
+      return;
+    }
 
     setState(() {
       _isSearching = true;
@@ -602,6 +618,17 @@ class SearchScreenState extends State<SearchScreen>
                                 );
                               }
                             },
+                          );
+                        },
+                      )
+                    : (_connectivity.isOffline && _currentQuery.isNotEmpty)
+                    ? OfflineBarrier(
+                        onGoToDownloads: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DownloadsScreen(),
+                            ),
                           );
                         },
                       )

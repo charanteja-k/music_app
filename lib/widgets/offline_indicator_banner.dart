@@ -1,73 +1,55 @@
-import 'dart:async';
-import 'dart:io' show InternetAddress, SocketException, Platform;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_theme_tokens.dart';
+import '../services/connectivity_service.dart';
 
 /// Non-intrusive persistent offline notification banner directing user to Downloads.
 class OfflineIndicatorBanner extends StatefulWidget {
   final VoidCallback onGoToDownloads;
+  final bool? isOfflineOverride;
 
-  const OfflineIndicatorBanner({super.key, required this.onGoToDownloads});
+  const OfflineIndicatorBanner({
+    super.key,
+    required this.onGoToDownloads,
+    this.isOfflineOverride,
+  });
 
   @override
   State<OfflineIndicatorBanner> createState() => _OfflineIndicatorBannerState();
 }
 
 class _OfflineIndicatorBannerState extends State<OfflineIndicatorBanner> {
-  bool _isOffline = false;
+  final ConnectivityService _connectivity = ConnectivityService();
   bool _isDismissed = false;
-  Timer? _checkTimer;
 
   @override
   void initState() {
     super.initState();
-    _checkConnectivity();
-    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
-      _checkTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-        _checkConnectivity();
-      });
-    }
+    _connectivity.addListener(_onConnectivityChanged);
+    _connectivity.init();
   }
 
   @override
   void dispose() {
-    _checkTimer?.cancel();
+    _connectivity.removeListener(_onConnectivityChanged);
     super.dispose();
   }
 
-  Future<void> _checkConnectivity() async {
-    if (kIsWeb || Platform.environment.containsKey('FLUTTER_TEST')) {
-      return;
-    }
-
-    try {
-      final result = await InternetAddress.lookup(
-        '1.1.1.1',
-      ).timeout(const Duration(seconds: 2));
-      final online = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-      if (mounted && _isOffline == online) {
-        setState(() {
-          _isOffline = !online;
-          if (online) _isDismissed = false;
-        });
+  void _onConnectivityChanged() {
+    if (mounted) {
+      if (_connectivity.isOnline) {
+        setState(() => _isDismissed = false);
+      } else {
+        setState(() {});
       }
-    } on SocketException catch (_) {
-      if (mounted && !_isOffline) {
-        setState(() => _isOffline = true);
-      }
-    } on TimeoutException catch (_) {
-      if (mounted && !_isOffline) {
-        setState(() => _isOffline = true);
-      }
-    } catch (_) {
-      // Keep previous state on transient lookup errors
     }
   }
 
+  bool get _effectiveOffline =>
+      widget.isOfflineOverride ?? _connectivity.isOffline;
+
   @override
   Widget build(BuildContext context) {
-    if (!_isOffline || _isDismissed) {
+    if (!_effectiveOffline || _isDismissed) {
       return const SizedBox.shrink();
     }
 
@@ -78,7 +60,7 @@ class _OfflineIndicatorBannerState extends State<OfflineIndicatorBanner> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1711).withValues(alpha: 0.95),
+            color: const Color(0xFF161622).withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: const Color(0xFFFFB74D).withValues(alpha: 0.35),
@@ -122,7 +104,7 @@ class _OfflineIndicatorBannerState extends State<OfflineIndicatorBanner> {
                       ),
                     ),
                     Text(
-                      'Play downloaded songs without internet',
+                      'Playing from Downloads',
                       style: TextStyle(color: Colors.white70, fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
