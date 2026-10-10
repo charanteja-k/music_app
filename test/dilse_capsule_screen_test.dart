@@ -47,6 +47,7 @@ void main() {
 
     // Verify Slide 0 renders
     expect(find.text('DILSE CAPSULE'), findsOneWidget);
+    expect(find.text('2026 CELEBRATION'), findsOneWidget);
     expect(find.text('1250'), findsOneWidget);
     expect(find.text('MINUTES'), findsOneWidget);
 
@@ -56,6 +57,7 @@ void main() {
 
     expect(find.text('Your Top Tracks'), findsOneWidget);
     expect(find.text('Chaiyya Chaiyya'), findsOneWidget);
+    expect(find.text('#1 MOST PLAYED'), findsOneWidget);
 
     // Tap right to advance to Slide 2 (Top Artists)
     await tester.tapAt(const Offset(300, 400));
@@ -63,6 +65,7 @@ void main() {
 
     expect(find.text('Artists Who Moved You'), findsOneWidget);
     expect(find.text('A.R. Rahman'), findsOneWidget);
+    expect(find.text('YOUR #1 ARTIST'), findsOneWidget);
 
     // Tap right to advance to Slide 3 (Persona)
     await tester.tapAt(const Offset(300, 400));
@@ -77,6 +80,7 @@ void main() {
 
     expect(find.text('Save Card'), findsOneWidget);
     expect(find.text('Copy Text'), findsOneWidget);
+    expect(find.text('2026 CAPSULE'), findsOneWidget);
 
     // Tap left to return to Slide 3
     await tester.tapAt(const Offset(50, 400));

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -227,6 +228,9 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
         children: [
           // Dynamic Ambient Mesh Background
           _buildAnimatedBackground(),
+
+          // Celebratory Confetti & Particle Layer
+          _buildConfettiOverlay(),
 
           // Slide Content with Tap Detection
           GestureDetector(
@@ -492,6 +496,42 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
               ),
             ),
             const SizedBox(height: 36),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE040FB), Color(0xFF00E5FF)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE040FB).withValues(alpha: 0.45),
+                    blurRadius: 14,
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.celebration_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    '2026 CELEBRATION',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             Text(
               'YOUR 2026 SOUNDSCAPE',
               style: TextStyle(
@@ -554,18 +594,25 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
+        color: Colors.black.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE040FB).withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: Colors.white70, size: 16),
+              Icon(icon, color: Colors.white, size: 17),
               const SizedBox(width: 6),
               Text(
                 title,
@@ -582,7 +629,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.0,
@@ -627,14 +674,22 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF1DB954).withValues(alpha: 0.25),
-                  Colors.white.withValues(alpha: 0.08),
+                  const Color(0xFF1DB954).withValues(alpha: 0.28),
+                  const Color(0xFFFFD700).withValues(alpha: 0.12),
+                  Colors.white.withValues(alpha: 0.06),
                 ],
               ),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF1DB954).withValues(alpha: 0.5),
+                color: const Color(0xFF1DB954).withValues(alpha: 0.6),
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1DB954).withValues(alpha: 0.25),
+                  blurRadius: 20,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -664,14 +719,25 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                           color: const Color(0xFF1DB954),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          '#1 MOST PLAYED',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                          ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.workspace_premium_rounded,
+                              color: Colors.black,
+                              size: 12,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '#1 MOST PLAYED',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -834,14 +900,22 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFFFF4081).withValues(alpha: 0.3),
-                  Colors.white.withValues(alpha: 0.08),
+                  const Color(0xFFFF4081).withValues(alpha: 0.32),
+                  const Color(0xFFFF9100).withValues(alpha: 0.12),
+                  Colors.white.withValues(alpha: 0.06),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFFFF4081).withValues(alpha: 0.6),
+                color: const Color(0xFFFF4081).withValues(alpha: 0.7),
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF4081).withValues(alpha: 0.25),
+                  blurRadius: 24,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -867,14 +941,25 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'YOUR #1 ARTIST',
-                        style: TextStyle(
-                          color: Color(0xFFFF80AB),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.0,
-                        ),
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            color: Color(0xFFFF80AB),
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'YOUR #1 ARTIST',
+                            style: TextStyle(
+                              color: Color(0xFFFF80AB),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -989,23 +1074,27 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 90,
-              height: 90,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.12),
-                border: Border.all(color: Colors.white30, width: 2),
+                color: Colors.white.withValues(alpha: 0.14),
+                border: Border.all(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
-                    blurRadius: 30,
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                    blurRadius: 36,
+                    spreadRadius: 4,
                   ),
                 ],
               ),
               child: Center(
                 child: Text(
                   _data.personaEmoji,
-                  style: const TextStyle(fontSize: 44),
+                  style: const TextStyle(fontSize: 48),
                 ),
               ),
             ),
@@ -1216,28 +1305,42 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+                              horizontal: 9,
+                              vertical: 3.5,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF1DB954,
-                              ).withValues(alpha: 0.2),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF1DB954), Color(0xFF00E5FF)],
+                              ),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(
-                                  0xFF1DB954,
-                                ).withValues(alpha: 0.6),
-                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF1DB954,
+                                  ).withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
-                            child: const Text(
-                              '2026 CAPSULE',
-                              style: TextStyle(
-                                color: Color(0xFF1DB954),
-                                fontWeight: FontWeight.w900,
-                                fontSize: 9.5,
-                                letterSpacing: 0.8,
-                              ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: Colors.black,
+                                  size: 11,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  '2026 CAPSULE',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 9.5,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1542,4 +1645,268 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       ),
     );
   }
+
+  Widget _buildConfettiOverlay() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _progressController,
+          builder: (context, _) {
+            return CustomPaint(
+              painter: _FestiveConfettiPainter(
+                progress: _progressController.value,
+                particles: _particles,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  static const List<_CapsuleParticle> _particles = [
+    _CapsuleParticle(
+      x: 0.12,
+      yOffset: 0.05,
+      speed: 0.7,
+      size: 7,
+      sway: 1.2,
+      color: Color(0xFFFFD700),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.28,
+      yOffset: 0.22,
+      speed: 0.9,
+      size: 5,
+      sway: 0.8,
+      color: Color(0xFFFA2D48),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.45,
+      yOffset: 0.15,
+      speed: 0.6,
+      size: 8,
+      sway: 1.5,
+      color: Color(0xFF00E5FF),
+      shape: 2,
+    ),
+    _CapsuleParticle(
+      x: 0.62,
+      yOffset: 0.35,
+      speed: 1.1,
+      size: 6,
+      sway: 0.9,
+      color: Color(0xFFE040FB),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.78,
+      yOffset: 0.10,
+      speed: 0.8,
+      size: 7,
+      sway: 1.1,
+      color: Color(0xFF1DB954),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.90,
+      yOffset: 0.45,
+      speed: 0.7,
+      size: 5,
+      sway: 1.4,
+      color: Color(0xFFFF9100),
+      shape: 2,
+    ),
+    _CapsuleParticle(
+      x: 0.06,
+      yOffset: 0.60,
+      speed: 1.0,
+      size: 6,
+      sway: 0.7,
+      color: Color(0xFFFA2D48),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.22,
+      yOffset: 0.50,
+      speed: 0.8,
+      size: 8,
+      sway: 1.3,
+      color: Color(0xFFFFD700),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.38,
+      yOffset: 0.75,
+      speed: 0.5,
+      size: 5,
+      sway: 1.0,
+      color: Color(0xFF00E5FF),
+      shape: 2,
+    ),
+    _CapsuleParticle(
+      x: 0.54,
+      yOffset: 0.65,
+      speed: 0.9,
+      size: 7,
+      sway: 1.2,
+      color: Color(0xFFE040FB),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.71,
+      yOffset: 0.80,
+      speed: 0.7,
+      size: 6,
+      sway: 0.8,
+      color: Color(0xFF1DB954),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.85,
+      yOffset: 0.70,
+      speed: 1.2,
+      size: 5,
+      sway: 1.6,
+      color: Color(0xFFFF9100),
+      shape: 2,
+    ),
+    _CapsuleParticle(
+      x: 0.18,
+      yOffset: 0.85,
+      speed: 0.6,
+      size: 7,
+      sway: 1.1,
+      color: Color(0xFFFFD700),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.33,
+      yOffset: 0.40,
+      speed: 1.0,
+      size: 5,
+      sway: 0.9,
+      color: Color(0xFFFA2D48),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.50,
+      yOffset: 0.90,
+      speed: 0.8,
+      size: 8,
+      sway: 1.4,
+      color: Color(0xFF00E5FF),
+      shape: 2,
+    ),
+    _CapsuleParticle(
+      x: 0.67,
+      yOffset: 0.25,
+      speed: 0.7,
+      size: 6,
+      sway: 1.0,
+      color: Color(0xFFE040FB),
+      shape: 0,
+    ),
+    _CapsuleParticle(
+      x: 0.82,
+      yOffset: 0.95,
+      speed: 1.1,
+      size: 7,
+      sway: 1.3,
+      color: Color(0xFF1DB954),
+      shape: 1,
+    ),
+    _CapsuleParticle(
+      x: 0.95,
+      yOffset: 0.18,
+      speed: 0.8,
+      size: 5,
+      sway: 0.7,
+      color: Color(0xFFFF9100),
+      shape: 2,
+    ),
+  ];
+}
+
+class _CapsuleParticle {
+  final double x;
+  final double yOffset;
+  final double speed;
+  final double size;
+  final double sway;
+  final Color color;
+  final int shape; // 0: rect, 1: circle, 2: strip
+
+  const _CapsuleParticle({
+    required this.x,
+    required this.yOffset,
+    required this.speed,
+    required this.size,
+    required this.sway,
+    required this.color,
+    required this.shape,
+  });
+}
+
+class _FestiveConfettiPainter extends CustomPainter {
+  final double progress;
+  final List<_CapsuleParticle> particles;
+
+  const _FestiveConfettiPainter({
+    required this.progress,
+    required this.particles,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final yNorm = (p.yOffset + progress * p.speed) % 1.0;
+      final y = yNorm * size.height;
+      final xNorm =
+          (p.x + 0.05 * math.sin((progress * 4.0 + p.yOffset * 10.0) * p.sway))
+              .clamp(0.02, 0.98);
+      final x = xNorm * size.width;
+
+      final paint = Paint()
+        ..color = p.color.withValues(alpha: 0.65)
+        ..style = PaintingStyle.fill;
+
+      canvas.save();
+      canvas.translate(x, y);
+      final angle = (progress * 6.0 + p.yOffset * 5.0) * p.sway;
+      canvas.rotate(angle);
+
+      if (p.shape == 0) {
+        canvas.drawRect(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: p.size,
+            height: p.size * 0.6,
+          ),
+          paint,
+        );
+      } else if (p.shape == 1) {
+        canvas.drawCircle(Offset.zero, p.size * 0.45, paint);
+      } else {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset.zero,
+              width: p.size * 1.4,
+              height: p.size * 0.4,
+            ),
+            const Radius.circular(2),
+          ),
+          paint,
+        );
+      }
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FestiveConfettiPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
