@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import '../models/jio_album.dart';
 import '../services/music_service.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/dilse_scrollbar.dart';
+import 'album_screen.dart';
 
 class CuratedPlaylistScreen extends StatefulWidget {
   final String title;
@@ -36,6 +38,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
   final ScrollController _scrollController = ScrollController();
 
   List<Video> _tracks = [];
+  List<JioAlbum> _relatedAlbums = [];
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -58,6 +61,8 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
   }
 
   Future<void> _loadTracks() async {
+    final query = widget.query ?? widget.title;
+
     if (widget.initialSongs != null && widget.initialSongs!.isNotEmpty) {
       if (mounted) {
         setState(() {
@@ -65,17 +70,28 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
           _isLoading = false;
         });
       }
+      try {
+        final albums = await _musicService.searchAlbums(query, limit: 10);
+        if (mounted) {
+          setState(() {
+            _relatedAlbums = albums;
+          });
+        }
+      } catch (_) {}
       return;
     }
 
-    final query = widget.query ?? widget.title;
     try {
-      final results = await _musicService.searchSongs(query);
+      final resultsFuture = _musicService.searchSongs(query);
+      final albumsFuture = _musicService.searchAlbums(query, limit: 10);
+      final results = await resultsFuture;
+      final albums = await albumsFuture;
       if (mounted) {
         setState(() {
           _tracks = results;
+          _relatedAlbums = albums;
           _isLoading = false;
-          if (_tracks.isEmpty) {
+          if (_tracks.isEmpty && _relatedAlbums.isEmpty) {
             _errorMessage = 'No tracks found for this playlist.';
           }
         });
@@ -95,6 +111,13 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return widget.gradientColors!;
     }
     return [const Color(0xFF6366F1), const Color(0xFF8B5CF6)];
+  }
+
+  String _formatDuration(Duration? duration) {
+    if (duration == null) return '';
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   @override
@@ -136,7 +159,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
                 slivers: [
-                  // App Bar with Back Button
+                  // App Bar with Elevated Back Button
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -146,13 +169,19 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white,
-                              size: 20,
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
                             ),
-                            onPressed: () => Navigator.pop(context),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              onPressed: () => Navigator.pop(context),
+                            ),
                           ),
                           Text(
                             widget.title,
@@ -326,7 +355,11 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                     ),
                   ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                  // Discovery Shelf (Row 1: Soundtracks & Albums)
+                  if (_relatedAlbums.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildSoundtracksShelf(context)),
 
                   // Tracklist or Loading state
                   if (_isLoading)
@@ -351,7 +384,44 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                         ),
                       ),
                     )
-                  else
+                  else ...[
+                    // Popular Tracks Header (Row 2+)
+                    if (_tracks.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.music_note_rounded,
+                                  size: 15,
+                                  color: primaryColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Popular Tracks (${_tracks.length})',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
                     SliverPadding(
                       padding: const EdgeInsets.only(
                         left: 12,
@@ -376,42 +446,62 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            leading: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  child: Text(
-                                    '${index + 1}',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: isCurrent
-                                          ? primaryColor
-                                          : Colors.white38,
-                                      fontSize: 13,
-                                      fontWeight: isCurrent
-                                          ? FontWeight.w800
-                                          : FontWeight.w500,
+                            leading: SizedBox(
+                              width: 76,
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 22,
+                                    child: Text(
+                                      '${index + 1}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isCurrent
+                                            ? primaryColor
+                                            : Colors.white38,
+                                        fontSize: 13,
+                                        fontWeight: isCurrent
+                                            ? FontWeight.w800
+                                            : FontWeight.w500,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    hdThumb,
-                                    width: 46,
-                                    height: 46,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Image.network(
-                                      video.thumbnails.lowResUrl,
+                                  const SizedBox(width: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: SizedBox(
                                       width: 46,
                                       height: 46,
-                                      fit: BoxFit.cover,
+                                      child: Image.network(
+                                        hdThumb,
+                                        width: 46,
+                                        height: 46,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) =>
+                                            Image.network(
+                                              video.thumbnails.lowResUrl,
+                                              width: 46,
+                                              height: 46,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, _, _) =>
+                                                  Container(
+                                                    width: 46,
+                                                    height: 46,
+                                                    color: const Color(
+                                                      0xFF161622,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.music_note_rounded,
+                                                      size: 20,
+                                                      color: Colors.white38,
+                                                    ),
+                                                  ),
+                                            ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             title: Text(
                               video.title,
@@ -437,6 +527,20 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (video.duration != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Text(
+                                      _formatDuration(video.duration),
+                                      style: TextStyle(
+                                        color: isCurrent
+                                            ? primaryColor
+                                            : Colors.white38,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
                                 if (isCurrent)
                                   Padding(
                                     padding: const EdgeInsets.only(right: 8),
@@ -468,6 +572,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                         }, childCount: _tracks.length),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -476,6 +581,189 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
           // Mini Player
           const Positioned(left: 0, right: 0, bottom: 0, child: MiniPlayer()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSoundtracksShelf(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.album_rounded,
+                  size: 15,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Soundtracks & Albums',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 185,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _relatedAlbums.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, idx) {
+              final album = _relatedAlbums[idx];
+              return _buildAlbumShelfCard(context, album);
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildAlbumShelfCard(BuildContext context, JioAlbum album) {
+    final isSingle = album.songCount <= 1;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AlbumScreen(
+              album: album,
+              albumId: album.id,
+              albumTitle: album.title,
+              albumArtwork: album.artwork,
+              albumArtist: album.artist,
+            ),
+          ),
+        );
+      },
+      child: SizedBox(
+        width: 125,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 125,
+              height: 125,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: album.artwork.isNotEmpty
+                          ? Image.network(
+                              album.artwork,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  _buildAlbumFallbackCover(album),
+                            )
+                          : _buildAlbumFallbackCover(album),
+                    ),
+                    if (album.songCount > 0)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isSingle
+                                  ? Colors.white24
+                                  : const Color(
+                                      0xFF7C3AED,
+                                    ).withValues(alpha: 0.5),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            isSingle ? 'Single' : '${album.songCount}',
+                            style: TextStyle(
+                              color: isSingle
+                                  ? Colors.white70
+                                  : const Color(0xFFA78BFA),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              album.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              album.artist.isNotEmpty
+                  ? album.artist
+                  : (album.year.isNotEmpty ? album.year : 'Album'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlbumFallbackCover(JioAlbum album) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF2E1065), Color(0xFF1E1B4B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.album_rounded, size: 36, color: Colors.white38),
       ),
     );
   }

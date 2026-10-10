@@ -264,13 +264,18 @@ class SearchScreenState extends State<SearchScreen>
     super.dispose();
   }
 
-  void _performSearch(String query, {bool isArtist = false}) async {
+  void _performSearch(
+    String query, {
+    bool isArtist = false,
+    String? type,
+  }) async {
     if (query.trim().isEmpty) return;
     _debounceTimer?.cancel();
 
-    await _prefs.addToSearchHistory(query);
-
     final bool isArtistSearch = isArtist || _artistService.isKnownArtist(query);
+    final String resolvedType = type ?? (isArtistSearch ? 'artist' : 'query');
+    await _prefs.addToSearchHistory(query, type: resolvedType);
+
     final String effectiveQuery = isArtistSearch
         ? (_artistService.findArtist(query)?.name ?? query)
         : query;
@@ -284,7 +289,7 @@ class SearchScreenState extends State<SearchScreen>
       _suggestions.clear();
       _searchResults.clear();
       _albumResults.clear();
-      _searchTabIndex = 0;
+      _searchTabIndex = resolvedType == 'album' ? 1 : 0;
     });
 
     // Fire song search + album search in parallel
@@ -373,7 +378,7 @@ class SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final history = _prefs.searchHistory;
+    final structuredHistory = _prefs.structuredSearchHistory;
 
     if (_browsePageController.hasClients) {
       final currentPage = _browsePageController.page?.round();
@@ -854,7 +859,7 @@ class SearchScreenState extends State<SearchScreen>
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (history.isNotEmpty) ...[
+                          if (structuredHistory.isNotEmpty) ...[
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -909,11 +914,28 @@ class SearchScreenState extends State<SearchScreen>
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 physics: const BouncingScrollPhysics(),
-                                itemCount: history.take(8).length,
+                                itemCount: structuredHistory.take(8).length,
                                 separatorBuilder: (_, _) =>
                                     const SizedBox(width: 8),
                                 itemBuilder: (context, idx) {
-                                  final item = history.take(8).toList()[idx];
+                                  final item = structuredHistory
+                                      .take(8)
+                                      .toList()[idx];
+                                  final IconData typeIcon;
+                                  final Color iconColor;
+                                  switch (item.type) {
+                                    case 'artist':
+                                      typeIcon = Icons.person_rounded;
+                                      iconColor = const Color(0xFFA78BFA);
+                                      break;
+                                    case 'album':
+                                      typeIcon = Icons.album_rounded;
+                                      iconColor = const Color(0xFF60A5FA);
+                                      break;
+                                    default:
+                                      typeIcon = Icons.history_rounded;
+                                      iconColor = Colors.white54;
+                                  }
                                   return Container(
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF161622),
@@ -929,8 +951,12 @@ class SearchScreenState extends State<SearchScreen>
                                       borderRadius: BorderRadius.circular(18),
                                       onTap: () {
                                         HapticFeedback.lightImpact();
-                                        _searchController.text = item;
-                                        _performSearch(item);
+                                        _searchController.text = item.query;
+                                        _performSearch(
+                                          item.query,
+                                          isArtist: item.type == 'artist',
+                                          type: item.type,
+                                        );
                                       },
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -940,12 +966,18 @@ class SearchScreenState extends State<SearchScreen>
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
+                                            Icon(
+                                              typeIcon,
+                                              size: 13,
+                                              color: iconColor,
+                                            ),
+                                            const SizedBox(width: 5),
                                             ConstrainedBox(
                                               constraints: const BoxConstraints(
                                                 maxWidth: 160,
                                               ),
                                               child: Text(
-                                                item,
+                                                item.query,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
@@ -961,7 +993,7 @@ class SearchScreenState extends State<SearchScreen>
                                               onTap: () {
                                                 HapticFeedback.selectionClick();
                                                 _prefs.removeFromSearchHistory(
-                                                  item,
+                                                  item.query,
                                                 );
                                                 setState(() {});
                                               },
@@ -1165,7 +1197,7 @@ class SearchScreenState extends State<SearchScreen>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final crossAxisCount = width > 900 ? 4 : (width > 600 ? 3 : 2);
-        final aspectRatio = width > 600 ? 1.75 : 1.60;
+        final aspectRatio = width > 600 ? 1.60 : 1.40;
 
         return ListView(
           key: const PageStorageKey('categories_grid_view'),
@@ -1686,6 +1718,7 @@ class SearchScreenState extends State<SearchScreen>
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
+        _prefs.addToSearchHistory(album.title, type: 'album');
         if (kIsWeb && MediaQuery.of(context).size.width >= 1024) {
           DesktopLayoutState.openAlbum(
             album: album,
