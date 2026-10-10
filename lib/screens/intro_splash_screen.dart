@@ -78,11 +78,17 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     _navigated = true;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: const Duration(milliseconds: 400),
         pageBuilder: (context, animation, secondaryAnimation) =>
             const MainScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            ),
+            child: child,
+          );
         },
       ),
     );
@@ -98,7 +104,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07070A),
+      backgroundColor: AppThemeTokens.oledBackground,
       body: Stack(
         children: [
           // Minimalist ambient center glow
@@ -107,13 +113,13 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
             builder: (context, _) {
               final t = _controller.value;
               final glowOpacity =
-                  (t < 0.3 ? (t / 0.3) * 0.22 : 0.22 + (0.08 * (1.0 - t)))
-                      .clamp(0.0, 0.35);
+                  (t < 0.3 ? (t / 0.3) * 0.18 : 0.18 + (0.06 * (1.0 - t)))
+                      .clamp(0.0, 0.28);
 
               return Center(
                 child: Container(
-                  width: 260,
-                  height: 260,
+                  width: 240,
+                  height: 240,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
@@ -121,8 +127,8 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
                         color: AppThemeTokens.brandRuby.withValues(
                           alpha: glowOpacity,
                         ),
-                        blurRadius: 100,
-                        spreadRadius: 20,
+                        blurRadius: 90,
+                        spreadRadius: 10,
                       ),
                     ],
                   ),
