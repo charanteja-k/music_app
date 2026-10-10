@@ -820,7 +820,40 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     if (_artworkMap.containsKey(videoId) && _artworkMap[videoId]!.isNotEmpty) {
       return _artworkMap[videoId]!;
     }
-    return 'https://i.ytimg.com/vi/$videoId/maxresdefault.jpg';
+    if (CanonicalSongDedup.isLikelyYouTubeId(videoId)) {
+      return 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
+    }
+    return '';
+  }
+
+  /// Resolves the human-readable album / soundtrack name for a song.
+  /// Falls back to extracted movie title, artist name, or 'Single' rather than hardcoded 'DilSe'.
+  static String resolveAlbumTitleForSong(Video song) {
+    final cached = getCachedAlbumTitle(song.id.value);
+    if (cached != null && cached.trim().isNotEmpty) return cached.trim();
+    final extracted = extractMovieOrAlbumTitle(song.title);
+    if (extracted != null && extracted.trim().isNotEmpty) {
+      return extracted.trim();
+    }
+    if (song.author.trim().isNotEmpty) return song.author.trim();
+    return 'Single';
+  }
+
+  /// Resolves a guaranteed valid, non-404 artwork URL for a song.
+  static String resolveArtworkUrl(Video song) {
+    final id = song.id.value;
+    final thumb = getHdThumbnail(id);
+    if (thumb.isNotEmpty) return thumb;
+    try {
+      final h = song.thumbnails.highResUrl;
+      if (h.isNotEmpty) return h;
+      final m = song.thumbnails.mediumResUrl;
+      if (m.isNotEmpty) return m;
+    } catch (_) {}
+    if (CanonicalSongDedup.isLikelyYouTubeId(id)) {
+      return 'https://i.ytimg.com/vi/$id/hqdefault.jpg';
+    }
+    return '';
   }
 
   static void registerArtwork(
@@ -988,8 +1021,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               break;
             case AudioInterruptionType.pause:
             case AudioInterruptionType.unknown:
-              _wasInterruptedBySystem = true;
-              _audioPlayer.pause();
+              if (_audioPlayer.playing) {
+                _wasInterruptedBySystem = true;
+                _audioPlayer.pause();
+              }
               break;
           }
         } else {
@@ -998,14 +1033,18 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               _audioPlayer.setVolume(1.0);
               break;
             case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
               if (_wasInterruptedBySystem) {
                 _wasInterruptedBySystem = false;
                 _audioPlayer.play();
               }
               break;
-            case AudioInterruptionType.unknown:
-              break;
           }
+        }
+      });
+      session.becomingNoisyEventStream.listen((_) {
+        if (_audioPlayer.playing) {
+          _audioPlayer.pause();
         }
       });
     } catch (e) {
@@ -1053,6 +1092,18 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       WebPlayerBridge.onError.listen((code) async {
         debugPrint('[WebPlayer] Error $code encountered. Handling recovery…');
         _isLoading = false;
+        final current = _currentSong;
+        if (current != null && _lastFailedSongId != current.id.value) {
+          // Retry current song once before auto-skipping to prevent single-tap drops
+          _lastFailedSongId = current.id.value;
+          _webStreamUrls.remove(current.id.value);
+          _showToast('Reconnecting stream…');
+          notifyListeners();
+          await Future.delayed(const Duration(milliseconds: 600));
+          await playSong(current, updateQueue: false);
+          return;
+        }
+
         _consecutivePlaybackFailures++;
         if (_consecutivePlaybackFailures >= 3) {
           debugPrint(
@@ -1111,10 +1162,18 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
               // If a crossfade was initiated, outgoing player reaching EOF is expected.
               // Do NOT cancel active fade or wipe incoming player that is currently resolving/buffering!
               if (_isCrossfading) {
-                debugPrint(
-                  '[AudioPlayer] Outgoing player reached EOF during crossfade. Standby deck will assume playback.',
-                );
-                return;
+                if (_standbyPlayer.playing) {
+                  debugPrint(
+                    '[AudioPlayer] Outgoing player reached EOF during crossfade. Standby deck assuming playback.',
+                  );
+                  return;
+                } else {
+                  // Standby deck didn't start playing yet! Transition cleanly so auto-advance doesn't stall.
+                  debugPrint(
+                    '[AudioPlayer] Outgoing player reached EOF but standby deck is not playing. Re-enabling auto-advance.',
+                  );
+                  _isCrossfading = false;
+                }
               }
 
               final currentPos = player.position;
@@ -1125,9 +1184,11 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
                   currentPos.inSeconds <
                       (currentDur.inSeconds * 0.85).round()) {
                 debugPrint(
-                  '[AudioPlayer] Ignoring spurious completion event at ${currentPos.inSeconds}s / ${currentDur.inSeconds}s',
+                  '[AudioPlayer] Ignoring premature completion event at ${currentPos.inSeconds}s / ${currentDur.inSeconds}s (player playing: ${player.playing})',
                 );
-                return;
+                if (player.playing) {
+                  return;
+                }
               }
               await _handleTrackCompletion();
             }
@@ -2234,10 +2295,16 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           if (localFile.existsSync()) {
             final mediaItem = MediaItem(
               id: trackId,
-              album: localItem['album'] ?? 'DilSe',
+              album:
+                  (localItem['album'] != null &&
+                      (localItem['album'] as String).trim().isNotEmpty)
+                  ? localItem['album']!
+                  : resolveAlbumTitleForSong(nextTrack),
               title: nextTrack.title,
               artist: nextTrack.author,
-              artUri: Uri.tryParse(getHdThumbnail(trackId)),
+              artUri: resolveArtworkUrl(nextTrack).isNotEmpty
+                  ? Uri.tryParse(resolveArtworkUrl(nextTrack))
+                  : null,
               duration: nextTrack.duration,
             );
             await _standbyPlayer.setAudioSource(
@@ -2264,10 +2331,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       if (streamUrl != null && streamUrl.isNotEmpty) {
         final mediaItem = MediaItem(
           id: trackId,
-          album: 'DilSe',
+          album: resolveAlbumTitleForSong(nextTrack),
           title: nextTrack.title,
           artist: nextTrack.author,
-          artUri: Uri.tryParse(getHdThumbnail(trackId)),
+          artUri: resolveArtworkUrl(nextTrack).isNotEmpty
+              ? Uri.tryParse(resolveArtworkUrl(nextTrack))
+              : null,
           duration: nextTrack.duration,
         );
 
@@ -4342,10 +4411,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
       final mediaItem = MediaItem(
         id: song.id.value,
-        album: 'DilSe',
+        album: resolveAlbumTitleForSong(song),
         title: song.title,
         artist: song.author,
-        artUri: Uri.tryParse(getHdThumbnail(song.id.value)),
+        artUri: resolveArtworkUrl(song).isNotEmpty
+            ? Uri.tryParse(resolveArtworkUrl(song))
+            : null,
         duration: song.duration,
       );
       if (!kIsWeb && audioHandler != null) {
@@ -4459,10 +4530,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
     final mediaItem = MediaItem(
       id: song.id.value,
-      album: 'DilSe',
+      album: resolveAlbumTitleForSong(song),
       title: song.title,
       artist: song.author,
-      artUri: Uri.tryParse(getHdThumbnail(song.id.value)),
+      artUri: resolveArtworkUrl(song).isNotEmpty
+          ? Uri.tryParse(resolveArtworkUrl(song))
+          : null,
       duration: song.duration,
     );
 
@@ -4700,7 +4773,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
             videoId: webVideoId,
             title: song.title,
             artist: song.author,
-            artworkUrl: getHdThumbnail(song.id.value),
+            artworkUrl: resolveArtworkUrl(song),
+            album: resolveAlbumTitleForSong(song),
             streamUrl: directStreamUrl,
             crossfadeSeconds: crossfadeSec,
           );
@@ -4711,7 +4785,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
             webVideoId,
             title: song.title,
             artist: song.author,
-            artworkUrl: getHdThumbnail(song.id.value),
+            artworkUrl: resolveArtworkUrl(song),
+            album: resolveAlbumTitleForSong(song),
             streamUrl: directStreamUrl,
           );
         }
@@ -5036,6 +5111,21 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       if (!playbackSourceSet) {
+        if (_lastFailedSongId != song.id.value) {
+          // Attempt 1 immediate retry for the selected track (evicting cached stream)
+          _lastFailedSongId = song.id.value;
+          _webStreamUrls.remove(song.id.value);
+          debugPrint(
+            '[Play] Initial resolution failed for "${song.title}". Retrying once…',
+          );
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (_currentSong?.id.value == song.id.value &&
+              sessionToken == _activePlaySessionToken) {
+            await playSong(song, updateQueue: false);
+            return;
+          }
+        }
+
         _consecutivePlaybackFailures++;
         _isLoading = false;
         _isCrossfading = false;
@@ -6214,15 +6304,24 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     if (_isCrossfading) {
       _cancelActiveFade();
     }
-    _savedPosition = position;
+    final totalDuration = duration ?? Duration.zero;
+    final maxSeek = (totalDuration > const Duration(milliseconds: 500))
+        ? totalDuration - const Duration(milliseconds: 500)
+        : totalDuration;
+    final clamped = (position < Duration.zero)
+        ? Duration.zero
+        : (position > maxSeek && maxSeek > Duration.zero ? maxSeek : position);
+
+    _savedPosition = clamped;
     if (kIsWeb) {
-      WebPlayerBridge.seek(position);
+      WebPlayerBridge.seek(clamped);
       notifyListeners();
-      PreferencesService().updateLastPlaybackPosition(position.inMilliseconds);
+      PreferencesService().updateLastPlaybackPosition(clamped.inMilliseconds);
       return;
     }
-    await _audioPlayer.seek(position);
-    PreferencesService().updateLastPlaybackPosition(position.inMilliseconds);
+    await _audioPlayer.seek(clamped);
+    notifyListeners();
+    PreferencesService().updateLastPlaybackPosition(clamped.inMilliseconds);
   }
 
   void togglePlayPause() {

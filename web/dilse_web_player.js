@@ -28,6 +28,7 @@
   let currentTitle = '';
   let currentArtist = '';
   let currentArtwork = '';
+  let currentAlbum = '';
   let lastReportedPos = 0;
   let lastReportedDur = 0;
   let fallbackTimer = null;
@@ -769,13 +770,6 @@
   window.addEventListener('focus', attemptAutoResumeAfterInterruption);
   window.addEventListener('pageshow', attemptAutoResumeAfterInterruption);
 
-  // Periodic poll to resume immediately once the reel or call finishes (only when visible to avoid notification glitch)
-  setInterval(() => {
-    if (isInterrupted && !isUserPaused && document.visibilityState === 'visible') {
-      attemptAutoResumeAfterInterruption();
-    }
-  }, 2000);
-
   // Background tab CPU & thermal optimization: throttle background tickers, snap UI on focus
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -874,7 +868,7 @@
     broadcastState('buffering');
 
     // Update MediaSession with initial metadata
-    window.dilseSetMetadata(currentTitle, currentArtist, currentArtwork);
+    window.dilseSetMetadata(currentTitle, currentArtist, currentArtwork, currentAlbum);
 
     isUserPaused = false;
     isInterrupted = false;
@@ -1038,7 +1032,8 @@
             window.dilseSetMetadata(
               jioSong.title || title,
               jioSong.artist || artist,
-              jioSong.artwork || artworkUrl
+              jioSong.artwork || artworkUrl,
+              jioSong.album || currentAlbum
             );
 
             audioEl.play().then(() => {
@@ -1089,7 +1084,7 @@
     isInterrupted = false;
     wasPlayingBeforeInterruption = true;
 
-    window.dilseSetMetadata(currentTitle, currentArtist, currentArtwork);
+    window.dilseSetMetadata(currentTitle, currentArtist, currentArtwork, currentAlbum);
 
     function startRamp() {
       // Toggle active deck
@@ -1156,7 +1151,13 @@
     }
   };
 
-  function cleanUpOnAppExit() {
+  function cleanUpOnAppExit(event) {
+    // If pagehide is fired with persisted=true or during active background playback,
+    // the page is entering bfcache (recent apps / tab switch).
+    // Do NOT destroy audio elements or strip src, which would kill background playback.
+    if (event && event.persisted) return;
+    if (event && event.type === 'pagehide' && !isUserPaused) return;
+
     stopBgAudio();
     cancelCrossfade();
     clearFallbackTimer();
@@ -1317,19 +1318,24 @@
     }
   };
 
-  window.dilseSetMetadata = function (title, artist, artworkUrl) {
+  window.dilseSetMetadata = function (title, artist, artworkUrl, album) {
     if (!('mediaSession' in navigator)) return;
 
     try {
+      if (album && album !== 'DilSe') currentAlbum = album;
+      const resolvedAlbum = (currentAlbum && currentAlbum !== 'DilSe')
+        ? currentAlbum
+        : (artist || 'Single');
+
       navigator.mediaSession.metadata = new MediaMetadata({
         title: title || 'DilSe Song',
         artist: artist || 'DilSe Music',
-        album: 'DilSe',
+        album: resolvedAlbum,
         artwork: artworkUrl
           ? [
-              { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
-              { src: artworkUrl, sizes: '192x192', type: 'image/jpeg' },
-              { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
+              { src: artworkUrl, sizes: '96x96' },
+              { src: artworkUrl, sizes: '192x192' },
+              { src: artworkUrl, sizes: '512x512' },
             ]
           : [],
       });
@@ -1339,6 +1345,10 @@
         window.dispatchEvent(new CustomEvent('dilse_remote_play'));
       });
       navigator.mediaSession.setActionHandler('pause', () => {
+        window.dilsePause();
+        window.dispatchEvent(new CustomEvent('dilse_remote_pause'));
+      });
+      navigator.mediaSession.setActionHandler('stop', () => {
         window.dilsePause();
         window.dispatchEvent(new CustomEvent('dilse_remote_pause'));
       });

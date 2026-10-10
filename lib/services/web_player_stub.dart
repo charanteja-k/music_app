@@ -23,6 +23,7 @@ class WebPlayerBridge {
     String? title,
     String? artist,
     String? artworkUrl,
+    String? album,
     double startSeconds = 0,
     String? streamUrl,
   }) {}
@@ -40,6 +41,7 @@ class WebPlayerBridge {
     String? title,
     String? artist,
     String? artworkUrl,
+    String? album,
     String? streamUrl,
     int crossfadeSeconds = 4,
   }) {}

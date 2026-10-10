@@ -46,6 +46,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   int? _doubleTapSeekDirection;
   Timer? _doubleTapSeekTimer;
   int _doubleTapSeekCounter = 0;
+  double? _sliderDragValue;
 
   @override
   void initState() {
@@ -2616,8 +2617,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final curMs = hasValidDuration
         ? position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble()
         : 0.0;
-    final remaining = hasValidDuration && duration > position
-        ? duration - position
+    final sliderVal = (_sliderDragValue ?? curMs).clamp(0.0, maxMs);
+    final displayPos = _sliderDragValue != null
+        ? Duration(milliseconds: _sliderDragValue!.toInt())
+        : position;
+    final remaining = hasValidDuration && duration > displayPos
+        ? duration - displayPos
         : Duration.zero;
 
     return Padding(
@@ -2639,13 +2644,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: Slider(
-              value: curMs,
+              value: sliderVal,
               min: 0,
               max: maxMs,
+              onChangeStart: hasValidDuration
+                  ? (val) {
+                      setState(() {
+                        _sliderDragValue = val;
+                      });
+                    }
+                  : null,
               onChanged: hasValidDuration
+                  ? (val) {
+                      setState(() {
+                        _sliderDragValue = val;
+                      });
+                    }
+                  : null,
+              onChangeEnd: hasValidDuration
                   ? (val) {
                       HapticFeedback.selectionClick();
                       _musicService.seek(Duration(milliseconds: val.toInt()));
+                      setState(() {
+                        _sliderDragValue = null;
+                      });
                     }
                   : null,
             ),
@@ -2656,7 +2678,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _formatDuration(position),
+                  _formatDuration(displayPos),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
@@ -3721,12 +3743,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       .toDouble()
                 : 0.0;
 
+            final sliderVal = (_sliderDragValue ?? curMs).clamp(0.0, maxMs);
+            final displayPos = _sliderDragValue != null
+                ? Duration(milliseconds: _sliderDragValue!.toInt())
+                : position;
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
                   Text(
-                    _formatDuration(position),
+                    _formatDuration(displayPos),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.65),
                       fontSize: 12,
@@ -3752,15 +3779,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ),
                       ),
                       child: Slider(
-                        value: curMs,
+                        value: sliderVal,
                         min: 0,
                         max: maxMs,
+                        onChangeStart: hasValidDuration
+                            ? (val) {
+                                setState(() {
+                                  _sliderDragValue = val;
+                                });
+                              }
+                            : null,
                         onChanged: hasValidDuration
+                            ? (val) {
+                                setState(() {
+                                  _sliderDragValue = val;
+                                });
+                              }
+                            : null,
+                        onChangeEnd: hasValidDuration
                             ? (val) {
                                 HapticFeedback.selectionClick();
                                 _musicService.seek(
                                   Duration(milliseconds: val.toInt()),
                                 );
+                                setState(() {
+                                  _sliderDragValue = null;
+                                });
                               }
                             : null,
                       ),
@@ -3808,12 +3852,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       .toDouble()
                 : 0.0;
 
+            final sliderVal = (_sliderDragValue ?? curMs).clamp(0.0, maxMs);
+            final displayPos = _sliderDragValue != null
+                ? Duration(milliseconds: _sliderDragValue!.toInt())
+                : position;
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
                   Text(
-                    _formatDuration(position),
+                    _formatDuration(displayPos),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 10,
@@ -3839,15 +3888,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ),
                       ),
                       child: Slider(
-                        value: curMs,
+                        value: sliderVal,
                         min: 0,
                         max: maxMs,
+                        onChangeStart: hasValidDuration
+                            ? (val) {
+                                setState(() {
+                                  _sliderDragValue = val;
+                                });
+                              }
+                            : null,
                         onChanged: hasValidDuration
+                            ? (val) {
+                                setState(() {
+                                  _sliderDragValue = val;
+                                });
+                              }
+                            : null,
+                        onChangeEnd: hasValidDuration
                             ? (val) {
                                 HapticFeedback.selectionClick();
                                 _musicService.seek(
                                   Duration(milliseconds: val.toInt()),
                                 );
+                                setState(() {
+                                  _sliderDragValue = null;
+                                });
                               }
                             : null,
                       ),

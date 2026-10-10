@@ -152,6 +152,7 @@ class WebPlayerBridge {
     String? title,
     String? artist,
     String? artworkUrl,
+    String? album,
     double startSeconds = 0,
     String? streamUrl,
   }) {
@@ -181,6 +182,7 @@ class WebPlayerBridge {
         (title ?? 'DilSe Song').toJS,
         (artist ?? 'DilSe Music').toJS,
         (artworkUrl ?? '').toJS,
+        (album ?? '').toJS,
       );
     }
 
@@ -236,6 +238,7 @@ class WebPlayerBridge {
     String? title,
     String? artist,
     String? artworkUrl,
+    String? album,
     String? streamUrl,
     int crossfadeSeconds = 4,
   }) {
@@ -266,6 +269,7 @@ class WebPlayerBridge {
         (title ?? 'DilSe Song').toJS,
         (artist ?? 'DilSe Music').toJS,
         (artworkUrl ?? '').toJS,
+        (album ?? '').toJS,
       );
     }
 
@@ -283,6 +287,7 @@ class WebPlayerBridge {
         title: title,
         artist: artist,
         artworkUrl: artworkUrl,
+        album: album,
         streamUrl: streamUrl,
       );
     }
