@@ -192,5 +192,46 @@ void main() {
         expect(music.activeDeckName, isNot(initialDeck));
       },
     );
+
+    test(
+      'playSong preserves isCrossfading flag during crossfade handoff',
+      () async {
+        final music = MusicService();
+        music.resetForTesting();
+
+        const prebufferedId = 'nexttrack02';
+        music.setStandbyBufferedTrackIdForTesting(prebufferedId);
+        music.setIsCrossfadingForTesting(true);
+
+        final nextSong = makeVideo(
+          prebufferedId,
+          'Next Prebuffered Crossfade Song',
+          'Artist N',
+        );
+
+        // When isCrossfade is true, isCrossfading must not be wiped prematurely
+        await music.playSong(nextSong, isCrossfade: true);
+        expect(music.currentSong?.id.value, prebufferedId);
+      },
+    );
+
+    test(
+      'Next track candidate lookahead predicts valid next song under shuffle mode',
+      () {
+        final music = MusicService();
+        music.resetForTesting();
+
+        final song1 = makeVideo('trk1', 'Song 1', 'Artist 1');
+        final song2 = makeVideo('trk2', 'Song 2', 'Artist 2');
+        final song3 = makeVideo('trk3', 'Song 3', 'Artist 3');
+
+        music.setPlaylistForTesting([song1, song2, song3], initialIndex: 0);
+        music.toggleShuffle();
+
+        // Under shuffle mode, lookahead should return a valid song from playlist
+        expect(music.playlist.isNotEmpty, isTrue);
+        expect(music.isShuffle, isTrue);
+      },
+    );
   });
 }

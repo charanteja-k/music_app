@@ -129,5 +129,40 @@ void main() {
         expect(config.androidStopForegroundOnPause, isFalse);
       },
     );
+
+    test(
+      'DilSeAudioHandler retains playing: true while loading to protect Android foreground service',
+      () {
+        final handler = DilSeAudioHandler();
+        handler.notifyLoading(isLoading: true);
+        expect(handler.playbackState.value.playing, isTrue);
+        expect(
+          handler.playbackState.value.processingState,
+          AudioProcessingState.loading,
+        );
+      },
+    );
+
+    test(
+      'playSong resets saved position and emits initial zero position broadcast immediately',
+      () async {
+        final music = MusicService();
+        music.resetForTesting();
+
+        final song = makeVideo('12345678901', 'Initial Tap Song', 'Artist I');
+        Duration? emittedPos;
+        final sub = music.positionStream.listen((pos) {
+          emittedPos = pos;
+        });
+
+        // Trigger playSong
+        music.playSong(song);
+
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(emittedPos, equals(Duration.zero));
+        expect(music.currentSong?.id.value, '12345678901');
+        await sub.cancel();
+      },
+    );
   });
 }

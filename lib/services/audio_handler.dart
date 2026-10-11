@@ -15,7 +15,7 @@ Future<void> initAudioService() async {
           'com.example.music_app.channel.audio_playback_v3',
       androidNotificationChannelName: 'DilSe Music Playback',
       androidNotificationOngoing: false,
-      androidStopForegroundOnPause: true,
+      androidStopForegroundOnPause: false,
       androidShowNotificationBadge: true,
       androidNotificationIcon: 'drawable/ic_stat_music',
       notificationColor: Color(0xFFFA2D48),
@@ -68,7 +68,13 @@ class DilSeAudioHandler extends BaseAudioHandler with SeekHandler {
 
     _playbackEventSub = _player.playbackEventStream.listen(
       (PlaybackEvent event) {
+        final pState = _player.processingState;
         final playing = _player.playing;
+        // Keep playing: true while actively playing, loading, or buffering so Android Foreground Service never drops
+        final isPlayingOrBuffering =
+            playing ||
+            pState == ProcessingState.loading ||
+            pState == ProcessingState.buffering;
         playbackState.add(
           playbackState.value.copyWith(
             controls: [
@@ -89,8 +95,8 @@ class DilSeAudioHandler extends BaseAudioHandler with SeekHandler {
               ProcessingState.buffering: AudioProcessingState.buffering,
               ProcessingState.ready: AudioProcessingState.ready,
               ProcessingState.completed: AudioProcessingState.completed,
-            }[_player.processingState]!,
-            playing: playing,
+            }[pState]!,
+            playing: isPlayingOrBuffering,
             updatePosition: _player.position,
             bufferedPosition: _player.bufferedPosition,
             speed: _player.speed,
