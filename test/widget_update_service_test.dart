@@ -47,7 +47,7 @@ void main() {
 
         final prefs = await SharedPreferences.getInstance();
         expect(prefs.getString('widget_title'), equals('Naatu Naatu'));
-        expect(prefs.getString('widget_artist'), equals('MM Keeravaani'));
+        expect(prefs.getString('widget_artist'), equals('Mm Keeravaani'));
         expect(prefs.getBool('widget_is_playing'), isTrue);
         expect(prefs.getBool('widget_is_shuffle'), isTrue);
         expect(prefs.getBool('widget_is_repeat'), isFalse);
@@ -173,5 +173,48 @@ void main() {
         debugDefaultTargetPlatformOverride = null;
       },
     );
+
+    test('toTitleCase capitalizes first letter of each word properly', () {
+      expect(
+        WidgetUpdateService.toTitleCase('swagatham krishna'),
+        'Swagatham Krishna',
+      );
+      expect(
+        WidgetUpdateService.toTitleCase('niranjana ramanan'),
+        'Niranjana Ramanan',
+      );
+      expect(WidgetUpdateService.toTitleCase('DILSE MUSIC'), 'Dilse Music');
+      expect(WidgetUpdateService.toTitleCase(''), '');
+    });
+
+    test('initWidgetActionHandler handles seekTo native action', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      Duration? soughtPos;
+      final service = WidgetUpdateService();
+      service.initWidgetActionHandler(
+        onToggleShuffle: () {},
+        onToggleRepeat: () {},
+        onPlayPlaylist: (index, id, query) async {},
+        onSeekTo: (pos) async {
+          soughtPos = pos;
+        },
+      );
+
+      final binding = TestDefaultBinaryMessengerBinding.instance;
+      final codec = const StandardMethodCodec();
+
+      final byteDataSeek = codec.encodeMethodCall(
+        const MethodCall('seekTo', {'positionMs': 45000}),
+      );
+      await binding.defaultBinaryMessenger.handlePlatformMessage(
+        'com.example.music_app/widget',
+        byteDataSeek,
+        (ByteData? reply) {},
+      );
+      expect(soughtPos, equals(const Duration(seconds: 45)));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
   });
 }

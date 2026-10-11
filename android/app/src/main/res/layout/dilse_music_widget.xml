@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="13dp">
+        android:padding="12dp">
 
         <!-- Top Playback Deck: Album Artwork (Left) + Metadata & Responsive Controls (Right) -->
         <LinearLayout
@@ -31,19 +31,19 @@
             <!-- Rounded Squircle Album Artwork -->
             <ImageView
                 android:id="@+id/widget_album_art"
-                android:layout_width="96dp"
-                android:layout_height="96dp"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
                 android:scaleType="centerCrop"
                 android:contentDescription="Album Art"
                 android:src="@drawable/ic_stat_music" />
 
-            <!-- Track Metadata, Controls & Progress Scrubber -->
+            <!-- Track Metadata, Controls & Interactive Scrubber -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_marginStart="14dp"
+                android:layout_marginStart="12dp"
                 android:gravity="center_vertical">
 
                 <!-- Song Title -->
@@ -53,7 +53,7 @@
                     android:layout_height="wrap_content"
                     android:text="DilSe Music"
                     android:textColor="#FFFFFFFF"
-                    android:textSize="17sp"
+                    android:textSize="16sp"
                     android:textStyle="bold"
                     android:singleLine="true"
                     android:ellipsize="marquee" />
@@ -68,7 +68,7 @@
                     android:textSize="12sp"
                     android:singleLine="true"
                     android:ellipsize="end"
-                    android:layout_marginTop="2dp" />
+                    android:layout_marginTop="1.5dp" />
 
                 <!-- Responsive Fluid Playcontrols Row -->
                 <LinearLayout
@@ -76,7 +76,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:layout_marginTop="6dp">
+                    android:layout_marginTop="5dp">
 
                     <!-- Shuffle Toggle -->
                     <ImageView
@@ -135,23 +135,109 @@
 
                 </LinearLayout>
 
-                <!-- Responsive Progress Bar -->
-                <ProgressBar
-                    android:id="@+id/widget_progress_bar"
-                    style="?android:attr/progressBarStyleHorizontal"
+                <!-- Interactive Scrubber: Visual ProgressBar + 10 Clickable Touch-Seek Zones -->
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="3.5dp"
-                    android:layout_marginTop="6dp"
-                    android:max="1000"
-                    android:progress="0"
-                    android:progressDrawable="@drawable/dilse_widget_progress" />
+                    android:layout_height="22dp"
+                    android:layout_marginTop="3dp">
 
-                <!-- Monospace Timestamps: Elapsed & Total Duration -->
+                    <!-- Visual Progress Bar -->
+                    <ProgressBar
+                        android:id="@+id/widget_progress_bar"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="4.5dp"
+                        android:layout_gravity="center_vertical"
+                        android:max="1000"
+                        android:progress="0"
+                        android:progressDrawable="@drawable/dilse_widget_progress" />
+
+                    <!-- 10 Responsive Tap-To-Seek Segments Overlay -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <View
+                            android:id="@+id/widget_seek_zone_0"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_1"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_2"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_3"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_4"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_5"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_6"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_7"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_8"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                        <View
+                            android:id="@+id/widget_seek_zone_9"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+                    </LinearLayout>
+
+                </FrameLayout>
+
+                <!-- Monospace Timestamps with Quick Tap-Seek Targets -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginTop="2dp">
+                    android:layout_marginTop="1dp">
 
                     <TextView
                         android:id="@+id/widget_time_current"
@@ -159,18 +245,20 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="0:00"
-                        android:textColor="#80FFFFFF"
+                        android:textColor="#99FFFFFF"
                         android:textSize="9.5sp"
-                        android:fontFamily="sans-serif-medium" />
+                        android:fontFamily="sans-serif-medium"
+                        android:background="?android:attr/selectableItemBackgroundBorderless" />
 
                     <TextView
                         android:id="@+id/widget_time_total"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0:00"
-                        android:textColor="#80FFFFFF"
+                        android:textColor="#99FFFFFF"
                         android:textSize="9.5sp"
-                        android:fontFamily="sans-serif-medium" />
+                        android:fontFamily="sans-serif-medium"
+                        android:background="?android:attr/selectableItemBackgroundBorderless" />
 
                 </LinearLayout>
 
@@ -178,13 +266,13 @@
 
         </LinearLayout>
 
-        <!-- Bottom Shelf: 5 Top Playlists Based On Listening Data -->
+        <!-- Bottom Shelf: 5 Prominent Top Playlists / Quick-Launch Badges -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="10dp">
+            android:gravity="center"
+            android:layout_marginTop="8dp">
 
             <!-- Playlist 0 -->
             <LinearLayout
@@ -192,27 +280,28 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="2dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_0"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_stat_music"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:scaleType="fitCenter"
                     android:contentDescription="Playlist 1" />
 
                 <TextView
                     android:id="@+id/widget_playlist_title_0"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="Daily\nMix"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="9.5sp"
-                    android:maxLines="2"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
+                    android:text="Daily Mix"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="10sp"
+                    android:singleLine="true"
                     android:ellipsize="end" />
 
             </LinearLayout>
@@ -223,27 +312,28 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="2dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_1"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_stat_music"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:scaleType="fitCenter"
                     android:contentDescription="Playlist 2" />
 
                 <TextView
                     android:id="@+id/widget_playlist_title_1"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
                     android:text="Favorites"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="9.5sp"
-                    android:maxLines="2"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="10sp"
+                    android:singleLine="true"
                     android:ellipsize="end" />
 
             </LinearLayout>
@@ -254,27 +344,28 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="2dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_2"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_stat_music"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:scaleType="fitCenter"
                     android:contentDescription="Playlist 3" />
 
                 <TextView
                     android:id="@+id/widget_playlist_title_2"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="Most\nPlayed"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="9.5sp"
-                    android:maxLines="2"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
+                    android:text="Most Played"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="10sp"
+                    android:singleLine="true"
                     android:ellipsize="end" />
 
             </LinearLayout>
@@ -285,27 +376,28 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="2dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_3"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_stat_music"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:scaleType="fitCenter"
                     android:contentDescription="Playlist 4" />
 
                 <TextView
                     android:id="@+id/widget_playlist_title_3"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="History\nReplay"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="9.5sp"
-                    android:maxLines="2"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
+                    android:text="History Replay"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="10sp"
+                    android:singleLine="true"
                     android:ellipsize="end" />
 
             </LinearLayout>
@@ -316,27 +408,28 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="2dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_4"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_stat_music"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:scaleType="fitCenter"
                     android:contentDescription="Playlist 5" />
 
                 <TextView
                     android:id="@+id/widget_playlist_title_4"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="Chill\nVibes"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="9.5sp"
-                    android:maxLines="2"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center"
+                    android:text="Chill Vibes"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="10sp"
+                    android:singleLine="true"
                     android:ellipsize="end" />
 
             </LinearLayout>

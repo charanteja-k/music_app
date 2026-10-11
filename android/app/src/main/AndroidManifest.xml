@@ -71,6 +71,12 @@
                 <action android:name="com.example.music_app.ACTION_PLAY_PAUSE" />
                 <action android:name="com.example.music_app.ACTION_NEXT" />
                 <action android:name="com.example.music_app.ACTION_PREVIOUS" />
+                <action android:name="com.example.music_app.ACTION_SHUFFLE" />
+                <action android:name="com.example.music_app.ACTION_REPEAT" />
+                <action android:name="com.example.music_app.ACTION_PLAY_PLAYLIST" />
+                <action android:name="com.example.music_app.ACTION_SEEK" />
+                <action android:name="com.example.music_app.ACTION_REWIND_10" />
+                <action android:name="com.example.music_app.ACTION_FORWARD_10" />
                 <action android:name="com.example.music_app.ACTION_UPDATE_WIDGET" />
             </intent-filter>
             <meta-data

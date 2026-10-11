@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.*
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -44,6 +46,62 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             ACTION_REPEAT -> {
                 optimisticToggleRepeat(context)
                 dispatchCustomAction(context, "toggleRepeat")
+            }
+            ACTION_SEEK -> {
+                val percent = intent.getFloatExtra(EXTRA_SEEK_PERCENT, -1f)
+                val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                val durationMs = prefs.getLong("flutter.widget_duration_ms", 0L)
+                if (percent in 0f..1f && durationMs > 0) {
+                    val targetMs = (durationMs * percent).toLong().coerceIn(0L, durationMs)
+                    prefs.edit()
+                        .putLong("flutter.widget_position_ms", targetMs)
+                        .putString("flutter.widget_position_text", formatDuration(targetMs))
+                        .apply()
+                    updateAllWidgets(context)
+                    val channel = MainActivity.activeWidgetChannel
+                    if (channel != null) {
+                        Handler(Looper.getMainLooper()).post {
+                            channel.invokeMethod("seekTo", mapOf("positionMs" to targetMs))
+                        }
+                    }
+                }
+            }
+            ACTION_REWIND_10 -> {
+                val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                val currentPos = prefs.getLong("flutter.widget_position_ms", 0L)
+                val targetMs = (currentPos - 10000L).coerceAtLeast(0L)
+                prefs.edit()
+                    .putLong("flutter.widget_position_ms", targetMs)
+                    .putString("flutter.widget_position_text", formatDuration(targetMs))
+                    .apply()
+                updateAllWidgets(context)
+                val channel = MainActivity.activeWidgetChannel
+                if (channel != null) {
+                    Handler(Looper.getMainLooper()).post {
+                        channel.invokeMethod("seekTo", mapOf("positionMs" to targetMs))
+                    }
+                } else {
+                    sendMediaKeyEvent(context, KeyEvent.KEYCODE_MEDIA_REWIND)
+                }
+            }
+            ACTION_FORWARD_10 -> {
+                val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                val currentPos = prefs.getLong("flutter.widget_position_ms", 0L)
+                val durationMs = prefs.getLong("flutter.widget_duration_ms", 0L)
+                val targetMs = if (durationMs > 0) (currentPos + 10000L).coerceAtMost(durationMs) else currentPos + 10000L
+                prefs.edit()
+                    .putLong("flutter.widget_position_ms", targetMs)
+                    .putString("flutter.widget_position_text", formatDuration(targetMs))
+                    .apply()
+                updateAllWidgets(context)
+                val channel = MainActivity.activeWidgetChannel
+                if (channel != null) {
+                    Handler(Looper.getMainLooper()).post {
+                        channel.invokeMethod("seekTo", mapOf("positionMs" to targetMs))
+                    }
+                } else {
+                    sendMediaKeyEvent(context, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
+                }
             }
             ACTION_PLAY_PLAYLIST -> {
                 val playlistIndex = intent.getIntExtra(EXTRA_PLAYLIST_INDEX, 0)
@@ -90,11 +148,19 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
     }
 
     private fun dispatchCustomAction(context: Context, action: String) {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("widget_action", action)
+        val channel = MainActivity.activeWidgetChannel
+        if (channel != null) {
+            Handler(Looper.getMainLooper()).post {
+                channel.invokeMethod(action, null)
+            }
+            return
         }
-        context.startActivity(intent)
+        // App is in background or not running: update SharedPreferences directly without launching MainActivity
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val key = if (action == "toggleShuffle") "flutter.widget_is_shuffle" else "flutter.widget_is_repeat"
+        val current = prefs.getBoolean(key, false)
+        prefs.edit().putBoolean(key, !current).apply()
+        updateAllWidgets(context)
     }
 
     private fun launchAppWithPlaylist(context: Context, index: Int, id: String, query: String) {
@@ -133,10 +199,33 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_REPEAT = "com.example.music_app.ACTION_REPEAT"
         const val ACTION_PLAY_PLAYLIST = "com.example.music_app.ACTION_PLAY_PLAYLIST"
         const val ACTION_UPDATE_WIDGET = "com.example.music_app.ACTION_UPDATE_WIDGET"
+        const val ACTION_SEEK = "com.example.music_app.ACTION_SEEK"
+        const val ACTION_REWIND_10 = "com.example.music_app.ACTION_REWIND_10"
+        const val ACTION_FORWARD_10 = "com.example.music_app.ACTION_FORWARD_10"
 
+        const val EXTRA_SEEK_PERCENT = "extra_seek_percent"
         const val EXTRA_PLAYLIST_INDEX = "extra_playlist_index"
         const val EXTRA_PLAYLIST_ID = "extra_playlist_id"
         const val EXTRA_PLAYLIST_QUERY = "extra_playlist_query"
+
+        fun formatDuration(ms: Long): String {
+            if (ms <= 0) return "0:00"
+            val totalSeconds = ms / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            return String.format("%d:%02d", minutes, seconds)
+        }
+
+        fun toTitleCase(input: String): String {
+            if (input.isBlank()) return input
+            return input.split(" ")
+                .filter { it.isNotEmpty() }
+                .joinToString(" ") { word ->
+                    word.lowercase().replaceFirstChar { char ->
+                        if (char.isLowerCase()) char.titlecase() else char.toString()
+                    }
+                }
+        }
 
         fun updateAppWidget(
             context: Context,
@@ -159,41 +248,72 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
 
             val views = RemoteViews(context.packageName, R.layout.dilse_music_widget)
 
-            // 1. Resolve Dominant Color
-            val dominantColor = if (dominantColorInt != 0) {
-                dominantColorInt
-            } else if (artworkPath != null && File(artworkPath).exists()) {
-                extractDominantColorFromBitmap(artworkPath)
-            } else {
-                Color.parseColor("#FF5722") // Warm vibrant amber fallback
+            // 1. Resolve Album Artwork (Local File or Cached Web Image)
+            var albumBitmap: Bitmap? = null
+            if (!artworkPath.isNullOrEmpty()) {
+                val file = File(artworkPath)
+                if (file.exists()) {
+                    try {
+                        albumBitmap = BitmapFactory.decodeFile(artworkPath)
+                    } catch (_: Exception) {}
+                } else if (artworkPath.startsWith("http://") || artworkPath.startsWith("https://")) {
+                    val safeHash = artworkPath.hashCode().toString().replace("-", "n")
+                    val cachedArt = File(context.cacheDir, "widget_art_$safeHash.png")
+                    if (cachedArt.exists()) {
+                        try {
+                            albumBitmap = BitmapFactory.decodeFile(cachedArt.absolutePath)
+                        } catch (_: Exception) {}
+                    } else {
+                        // Asynchronously download and cache to disk, then trigger widget update
+                        Thread {
+                            try {
+                                val url = java.net.URL(artworkPath)
+                                val conn = url.openConnection() as java.net.HttpURLConnection
+                                conn.connectTimeout = 3000
+                                conn.readTimeout = 3000
+                                conn.doInput = true
+                                conn.connect()
+                                val stream = conn.inputStream
+                                val downloadedBmp = BitmapFactory.decodeStream(stream)
+                                if (downloadedBmp != null) {
+                                    cachedArt.outputStream().use { out ->
+                                        downloadedBmp.compress(Bitmap.CompressFormat.PNG, 90, out)
+                                    }
+                                    Handler(Looper.getMainLooper()).post {
+                                        updateAllWidgets(context)
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }.start()
+                    }
+                }
             }
 
-            // 2. Synthesize Dynamic Frosted Glass Background Canvas
+            if (albumBitmap != null) {
+                val roundedArt = createRoundedBitmap(albumBitmap, 30f)
+                views.setImageViewBitmap(R.id.widget_album_art, roundedArt)
+            } else {
+                views.setImageViewResource(R.id.widget_album_art, R.drawable.ic_stat_music)
+            }
+
+            // 2. Resolve Dominant Dynamic Accent Color
+            val dominantColor = if (dominantColorInt != 0) {
+                dominantColorInt
+            } else if (albumBitmap != null) {
+                extractDominantColorFromBitmap(albumBitmap)
+            } else {
+                Color.parseColor("#E03E52") // Rich vibrant crimson fallback
+            }
+
+            // 3. Synthesize Dynamic Frosted Glass Background Canvas
             val bgBitmap = createDynamicGlassBackground(context, dominantColor)
             if (bgBitmap != null) {
                 views.setImageViewBitmap(R.id.widget_background_image, bgBitmap)
             }
 
-            // 3. Track Metadata
-            views.setTextViewText(R.id.widget_song_title, title)
-            views.setTextViewText(R.id.widget_song_artist, artist)
-
-            // 4. Squircle Album Art with Rounded Corners
-            if (artworkPath != null && File(artworkPath).exists()) {
-                try {
-                    val rawBitmap = BitmapFactory.decodeFile(artworkPath)
-                    if (rawBitmap != null) {
-                        val roundedArt = createRoundedBitmap(rawBitmap, 28f)
-                        views.setImageViewBitmap(R.id.widget_album_art, roundedArt)
-                    } else {
-                        views.setImageViewResource(R.id.widget_album_art, R.drawable.ic_stat_music)
-                    }
-                } catch (_: Exception) {
-                    views.setImageViewResource(R.id.widget_album_art, R.drawable.ic_stat_music)
-                }
-            } else {
-                views.setImageViewResource(R.id.widget_album_art, R.drawable.ic_stat_music)
-            }
+            // 4. Track Metadata (Formatted with Title Case Capitalization)
+            views.setTextViewText(R.id.widget_song_title, toTitleCase(title))
+            views.setTextViewText(R.id.widget_song_artist, toTitleCase(artist))
 
             // 5. Glowing Circular Play / Pause Deck
             val playPauseBitmap = createGlowingPlayButton(context, isPlaying, dominantColor)
@@ -201,7 +321,7 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
 
             // 6. Responsive Shuffle & Repeat Tint States
             val activeColor = Color.WHITE
-            val inactiveColor = Color.argb(100, 255, 255, 255)
+            val inactiveColor = Color.argb(90, 255, 255, 255)
             views.setInt(R.id.widget_btn_shuffle, "setColorFilter", if (isShuffle) activeColor else inactiveColor)
             views.setInt(R.id.widget_btn_repeat, "setColorFilter", if (isRepeat) activeColor else inactiveColor)
 
@@ -215,7 +335,7 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_time_current, positionText)
             views.setTextViewText(R.id.widget_time_total, durationText)
 
-            // 8. PendingIntents for Touch Controls
+            // 8. PendingIntents for Touch Controls & Interactive Scrubber
             val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             } else {
@@ -258,7 +378,43 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             }
             views.setOnClickPendingIntent(R.id.widget_btn_repeat, PendingIntent.getBroadcast(context, 5, repeatIntent, flag))
 
-            // 9. Bottom Shelf: 5 Top Playlists Based On Listening Data
+            // Interactive Scrubber Tap-To-Seek Zones (10 segments across the scrubber)
+            val seekZoneIds = intArrayOf(
+                R.id.widget_seek_zone_0,
+                R.id.widget_seek_zone_1,
+                R.id.widget_seek_zone_2,
+                R.id.widget_seek_zone_3,
+                R.id.widget_seek_zone_4,
+                R.id.widget_seek_zone_5,
+                R.id.widget_seek_zone_6,
+                R.id.widget_seek_zone_7,
+                R.id.widget_seek_zone_8,
+                R.id.widget_seek_zone_9
+            )
+            for (i in seekZoneIds.indices) {
+                val seekPercent = (i * 0.1f) + 0.05f
+                val seekIntent = Intent(context, DilSeMusicWidgetProvider::class.java).apply {
+                    action = ACTION_SEEK
+                    putExtra(EXTRA_SEEK_PERCENT, seekPercent)
+                }
+                views.setOnClickPendingIntent(
+                    seekZoneIds[i],
+                    PendingIntent.getBroadcast(context, 50 + i, seekIntent, flag)
+                )
+            }
+
+            // Quick Rewind / Forward on Timestamps (-10s / +10s)
+            val rewindIntent = Intent(context, DilSeMusicWidgetProvider::class.java).apply {
+                action = ACTION_REWIND_10
+            }
+            views.setOnClickPendingIntent(R.id.widget_time_current, PendingIntent.getBroadcast(context, 70, rewindIntent, flag))
+
+            val forwardIntent = Intent(context, DilSeMusicWidgetProvider::class.java).apply {
+                action = ACTION_FORWARD_10
+            }
+            views.setOnClickPendingIntent(R.id.widget_time_total, PendingIntent.getBroadcast(context, 71, forwardIntent, flag))
+
+            // 9. Bottom Shelf: 5 Prominent Top Playlists / Quick-Launch Badges
             setupTopPlaylists(context, views, playlistsJson, dominantColor, flag)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -272,11 +428,11 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             flag: Int
         ) {
             val defaultPlaylists = listOf(
-                Pair("Daily\nMix", "Daily Mix"),
+                Pair("Daily Mix", "Daily Mix"),
                 Pair("Favorites", "Favorites"),
-                Pair("Most\nPlayed", "Most Played"),
-                Pair("History\nReplay", "History"),
-                Pair("Chill\nVibes", "Chill Vibes")
+                Pair("Most Played", "Most Played"),
+                Pair("History Replay", "History"),
+                Pair("Chill Vibes", "Chill Vibes")
             )
 
             var parsedList: List<Triple<String, String, String>>? = null
@@ -289,7 +445,7 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
                         val title = obj.optString("title", "Mix")
                         val id = obj.optString("id", "")
                         val query = obj.optString("query", title)
-                        list.add(Triple(title, id, query))
+                        list.add(Triple(toTitleCase(title), id, query))
                     }
                     if (list.isNotEmpty()) parsedList = list
                 } catch (_: Exception) {}
@@ -330,10 +486,10 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
                 val id = parsedList?.getOrNull(i)?.second ?: "playlist_$i"
                 val query = parsedList?.getOrNull(i)?.third ?: defaultPlaylists[i].second
 
-                views.setTextViewText(titleIds[i], title)
+                views.setTextViewText(titleIds[i], toTitleCase(title))
 
-                // Render micro squircle gradient badge
-                val badgeBitmap = createPlaylistBadge(badgeGradients[i % badgeGradients.size])
+                // Render micro squircle gradient badge with centered vector icon
+                val badgeBitmap = createPlaylistBadge(badgeGradients[i % badgeGradients.size], i)
                 views.setImageViewBitmap(artIds[i], badgeBitmap)
 
                 // Intent for tapping playlist
@@ -347,20 +503,89 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun createPlaylistBadge(colors: IntArray): Bitmap {
-            val size = 56
+        private fun createPlaylistBadge(colors: IntArray, iconType: Int): Bitmap {
+            val size = 76
             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(0f, 0f, size.toFloat(), size.toFloat(), colors, null, Shader.TileMode.CLAMP)
             }
             val rect = RectF(0f, 0f, size.toFloat(), size.toFloat())
-            canvas.drawRoundRect(rect, 14f, 14f, paint)
+            canvas.drawRoundRect(rect, 20f, 20f, paint)
+
+            // Subtle inner glow border
+            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f
+                color = Color.argb(60, 255, 255, 255)
+            }
+            canvas.drawRoundRect(RectF(1f, 1f, size - 1f, size - 1f), 19f, 19f, strokePaint)
+
+            // Draw crisp white icon centered inside the badge
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.FILL
+            }
+            val center = size / 2f
+            when (iconType) {
+                0 -> { // Daily Mix: Music soundwave bars
+                    val r = 2f
+                    canvas.drawRoundRect(RectF(center - 12f, center - 6f, center - 8f, center + 6f), r, r, iconPaint)
+                    canvas.drawRoundRect(RectF(center - 5f, center - 12f, center - 1f, center + 12f), r, r, iconPaint)
+                    canvas.drawRoundRect(RectF(center + 2f, center - 16f, center + 6f, center + 16f), r, r, iconPaint)
+                    canvas.drawRoundRect(RectF(center + 9f, center - 8f, center + 13f, center + 8f), r, r, iconPaint)
+                }
+                1 -> { // Favorites: Heart
+                    val path = Path()
+                    val w = 11f
+                    val h = 11f
+                    path.moveTo(center, center + h * 0.7f)
+                    path.cubicTo(center - w * 1.2f, center - h * 0.2f, center - w * 0.7f, center - h * 1.1f, center, center - h * 0.3f)
+                    path.cubicTo(center + w * 0.7f, center - h * 1.1f, center + w * 1.2f, center - h * 0.2f, center, center + h * 0.7f)
+                    path.close()
+                    canvas.drawPath(path, iconPaint)
+                }
+                2 -> { // Most Played: Star
+                    val path = Path()
+                    val rOuter = 12f
+                    val rInner = 5.5f
+                    for (step in 0 until 10) {
+                        val angle = (step * Math.PI / 5 - Math.PI / 2).toFloat()
+                        val r = if (step % 2 == 0) rOuter else rInner
+                        val x = center + (r * Math.cos(angle.toDouble())).toFloat()
+                        val y = center + (r * Math.sin(angle.toDouble())).toFloat()
+                        if (step == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    }
+                    path.close()
+                    canvas.drawPath(path, iconPaint)
+                }
+                3 -> { // History Replay: Clock / Circular rewind
+                    val strokeP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.WHITE
+                        style = Paint.Style.STROKE
+                        strokeWidth = 2.5f
+                    }
+                    canvas.drawCircle(center, center, 11f, strokeP)
+                    canvas.drawLine(center, center, center, center - 6.5f, strokeP)
+                    canvas.drawLine(center, center, center + 5f, center, strokeP)
+                }
+                else -> { // Disc / Music Note
+                    val path = Path()
+                    path.addCircle(center - 5f, center + 6f, 4f, Path.Direction.CW)
+                    path.moveTo(center - 1f, center + 6f)
+                    path.lineTo(center - 1f, center - 8f)
+                    path.lineTo(center + 8f, center - 11f)
+                    path.lineTo(center + 8f, center + 3f)
+                    path.addCircle(center + 4f, center + 3f, 4f, Path.Direction.CW)
+                    canvas.drawPath(path, iconPaint)
+                }
+            }
+
             return bitmap
         }
 
         private fun createRoundedBitmap(source: Bitmap, cornerRadiusDp: Float): Bitmap {
-            val size = 200
+            val size = 220
             val scaled = Bitmap.createScaledBitmap(source, size, size, true)
             val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(output)
@@ -378,13 +603,13 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             val canvas = Canvas(bitmap)
             val center = size / 2f
 
-            // 1. Soft Ambient Halo Glow
+            // 1. Soft Ambient Halo Glow matching dominant color
             val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
                     center, center, center,
                     intArrayOf(
-                        Color.argb(160, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
-                        Color.argb(80, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
+                        Color.argb(175, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
+                        Color.argb(70, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
                         Color.TRANSPARENT
                     ),
                     floatArrayOf(0.0f, 0.65f, 1.0f),
@@ -443,88 +668,98 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
-            val cornerRadius = 56f
+            val cornerRadius = 52f
+
+            // Ensure dominantColor has enough vibrancy and saturation for ambient beauty
+            val hsv = FloatArray(3)
+            Color.colorToHSV(dominantColor, hsv)
+            val vibrantHsv = floatArrayOf(
+                hsv[0],
+                maxOf(0.65f, hsv[1]),
+                hsv[2].coerceIn(0.40f, 0.85f)
+            )
+            val vibrantColor = Color.HSVToColor(vibrantHsv)
 
             // 1. Base Dark Charcoal Obsidian Glass
             val basePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#FF0F0F16")
+                color = Color.parseColor("#FF101016")
             }
             canvas.drawRoundRect(rect, cornerRadius, cornerRadius, basePaint)
 
-            // 2. Dominant Color Ambient Bloons (Light Bleed Matching Mock)
-            // Left bloom behind artwork
-            val leftGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(
-                    width * 0.25f, height * 0.35f, width * 0.55f,
+            // 2. Rich Multi-Stop Linear Gradient from top-left to bottom-right
+            val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, 0f, width.toFloat(), height.toFloat(),
                     intArrayOf(
-                        Color.argb(170, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
-                        Color.argb(80, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
+                        Color.argb(130, Color.red(vibrantColor), Color.green(vibrantColor), Color.blue(vibrantColor)),
+                        Color.argb(65, Color.red(vibrantColor), Color.green(vibrantColor), Color.blue(vibrantColor)),
+                        Color.argb(205, 16, 16, 24)
+                    ),
+                    floatArrayOf(0.0f, 0.45f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, gradientPaint)
+
+            // 3. Ambient Radial Glow behind the Album Art (Left side bloom)
+            val albumGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    width * 0.22f, height * 0.35f, width * 0.50f,
+                    intArrayOf(
+                        Color.argb(165, Color.red(vibrantColor), Color.green(vibrantColor), Color.blue(vibrantColor)),
+                        Color.argb(70, Color.red(vibrantColor), Color.green(vibrantColor), Color.blue(vibrantColor)),
                         Color.TRANSPARENT
                     ),
                     floatArrayOf(0f, 0.55f, 1f),
                     Shader.TileMode.CLAMP
                 )
             }
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, leftGlow)
+            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, albumGlow)
 
-            // Right/Center ambient warm glow
-            val centerGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(
-                    width * 0.70f, height * 0.40f, width * 0.45f,
-                    intArrayOf(
-                        Color.argb(100, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor)),
-                        Color.TRANSPARENT
-                    ),
-                    floatArrayOf(0f, 1f),
-                    Shader.TileMode.CLAMP
-                )
-            }
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, centerGlow)
-
-            // Subtle dark vignette at the bottom for playlist readability
+            // 4. Subtle Bottom Vignette for crisp playlist icon and text readability
             val bottomVignette = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
-                    0f, height * 0.55f, 0f, height.toFloat(),
+                    0f, height * 0.50f, 0f, height.toFloat(),
                     Color.TRANSPARENT,
-                    Color.argb(160, 10, 10, 15),
+                    Color.argb(180, 10, 10, 16),
                     Shader.TileMode.CLAMP
                 )
             }
             canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bottomVignette)
 
-            // 3. Translucent Glass Outline Stroke Border
+            // 5. Sleek Translucent Glass Highlight Border Outline
             val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
-                strokeWidth = 3f
+                strokeWidth = 2.5f
                 shader = LinearGradient(
                     0f, 0f, width.toFloat(), height.toFloat(),
                     intArrayOf(
-                        Color.argb(90, 255, 255, 255),
-                        Color.argb(30, 255, 255, 255),
-                        Color.argb(70, Color.red(dominantColor), Color.green(dominantColor), Color.blue(dominantColor))
+                        Color.argb(110, 255, 255, 255),
+                        Color.argb(45, Color.red(vibrantColor), Color.green(vibrantColor), Color.blue(vibrantColor)),
+                        Color.argb(30, 255, 255, 255)
                     ),
                     null,
                     Shader.TileMode.CLAMP
                 )
             }
-            val strokeRect = RectF(1.5f, 1.5f, width - 1.5f, height - 1.5f)
+            val strokeRect = RectF(1.25f, 1.25f, width - 1.25f, height - 1.25f)
             canvas.drawRoundRect(strokeRect, cornerRadius, cornerRadius, strokePaint)
 
             return bitmap
         }
 
-        private fun extractDominantColorFromBitmap(filePath: String): Int {
+        private fun extractDominantColorFromBitmap(bmp: Bitmap): Int {
             return try {
-                val opts = BitmapFactory.Options().apply { inSampleSize = 8 }
-                val bmp = BitmapFactory.decodeFile(filePath, opts) ?: return Color.parseColor("#FF5722")
                 val width = bmp.width
                 val height = bmp.height
                 var redSum = 0L
                 var greenSum = 0L
                 var blueSum = 0L
                 var count = 0L
-                for (x in width / 4 until (3 * width / 4) step 4) {
-                    for (y in height / 4 until (3 * height / 4) step 4) {
+                val stepX = maxOf(1, width / 20)
+                val stepY = maxOf(1, height / 20)
+                for (x in 0 until width step stepX) {
+                    for (y in 0 until height step stepY) {
                         val p = bmp.getPixel(x, y)
                         redSum += Color.red(p)
                         greenSum += Color.green(p)
@@ -532,10 +767,10 @@ class DilSeMusicWidgetProvider : AppWidgetProvider() {
                         count++
                     }
                 }
-                if (count == 0L) Color.parseColor("#FF5722")
+                if (count == 0L) Color.parseColor("#E03E52")
                 else Color.rgb((redSum / count).toInt(), (greenSum / count).toInt(), (blueSum / count).toInt())
             } catch (_: Exception) {
-                Color.parseColor("#FF5722")
+                Color.parseColor("#E03E52")
             }
         }
 

@@ -33,6 +33,7 @@ class WidgetUpdateService {
     required VoidCallback onToggleRepeat,
     required Future<void> Function(int index, String id, String query)
     onPlayPlaylist,
+    Future<void> Function(Duration position)? onSeekTo,
   }) {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     _channel.setMethodCallHandler((call) async {
@@ -43,6 +44,13 @@ class WidgetUpdateService {
         case 'toggleRepeat':
           onToggleRepeat();
           break;
+        case 'seekTo':
+          final args = call.arguments as Map?;
+          final posMs = args?['positionMs'] as int? ?? 0;
+          if (onSeekTo != null) {
+            await onSeekTo(Duration(milliseconds: posMs));
+          }
+          break;
         case 'playPlaylist':
           final args = call.arguments as Map?;
           final index = args?['index'] as int? ?? 0;
@@ -52,6 +60,18 @@ class WidgetUpdateService {
           break;
       }
     });
+  }
+
+  static String toTitleCase(String text) {
+    if (text.trim().isEmpty) return text;
+    return text
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .map((word) {
+          if (word.length <= 1) return word.toUpperCase();
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   static String formatDuration(Duration? d) {
@@ -92,8 +112,8 @@ class WidgetUpdateService {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('widget_title', title);
-      await prefs.setString('widget_artist', artist);
+      await prefs.setString('widget_title', toTitleCase(title));
+      await prefs.setString('widget_artist', toTitleCase(artist));
       await prefs.setBool('widget_is_playing', isPlaying);
       await prefs.setBool('widget_is_shuffle', isShuffle);
       await prefs.setBool('widget_is_repeat', isRepeat);

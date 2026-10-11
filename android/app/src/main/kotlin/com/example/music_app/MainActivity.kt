@@ -15,12 +15,24 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceActivity() {
     private var widgetChannel: MethodChannel? = null
 
+    companion object {
+        @Volatile
+        var activeWidgetChannel: MethodChannel? = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         unlockHighRefreshRate()
         createNotificationChannel()
         keepAudioServiceDrawables()
         handleWidgetIntent(intent)
+    }
+
+    override fun onDestroy() {
+        if (activeWidgetChannel == widgetChannel) {
+            activeWidgetChannel = null
+        }
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -72,6 +84,7 @@ class MainActivity : AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.music_app/widget")
         widgetChannel = channel
+        activeWidgetChannel = channel
         channel.setMethodCallHandler { call, result ->
             if (call.method == "updateWidget") {
                 DilSeMusicWidgetProvider.updateAllWidgets(this)
