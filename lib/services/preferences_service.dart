@@ -13,6 +13,8 @@ enum ArtworkStyle { card, vinyl }
 
 enum ScrubberStyle { waveform, classic }
 
+enum ProgressLineStyle { wave, classic }
+
 enum AudioQualityPreset {
   studioMaster, // 320 kbps (Direct JioSaavn 320k CDN / max bitrate)
   high, // 160 kbps (High Fidelity Opus / 160k AAC)
@@ -225,12 +227,18 @@ class PreferencesService extends ChangeNotifier {
   String? _profileImagePath;
 
   // Search History
+  static const String _recentSearchesKey = 'recent_searches_json';
+  List<Map<String, dynamic>> _recentSearches = [];
   List<String> _searchHistory = [];
   List<RecentSearchItem> _structuredSearchHistory = [];
 
   // Followed Artists (Independent of Daily Mix & Listening History)
   static const String _followedArtistsKey = 'followed_artists_v1';
   final Set<String> _followedArtists = {};
+
+  // Pinned Playlists (Stored in PreferencesService)
+  static const String _pinnedPlaylistIdsKey = 'pinned_playlist_ids';
+  final Set<String> _pinnedPlaylistIds = {};
 
   // Listening History
   List<Map<String, String>> _listeningHistory = [];
@@ -292,6 +300,10 @@ class PreferencesService extends ChangeNotifier {
   String get cloudflareWorkerUrl => _cloudflareWorkerUrl;
   ArtworkStyle get artworkStyle => _artworkStyle;
   ScrubberStyle get scrubberStyle => _scrubberStyle;
+  ProgressLineStyle get progressLineStyle =>
+      _scrubberStyle == ScrubberStyle.waveform
+      ? ProgressLineStyle.wave
+      : ProgressLineStyle.classic;
   AudioQualityPreset get audioQuality => _audioQuality;
   AudioFormatPreference get audioFormat => _audioFormat;
   String get lyricsDisplayMode => _lyricsDisplayMode;
@@ -399,6 +411,36 @@ class PreferencesService extends ChangeNotifier {
           )
           .toList();
     }
+    final recentSearchesRaw = _prefs.getString(_recentSearchesKey);
+    if (recentSearchesRaw != null && recentSearchesRaw.isNotEmpty) {
+      try {
+        final decoded = json.decode(recentSearchesRaw) as List<dynamic>;
+        _recentSearches = decoded
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .where(
+              (e) =>
+                  (e['title'] != null &&
+                      (e['title'] as String).trim().isNotEmpty) ||
+                  (e['id'] != null && (e['id'] as String).trim().isNotEmpty),
+            )
+            .toList();
+      } catch (_) {
+        _recentSearches = [];
+      }
+    }
+    if (_recentSearches.isEmpty && _structuredSearchHistory.isNotEmpty) {
+      _recentSearches = _structuredSearchHistory
+          .map(
+            (item) => <String, dynamic>{
+              'id': item.query,
+              'title': item.query,
+              'type': item.type,
+              'subtitle': '',
+              'imageUrl': '',
+            },
+          )
+          .toList();
+    }
     _mostPlayedArtist = _prefs.getString('mostPlayedArtist') ?? '';
     _userName = _prefs.getString('userName') ?? '';
     _hasPromptedName = _prefs.getBool('hasPromptedName') ?? false;
@@ -439,6 +481,11 @@ class PreferencesService extends ChangeNotifier {
     _followedArtists
       ..clear()
       ..addAll(followedList);
+
+    final pinnedList = _prefs.getStringList(_pinnedPlaylistIdsKey) ?? [];
+    _pinnedPlaylistIds
+      ..clear()
+      ..addAll(pinnedList);
 
     final playsJson = _prefs.getString('artistPlayCountsJson');
     if (playsJson != null && playsJson.isNotEmpty) {
@@ -1297,6 +1344,71 @@ class PreferencesService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns the stored recent searches list (max 10 items, LIFO order).
+  List<Map<String, dynamic>> getRecentSearches() {
+    return List<Map<String, dynamic>>.from(_recentSearches);
+  }
+
+  /// Adds a recent search item (song, playlist, album, artist, or query).
+  /// Enforces LIFO order and deduplicates based on 'id' or 'title'.
+  Future<void> addRecentSearch(Map<String, dynamic> item) async {
+    if (!_isInitialized) return;
+    final id =
+        (item['id'] as String?)?.trim() ??
+        (item['title'] as String?)?.trim() ??
+        (item['query'] as String?)?.trim() ??
+        '';
+    if (id.isEmpty) return;
+
+    _recentSearches.removeWhere((existing) {
+      final existingId =
+          (existing['id'] as String?)?.trim() ??
+          (existing['title'] as String?)?.trim() ??
+          (existing['query'] as String?)?.trim() ??
+          '';
+      return existingId.toLowerCase() == id.toLowerCase();
+    });
+
+    _recentSearches.insert(0, Map<String, dynamic>.from(item));
+    if (_recentSearches.length > 10) {
+      _recentSearches = _recentSearches.sublist(0, 10);
+    }
+
+    await _prefs.setString(_recentSearchesKey, json.encode(_recentSearches));
+    notifyListeners();
+  }
+
+  /// Removes an item from recent searches by ID or title.
+  Future<void> removeRecentSearch(String id) async {
+    if (!_isInitialized) return;
+    final cleanId = id.trim().toLowerCase();
+    _recentSearches.removeWhere((existing) {
+      final existingId =
+          ((existing['id'] as String?) ??
+                  (existing['title'] as String?) ??
+                  (existing['query'] as String?) ??
+                  '')
+              .trim()
+              .toLowerCase();
+      return existingId == cleanId;
+    });
+
+    await _prefs.setString(_recentSearchesKey, json.encode(_recentSearches));
+    notifyListeners();
+  }
+
+  /// Clears all recent searches from memory and disk.
+  Future<void> clearRecentSearches() async {
+    if (!_isInitialized) return;
+    _recentSearches.clear();
+    _searchHistory.clear();
+    _structuredSearchHistory.clear();
+    await _prefs.remove(_recentSearchesKey);
+    await _prefs.setStringList('searchHistory', _searchHistory);
+    await _prefs.remove('structuredSearchHistoryJson');
+    notifyListeners();
+  }
+
   Future<void> addToSearchHistory(String query, {String type = 'query'}) async {
     if (!_isInitialized) return;
     final trimmed = query.trim();
@@ -1327,6 +1439,27 @@ class PreferencesService extends ChangeNotifier {
       'structuredSearchHistoryJson',
       json.encode(_structuredSearchHistory.map((e) => e.toJson()).toList()),
     );
+
+    _recentSearches.removeWhere((existing) {
+      final existingId =
+          (existing['id'] as String?)?.trim() ??
+          (existing['title'] as String?)?.trim() ??
+          (existing['query'] as String?)?.trim() ??
+          '';
+      return existingId.toLowerCase() == trimmed.toLowerCase();
+    });
+    _recentSearches.insert(0, <String, dynamic>{
+      'id': trimmed,
+      'title': trimmed,
+      'type': type,
+      'subtitle': '',
+      'imageUrl': '',
+    });
+    if (_recentSearches.length > 10) {
+      _recentSearches = _recentSearches.sublist(0, 10);
+    }
+    await _prefs.setString(_recentSearchesKey, json.encode(_recentSearches));
+
     notifyListeners();
   }
 
@@ -1343,6 +1476,20 @@ class PreferencesService extends ChangeNotifier {
       'structuredSearchHistoryJson',
       json.encode(_structuredSearchHistory.map((e) => e.toJson()).toList()),
     );
+
+    _recentSearches.removeWhere((existing) {
+      final existingId =
+          ((existing['id'] as String?) ??
+                  (existing['title'] as String?) ??
+                  (existing['query'] as String?) ??
+                  '')
+              .trim()
+              .toLowerCase();
+      return existingId == trimmed.toLowerCase() ||
+          existingId == query.toLowerCase();
+    });
+    await _prefs.setString(_recentSearchesKey, json.encode(_recentSearches));
+
     notifyListeners();
   }
 
@@ -1350,8 +1497,10 @@ class PreferencesService extends ChangeNotifier {
     if (!_isInitialized) return;
     _searchHistory.clear();
     _structuredSearchHistory.clear();
+    _recentSearches.clear();
     await _prefs.setStringList('searchHistory', _searchHistory);
     await _prefs.remove('structuredSearchHistoryJson');
+    await _prefs.remove(_recentSearchesKey);
     notifyListeners();
   }
 
@@ -1720,6 +1869,28 @@ class PreferencesService extends ChangeNotifier {
     }
   }
 
+  List<String> get pinnedPlaylistIds =>
+      _pinnedPlaylistIds.toList(growable: false);
+
+  bool isPlaylistPinned(String playlistId) =>
+      _pinnedPlaylistIds.contains(playlistId);
+
+  Future<void> togglePinPlaylist(String playlistId) async {
+    if (playlistId.isEmpty) return;
+    if (_pinnedPlaylistIds.contains(playlistId)) {
+      _pinnedPlaylistIds.remove(playlistId);
+    } else {
+      _pinnedPlaylistIds.add(playlistId);
+    }
+    if (_isInitialized) {
+      await _prefs.setStringList(
+        _pinnedPlaylistIdsKey,
+        _pinnedPlaylistIds.toList(),
+      );
+    }
+    notifyListeners();
+  }
+
   bool isAlbumSaved(String albumIdOrTitle) {
     final lower = albumIdOrTitle.toLowerCase().trim();
     return _savedAlbums.any((a) {
@@ -1777,12 +1948,14 @@ class PreferencesService extends ChangeNotifier {
     _listeningHistory.clear();
     _searchHistory.clear();
     _structuredSearchHistory.clear();
+    _recentSearches.clear();
     _mostPlayedSongs.clear();
     _mostPlayedArtist = '';
     _topArtistPlayCount = 0;
     _profileImagePath = null;
     _spotifyImportedPlaylistIds.clear();
     _manualCreatedPlaylistIds.clear();
+    _pinnedPlaylistIds.clear();
     _savedAlbums.clear();
   }
 }

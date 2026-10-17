@@ -5,6 +5,10 @@ import '../screens/library_screen.dart';
 import '../screens/custom_playlist_screen.dart';
 import '../screens/artist_profile_screen.dart';
 import '../screens/album_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/profile_screen.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import '../screens/curated_playlist_screen.dart';
 import '../models/jio_album.dart';
 import 'desktop_layout_state.dart';
 
@@ -14,7 +18,7 @@ import 'desktop_layout_state.dart';
 /// 1. Independent vertical scrolling container for central navigation routes.
 /// 2. Preserves scroll states using [PageStorageKey] and [IndexedStack].
 /// 3. Automatically updates when [DesktopLayoutState.activeNavTab] changes.
-/// 4. Renders playlists, artist profiles, and albums seamlessly inside the desktop spatial grid.
+/// 4. Renders playlists, artist profiles, albums, settings, and profile seamlessly inside the desktop spatial grid.
 class DesktopMainViewport extends StatelessWidget {
   const DesktopMainViewport({super.key});
 
@@ -23,24 +27,48 @@ class DesktopMainViewport extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF12121A),
+        color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
-          width: 1.0,
-        ),
+        border: Border.all(color: const Color(0xFF1E1E1E), width: 1.0),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12.0),
         child: ValueListenableBuilder<DesktopNavTab>(
           valueListenable: DesktopLayoutState.activeNavTab,
           builder: (context, activeTab, _) {
+            if (activeTab == DesktopNavTab.settings) {
+              return const SettingsScreen(
+                key: ValueKey('desktop_settings_viewport'),
+              );
+            }
+
+            if (activeTab == DesktopNavTab.profile) {
+              return const ProfileScreen(
+                key: ValueKey('desktop_profile_viewport'),
+              );
+            }
+
             if (activeTab == DesktopNavTab.customPlaylist) {
               return ValueListenableBuilder<String?>(
                 valueListenable: DesktopLayoutState.activePlaylistId,
                 builder: (context, playlistId, _) {
                   if (playlistId == null || playlistId.isEmpty) {
                     return _buildIndexedStack(DesktopNavTab.home);
+                  }
+                  final curatedData =
+                      DesktopLayoutState.activeCuratedPlaylistData.value;
+                  if (curatedData != null) {
+                    return CuratedPlaylistScreen(
+                      key: ValueKey('desktop_curated_$playlistId'),
+                      title: curatedData['title'] as String,
+                      subtitle: curatedData['subtitle'] as String,
+                      query: curatedData['query'] as String?,
+                      initialSongs: curatedData['initialSongs'] as List<Video>?,
+                      gradientColors:
+                          curatedData['gradientColors'] as List<Color>?,
+                      icon: curatedData['icon'] as IconData?,
+                      imageUrl: curatedData['imageUrl'] as String?,
+                    );
                   }
                   return CustomPlaylistScreen(
                     key: ValueKey('desktop_playlist_$playlistId'),
@@ -116,6 +144,8 @@ class DesktopMainViewport extends StatelessWidget {
       case DesktopNavTab.customPlaylist:
       case DesktopNavTab.artistProfile:
       case DesktopNavTab.album:
+      case DesktopNavTab.settings:
+      case DesktopNavTab.profile:
         return 0;
       case DesktopNavTab.search:
         return 1;

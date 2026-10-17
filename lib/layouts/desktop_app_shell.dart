@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/keyboard_playback_controller.dart';
 import '../widgets/desktop/desktop_top_nav_bar.dart';
 import '../widgets/desktop/desktop_resize_divider.dart';
@@ -23,6 +24,10 @@ class DesktopAppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      BrowserContextMenu.disableContextMenu();
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -43,7 +48,7 @@ class DesktopAppShell extends StatelessWidget {
 
         return KeyboardPlaybackController(
           child: Scaffold(
-            backgroundColor: const Color(0xFF0B0B0F),
+            backgroundColor: const Color(0xFF000000),
             body: Column(
               children: [
                 // 1. Top Navigation Bar (64px)
@@ -80,20 +85,9 @@ class DesktopAppShell extends StatelessWidget {
                             },
                           ),
 
-                          // Tactical Left Resize Divider (Only in Wide Tier 1 when sidebar is expanded)
+                          // Tactical Left Resize Divider (Only in Wide Tier 1)
                           if (!isCompactMode)
-                            ValueListenableBuilder<double>(
-                              valueListenable:
-                                  DesktopLayoutState.leftSidebarWidth,
-                              builder: (context, sidebarWidth, _) {
-                                if (sidebarWidth <= 72.0) {
-                                  return const SizedBox.shrink();
-                                }
-                                return const DesktopResizeDivider(
-                                  isRightSide: false,
-                                );
-                              },
-                            ),
+                            const DesktopResizeDivider(isRightSide: false),
 
                           // Center Main Content Viewport (Expanded flex 1)
                           const Expanded(
@@ -175,10 +169,10 @@ class DesktopAppShell extends StatelessWidget {
                                   Container(
                                     width: 260.0,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF121217),
+                                      color: const Color(0xFF121212),
                                       border: const Border(
                                         left: BorderSide(
-                                          color: Color(0xFF24242C),
+                                          color: Color(0xFF1E1E1E),
                                           width: 1,
                                         ),
                                       ),

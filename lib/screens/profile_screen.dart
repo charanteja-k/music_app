@@ -354,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final hasCustomImage = hasProfileImage(customImagePath);
 
         return Scaffold(
-          backgroundColor: const Color(0xFF0B0B0F),
+          backgroundColor: const Color(0xFF121212),
           body: LayoutBuilder(
             builder: (context, constraints) {
               final isDesktop = constraints.maxWidth >= 720;
@@ -478,7 +478,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           colors: [
             const Color(0xFF4A1521).withValues(alpha: 0.85),
             const Color(0xFF221118).withValues(alpha: 0.9),
-            const Color(0xFF0B0B0F),
+            const Color(0xFF121212),
           ],
         ),
       ),
@@ -507,7 +507,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onPressed: () => Navigator.pop(context),
                     )
                   else
-                    const SizedBox(width: 48),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                      ),
+                      tooltip: 'Back to Home',
+                      onPressed: () =>
+                          DesktopLayoutState.setNavTab(DesktopNavTab.home),
+                    ),
                   const Expanded(
                     child: Text(
                       'Profile & Activity',

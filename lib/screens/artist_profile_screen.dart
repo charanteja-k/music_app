@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -11,6 +12,7 @@ import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/dilse_scrollbar.dart';
+import '../widgets/desktop/desktop_context_menu.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../constants/app_theme_tokens.dart';
 
@@ -1060,77 +1062,116 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                           song.id.value,
                         );
 
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 2,
-                          ),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              hdThumbnail,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              cacheWidth: 120,
-                              cacheHeight: 120,
-                              errorBuilder: (_, _, _) => Image.network(
-                                song.thumbnails.lowResUrl,
+                        return GestureDetector(
+                          onSecondaryTapDown: (details) {
+                            showUnifiedTrackMenu(
+                              context: context,
+                              globalPosition: details.globalPosition,
+                              song: song,
+                            );
+                          },
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 2,
+                            ),
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                hdThumbnail,
                                 width: 50,
                                 height: 50,
                                 fit: BoxFit.cover,
                                 cacheWidth: 120,
                                 cacheHeight: 120,
+                                errorBuilder: (_, _, _) => Image.network(
+                                  song.thumbnails.lowResUrl,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 120,
+                                  cacheHeight: 120,
+                                ),
                               ),
                             ),
-                          ),
-                          title: Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isCurrentSong ? themeColor : Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                            title: Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCurrentSong
+                                    ? themeColor
+                                    : Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          subtitle: Text(
-                            song.author,
-                            maxLines: 1,
-                            style: TextStyle(
-                              color: isCurrentSong
-                                  ? themeColor.withValues(alpha: 0.8)
-                                  : Colors.grey[400],
-                              fontSize: 12,
+                            subtitle: Text(
+                              song.author,
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: isCurrentSong
+                                    ? themeColor.withValues(alpha: 0.8)
+                                    : Colors.grey[400],
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isCurrentSong)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: AnimatedEqualizer(
-                                    isPlaying: _musicService.isPlaying,
-                                    barCount: 3,
-                                    color: themeColor,
-                                    size: 16,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isCurrentSong)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: AnimatedEqualizer(
+                                      isPlaying: _musicService.isPlaying,
+                                      barCount: 3,
+                                      color: themeColor,
+                                      size: 16,
+                                    ),
+                                  ),
+                                Builder(
+                                  builder: (btnCtx) => IconButton(
+                                    icon: const Icon(
+                                      Icons.more_horiz,
+                                      color: Colors.white54,
+                                    ),
+                                    onPressed: () {
+                                      final isDesktop =
+                                          kIsWeb ||
+                                          MediaQuery.of(context).size.width >=
+                                              640;
+                                      if (isDesktop) {
+                                        final box =
+                                            btnCtx.findRenderObject()
+                                                as RenderBox?;
+                                        final pos = box != null
+                                            ? box.localToGlobal(
+                                                box.size.bottomLeft(
+                                                  Offset.zero,
+                                                ),
+                                              )
+                                            : Offset.zero;
+                                        showUnifiedTrackMenu(
+                                          context: context,
+                                          globalPosition: pos,
+                                          song: song,
+                                        );
+                                      } else {
+                                        showSongOptionsBottomSheet(
+                                          context,
+                                          song,
+                                        );
+                                      }
+                                    },
                                   ),
                                 ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.more_horiz,
-                                  color: Colors.white54,
-                                ),
-                                onPressed: () =>
-                                    showSongOptionsBottomSheet(context, song),
-                              ),
-                            ],
+                              ],
+                            ),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _musicService.playPlaylist(filtered, index);
+                            },
                           ),
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            _musicService.playPlaylist(filtered, index);
-                          },
                         );
                       }, childCount: filtered.length),
                     ),

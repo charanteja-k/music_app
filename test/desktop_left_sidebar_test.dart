@@ -32,15 +32,15 @@ void main() {
           ),
         );
 
-        // Verify top expand control and compact navigation icons exist
-        expect(find.byIcon(Icons.menu_open_rounded), findsOneWidget);
+        // Verify authoritative Library expand control and compact navigation icons exist
+        expect(find.byIcon(Icons.view_sidebar_rounded), findsOneWidget);
         expect(find.byIcon(Icons.home_filled), findsOneWidget);
         expect(find.byIcon(Icons.search_rounded), findsOneWidget);
         expect(find.byIcon(Icons.add_rounded), findsOneWidget);
-        expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+        expect(find.byIcon(Icons.favorite), findsOneWidget);
 
-        // Test expanding sidebar from compact mode via top expand control
-        await tester.tap(find.byIcon(Icons.menu_open_rounded));
+        // Test expanding sidebar from compact mode via Library expand control
+        await tester.tap(find.byIcon(Icons.view_sidebar_rounded));
         await tester.pump();
         expect(DesktopLayoutState.isLeftSidebarCollapsed.value, false);
         expect(DesktopLayoutState.leftSidebarWidth.value, 280.0);
@@ -71,7 +71,7 @@ void main() {
 
       // Card 2 Library Header
       expect(find.text('Your Library'), findsOneWidget);
-      expect(find.byIcon(Icons.menu_open_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.view_sidebar_rounded), findsOneWidget);
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
 
       // Filter Chips
@@ -95,7 +95,7 @@ void main() {
       expect(find.text('Liked Songs'), findsOneWidget);
 
       // Test collapsing sidebar via collapse button
-      await tester.tap(find.byIcon(Icons.menu_open_rounded));
+      await tester.tap(find.byIcon(Icons.view_sidebar_rounded));
       await tester.pump();
       expect(DesktopLayoutState.isLeftSidebarCollapsed.value, true);
       expect(DesktopLayoutState.leftSidebarWidth.value, 72.0);
@@ -223,8 +223,8 @@ void main() {
           ),
         );
 
-        expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
-        await tester.tap(find.byIcon(Icons.favorite_rounded));
+        expect(find.byIcon(Icons.favorite), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.favorite));
         await tester.pump();
 
         expect(
@@ -288,6 +288,119 @@ void main() {
         expect(DesktopLayoutState.isLeftSidebarCollapsed.value, true);
         expect(DesktopLayoutState.leftSidebarWidth.value, 72.0);
         expect(find.byTooltip('Expand sidebar'), findsOneWidget);
+      },
+    );
+
+    testWidgets('Tapping Your Library header title collapses the sidebar', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      DesktopLayoutState.leftSidebarWidth.value = 280.0;
+      DesktopLayoutState.isLeftSidebarCollapsed.value = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ValueListenableBuilder<double>(
+              valueListenable: DesktopLayoutState.leftSidebarWidth,
+              builder: (context, width, _) {
+                return SizedBox(
+                  width: width,
+                  child: DesktopLeftSidebar(width: width),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Your Library'), findsOneWidget);
+      await tester.tap(find.text('Your Library'));
+      await tester.pump();
+
+      expect(DesktopLayoutState.isLeftSidebarCollapsed.value, true);
+      expect(DesktopLayoutState.leftSidebarWidth.value, 72.0);
+      expect(find.byTooltip('Expand sidebar'), findsOneWidget);
+    });
+
+    testWidgets('Preserves custom expanded width across collapse and expand', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      // User customizes width to 340px
+      DesktopLayoutState.updateLeftSidebarWidth(340.0);
+      expect(DesktopLayoutState.leftSidebarWidth.value, 340.0);
+      expect(DesktopLayoutState.isLeftSidebarCollapsed.value, false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ValueListenableBuilder<double>(
+              valueListenable: DesktopLayoutState.leftSidebarWidth,
+              builder: (context, width, _) {
+                return SizedBox(
+                  width: width,
+                  child: DesktopLeftSidebar(width: width),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Collapse via collapse button
+      await tester.tap(find.byTooltip('Collapse sidebar'));
+      await tester.pump();
+      expect(DesktopLayoutState.isLeftSidebarCollapsed.value, true);
+      expect(DesktopLayoutState.leftSidebarWidth.value, 72.0);
+
+      // Reopen via expand button -> restores 340px
+      await tester.tap(find.byTooltip('Expand sidebar'));
+      await tester.pump();
+      expect(DesktopLayoutState.isLeftSidebarCollapsed.value, false);
+      expect(DesktopLayoutState.leftSidebarWidth.value, 340.0);
+    });
+
+    testWidgets(
+      'Compact Mode renders 48x48 Liked Songs album tile & playlist covers',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        DesktopLayoutState.leftSidebarWidth.value = 72.0;
+        DesktopLayoutState.isLeftSidebarCollapsed.value = true;
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 72.0,
+                child: DesktopLeftSidebar(width: 72.0),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Liked songs 48x48 tile with white heart icon
+        expect(find.byIcon(Icons.favorite), findsOneWidget);
+        expect(find.byTooltip('Liked Songs • 0 songs'), findsOneWidget);
+
+        // Verify tapping Liked Songs opens liked_songs playlist in layout state
+        await tester.tap(find.byIcon(Icons.favorite));
+        await tester.pump();
+        expect(DesktopLayoutState.activePlaylistId.value, 'liked_songs');
+        expect(
+          DesktopLayoutState.activeNavTab.value,
+          DesktopNavTab.customPlaylist,
+        );
       },
     );
   });

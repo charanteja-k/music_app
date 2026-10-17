@@ -36,7 +36,8 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
   static const int _totalSlides = 5;
 
   int _currentSlide = 0;
-  late AnimationController _progressController;
+  late AnimationController _storyController;
+  AnimationController get _progressController => _storyController;
   bool _isPaused = false;
   bool _isSavingImage = false;
 
@@ -46,22 +47,26 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
     _prefs = PreferencesService();
     _data = widget.initialData ?? CapsuleService().buildCapsuleData(_prefs);
 
-    _progressController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 7))
-          ..addStatusListener((status) {
-            if (widget.autoAdvance && status == AnimationStatus.completed) {
-              _advanceSlide();
-            }
-          });
+    _storyController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(
+            seconds: 6,
+          ), // Fixed 6.0 seconds per story card
+        )..addStatusListener((status) {
+          if (widget.autoAdvance && status == AnimationStatus.completed) {
+            _advanceSlide();
+          }
+        });
 
     if (widget.autoAdvance) {
-      _progressController.forward();
+      _storyController.forward();
     }
   }
 
   @override
   void dispose() {
-    _progressController.dispose();
+    _storyController.dispose();
     super.dispose();
   }
 
@@ -236,9 +241,9 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           // Slide Content with Tap Detection
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onLongPressStart: (_) => _pauseProgress(),
-            onLongPressEnd: (_) => _resumeProgress(),
+            onTapDown: (_) => _pauseProgress(),
             onTapUp: (details) {
+              _resumeProgress();
               final screenWidth = MediaQuery.of(context).size.width;
               if (details.localPosition.dx < screenWidth * 0.32) {
                 _previousSlide();
@@ -246,6 +251,9 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                 _advanceSlide();
               }
             },
+            onTapCancel: () => _resumeProgress(),
+            onLongPressStart: (_) => _pauseProgress(),
+            onLongPressEnd: (_) => _resumeProgress(),
             child: SafeArea(
               child: Column(
                 children: [

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/music_service.dart';
+import '../services/web_player_bridge.dart';
 
 /// Wraps the widget tree with declarative Web & Desktop keyboard playback controls.
 ///
@@ -88,8 +90,14 @@ class KeyboardPlaybackController extends StatelessWidget {
       final currentVol = player.volume;
       if (currentVol <= 0.001) {
         player.setVolume(1.0);
+        if (kIsWeb) {
+          WebPlayerBridge.setVolume(1.0);
+        }
       } else {
         player.setVolume(0.0);
+        if (kIsWeb) {
+          WebPlayerBridge.setVolume(0.0);
+        }
       }
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.keyL) {

@@ -9,6 +9,9 @@ class WaveformScrubber extends StatefulWidget {
   final Color accentColor;
   final ValueChanged<Duration> onSeek;
 
+  final bool showTimestamps;
+  final double height;
+
   const WaveformScrubber({
     super.key,
     required this.position,
@@ -16,6 +19,8 @@ class WaveformScrubber extends StatefulWidget {
     required this.songId,
     required this.accentColor,
     required this.onSeek,
+    this.showTimestamps = true,
+    this.height = 44.0,
   });
 
   @override
@@ -107,60 +112,62 @@ class _WaveformScrubberState extends State<WaveformScrubber> {
         ? widget.duration - displayPosition
         : Duration.zero;
 
+    final waveformTrack = LayoutBuilder(
+      builder: (context, constraints) {
+        final trackWidth = constraints.maxWidth;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: hasValidDuration
+              ? (details) {
+                  _isDragging = true;
+                  _handleSeek(details.localPosition.dx, trackWidth);
+                  HapticFeedback.lightImpact();
+                }
+              : null,
+          onHorizontalDragUpdate: hasValidDuration
+              ? (details) {
+                  _handleSeek(details.localPosition.dx, trackWidth);
+                }
+              : null,
+          onHorizontalDragEnd: hasValidDuration ? (_) => _commitSeek() : null,
+          onHorizontalDragCancel: () {
+            setState(() {
+              _isDragging = false;
+              _dragProgress = null;
+            });
+          },
+          onTapDown: hasValidDuration
+              ? (details) {
+                  _handleSeek(details.localPosition.dx, trackWidth);
+                  _commitSeek();
+                }
+              : null,
+          child: Container(
+            height: widget.height,
+            alignment: Alignment.center,
+            child: CustomPaint(
+              size: Size(trackWidth, widget.height * 0.9),
+              painter: _WaveformPainter(
+                waveform: _waveformHeights,
+                progress: activeProgress,
+                isDragging: _isDragging,
+                accentColor: widget.accentColor,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!widget.showTimestamps) {
+      return waveformTrack;
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Waveform Visualizer & Seek Track
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final trackWidth = constraints.maxWidth;
-
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragStart: hasValidDuration
-                  ? (details) {
-                      _isDragging = true;
-                      _handleSeek(details.localPosition.dx, trackWidth);
-                      HapticFeedback.lightImpact();
-                    }
-                  : null,
-              onHorizontalDragUpdate: hasValidDuration
-                  ? (details) {
-                      _handleSeek(details.localPosition.dx, trackWidth);
-                    }
-                  : null,
-              onHorizontalDragEnd: hasValidDuration
-                  ? (_) => _commitSeek()
-                  : null,
-              onHorizontalDragCancel: () {
-                setState(() {
-                  _isDragging = false;
-                  _dragProgress = null;
-                });
-              },
-              onTapDown: hasValidDuration
-                  ? (details) {
-                      _handleSeek(details.localPosition.dx, trackWidth);
-                      _commitSeek();
-                    }
-                  : null,
-              child: Container(
-                height: 44,
-                alignment: Alignment.center,
-                child: CustomPaint(
-                  size: Size(trackWidth, 40),
-                  painter: _WaveformPainter(
-                    waveform: _waveformHeights,
-                    progress: activeProgress,
-                    isDragging: _isDragging,
-                    accentColor: widget.accentColor,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-
+        waveformTrack,
         const SizedBox(height: 4),
 
         // Timestamps with Tabular Numbers (prevents jitter)

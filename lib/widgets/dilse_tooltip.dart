@@ -32,12 +32,11 @@ class DilSeTooltip extends StatelessWidget {
         preferBelow: preferBelow,
         waitDuration: waitDuration ?? const Duration(milliseconds: 300),
         showDuration: showDuration ?? const Duration(milliseconds: 1500),
-        triggerMode: kIsWeb
-            ? TooltipTriggerMode.tap
-            : (defaultTargetPlatform == TargetPlatform.android ||
-                      defaultTargetPlatform == TargetPlatform.iOS
-                  ? TooltipTriggerMode.manual
-                  : TooltipTriggerMode.tap),
+        triggerMode:
+            (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS)
+            ? TooltipTriggerMode.manual
+            : null,
         child: child,
       ),
     );

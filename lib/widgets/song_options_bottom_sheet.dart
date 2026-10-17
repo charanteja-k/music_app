@@ -6,6 +6,8 @@ import '../services/music_service.dart';
 import '../screens/artist_profile_screen.dart';
 import '../screens/album_screen.dart';
 import '../services/preferences_service.dart';
+import '../layouts/desktop_layout_state.dart';
+import '../models/jio_album.dart';
 
 /// Converts a song Map representation into a youtube_explode Video instance
 /// for seamless interop across existing song action sheets.
@@ -193,13 +195,17 @@ void showSongOptionsBottomSheet(
                 subtitle: 'Explore full discography for ${song.author}',
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ArtistProfileScreen(artistName: song.author),
-                    ),
-                  );
+                  if (MediaQuery.of(context).size.width >= 640) {
+                    DesktopLayoutState.openArtist(song.author);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ArtistProfileScreen(artistName: song.author),
+                      ),
+                    );
+                  }
                 },
               ),
 
@@ -232,17 +238,13 @@ void showSongOptionsBottomSheet(
                     song.id.value,
                   );
                   if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
-                    Navigator.push(
+                    _navigateToAlbum(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => AlbumScreen(
-                          album: cachedAlbum,
-                          albumId: cachedAlbum.id,
-                          albumTitle: cachedAlbum.title,
-                          albumArtwork: cachedAlbum.artwork,
-                          albumArtist: cachedAlbum.artist,
-                        ),
-                      ),
+                      album: cachedAlbum,
+                      albumId: cachedAlbum.id,
+                      albumTitle: cachedAlbum.title,
+                      albumArtwork: cachedAlbum.artwork,
+                      albumArtist: cachedAlbum.artist,
                     );
                     return;
                   }
@@ -254,18 +256,14 @@ void showSongOptionsBottomSheet(
 
                   if ((cachedId != null && cachedId.isNotEmpty) ||
                       (cachedTitle != null && cachedTitle.isNotEmpty)) {
-                    Navigator.push(
+                    _navigateToAlbum(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => AlbumScreen(
-                          albumId: cachedId ?? '',
-                          albumTitle: cachedTitle ?? '',
-                          albumArtwork:
-                              customThumbnail ??
-                              MusicService.getHdThumbnail(song.id.value),
-                          albumArtist: song.author,
-                        ),
-                      ),
+                      albumId: cachedId ?? '',
+                      albumTitle: cachedTitle ?? '',
+                      albumArtwork:
+                          customThumbnail ??
+                          MusicService.getHdThumbnail(song.id.value),
+                      albumArtist: song.author,
                     );
                     return;
                   }
@@ -273,17 +271,13 @@ void showSongOptionsBottomSheet(
                   final resolved = await musicService.resolveAlbumForSong(song);
                   if (context.mounted) {
                     if (resolved != null && resolved.songs.isNotEmpty) {
-                      Navigator.push(
+                      _navigateToAlbum(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => AlbumScreen(
-                            album: resolved,
-                            albumId: resolved.id,
-                            albumTitle: resolved.title,
-                            albumArtwork: resolved.artwork,
-                            albumArtist: resolved.artist,
-                          ),
-                        ),
+                        album: resolved,
+                        albumId: resolved.id,
+                        albumTitle: resolved.title,
+                        albumArtwork: resolved.artwork,
+                        albumArtist: resolved.artist,
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -646,4 +640,46 @@ void _showToast(BuildContext context, String message) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
+}
+
+void _navigateToAlbum(
+  BuildContext context, {
+  JioAlbum? album,
+  String? albumId,
+  String? albumTitle,
+  String? albumArtwork,
+  String? albumArtist,
+}) {
+  final hasValidAlbum =
+      (album != null) ||
+      (albumId != null && albumId.trim().isNotEmpty) ||
+      (albumTitle != null && albumTitle.trim().isNotEmpty);
+
+  if (!hasValidAlbum) {
+    _showToast(context, 'Album details not available.');
+    return;
+  }
+
+  if (MediaQuery.of(context).size.width >= 640) {
+    DesktopLayoutState.openAlbum(
+      album: album,
+      albumId: albumId,
+      albumTitle: albumTitle,
+      albumArtwork: albumArtwork,
+      albumArtist: albumArtist,
+    );
+  } else {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AlbumScreen(
+          album: album,
+          albumId: albumId,
+          albumTitle: albumTitle,
+          albumArtwork: albumArtwork,
+          albumArtist: albumArtist,
+        ),
+      ),
+    );
+  }
 }

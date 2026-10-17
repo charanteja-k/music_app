@@ -1,6 +1,7 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'constants/app_theme_tokens.dart';
 import 'services/audio_handler.dart';
 import 'screens/intro_splash_screen.dart';
@@ -9,7 +10,9 @@ import 'services/bug_report_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    BrowserContextMenu.disableContextMenu();
+  } else {
     try {
       await initAudioService();
     } catch (e) {

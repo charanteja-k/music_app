@@ -11,7 +11,12 @@ enum DesktopNavTab {
   customPlaylist,
   artistProfile,
   album,
+  settings,
+  profile,
 }
+
+/// Type alias for DesktopNavTab matching prompt specification.
+typedef DesktopMainViewType = DesktopNavTab;
 
 /// Lightweight, primitive ValueNotifier state holder for the Spotify-grade Desktop Shell.
 ///
@@ -24,10 +29,20 @@ class DesktopLayoutState {
   static final ValueNotifier<DesktopNavTab> activeNavTab =
       ValueNotifier<DesktopNavTab>(DesktopNavTab.home);
 
+  /// Alias for activeNavTab matching DesktopMainViewType specification.
+  static ValueNotifier<DesktopNavTab> get currentView => activeNavTab;
+
   /// Active custom playlist ID rendered inside the central desktop viewport.
   static final ValueNotifier<String?> activePlaylistId = ValueNotifier<String?>(
     null,
   );
+
+  /// Alias for activePlaylistId.
+  static ValueNotifier<String?> get selectedPlaylistId => activePlaylistId;
+
+  /// Active curated playlist data rendered inside the central desktop viewport.
+  static final ValueNotifier<Map<String, dynamic>?> activeCuratedPlaylistData =
+      ValueNotifier<Map<String, dynamic>?>(null);
 
   /// Active artist name rendered inside the central desktop viewport.
   static final ValueNotifier<String?> activeArtistName = ValueNotifier<String?>(
@@ -67,6 +82,8 @@ class DesktopLayoutState {
   static final ValueNotifier<DesktopContextTab> contextTab =
       ValueNotifier<DesktopContextTab>(DesktopContextTab.nowPlaying);
 
+  static double _lastExpandedLeftSidebarWidth = 280.0;
+
   /// Updates left sidebar width with tactical snap mechanics:
   /// - If dragged below 120px: snaps immediately to 72px (collapsed icon strip).
   /// - Otherwise: clamps between 72px and 398px.
@@ -75,8 +92,12 @@ class DesktopLayoutState {
       leftSidebarWidth.value = 72.0;
       isLeftSidebarCollapsed.value = true;
     } else {
-      leftSidebarWidth.value = newWidth.clamp(72.0, 398.0);
+      final clamped = newWidth.clamp(72.0, 398.0);
+      leftSidebarWidth.value = clamped;
       isLeftSidebarCollapsed.value = false;
+      if (clamped >= 240.0) {
+        _lastExpandedLeftSidebarWidth = clamped;
+      }
     }
   }
 
@@ -85,14 +106,34 @@ class DesktopLayoutState {
     rightPanelWidth.value = newWidth.clamp(240.0, 460.0);
   }
 
-  /// Toggles the left sidebar between expanded (280px) and collapsed (72px).
+  /// Toggles the left sidebar between expanded (280px or user custom width) and collapsed (72px).
   static void toggleLeftSidebar() {
     if (isLeftSidebarCollapsed.value || leftSidebarWidth.value <= 72.0) {
-      leftSidebarWidth.value = 280.0;
+      leftSidebarWidth.value = _lastExpandedLeftSidebarWidth.clamp(
+        240.0,
+        398.0,
+      );
       isLeftSidebarCollapsed.value = false;
     } else {
+      if (leftSidebarWidth.value >= 240.0) {
+        _lastExpandedLeftSidebarWidth = leftSidebarWidth.value;
+      }
       leftSidebarWidth.value = 72.0;
       isLeftSidebarCollapsed.value = true;
+    }
+  }
+
+  /// Explicitly expands the left sidebar to its expanded state.
+  static void expandLeftSidebar() {
+    if (isLeftSidebarCollapsed.value || leftSidebarWidth.value <= 72.0) {
+      toggleLeftSidebar();
+    }
+  }
+
+  /// Explicitly collapses the left sidebar to the 72px rail.
+  static void collapseLeftSidebar() {
+    if (!isLeftSidebarCollapsed.value && leftSidebarWidth.value > 72.0) {
+      toggleLeftSidebar();
     }
   }
 
@@ -124,6 +165,33 @@ class DesktopLayoutState {
   /// Opens a custom playlist inside the central desktop viewport while keeping side panels docked.
   static void openPlaylist(String playlistId) {
     activePlaylistId.value = playlistId;
+    activeCuratedPlaylistData.value = null;
+    activeArtistName.value = null;
+    activeAlbumData.value = null;
+    activeNavTab.value = DesktopNavTab.customPlaylist;
+  }
+
+  /// Opens a curated playlist inside the central desktop viewport while keeping side panels docked.
+  static void openCuratedPlaylist(
+    String playlistId, {
+    required String title,
+    required String subtitle,
+    String? query,
+    dynamic initialSongs,
+    dynamic gradientColors,
+    dynamic icon,
+    String? imageUrl,
+  }) {
+    activePlaylistId.value = playlistId;
+    activeCuratedPlaylistData.value = {
+      'title': title,
+      'subtitle': subtitle,
+      'query': query,
+      'initialSongs': initialSongs,
+      'gradientColors': gradientColors,
+      'icon': icon,
+      'imageUrl': imageUrl,
+    };
     activeArtistName.value = null;
     activeAlbumData.value = null;
     activeNavTab.value = DesktopNavTab.customPlaylist;
@@ -133,6 +201,7 @@ class DesktopLayoutState {
   static void openArtist(String artistName) {
     activeArtistName.value = artistName;
     activePlaylistId.value = null;
+    activeCuratedPlaylistData.value = null;
     activeAlbumData.value = null;
     activeNavTab.value = DesktopNavTab.artistProfile;
   }
@@ -153,18 +222,32 @@ class DesktopLayoutState {
       'albumArtist': albumArtist,
     };
     activePlaylistId.value = null;
+    activeCuratedPlaylistData.value = null;
     activeArtistName.value = null;
     activeNavTab.value = DesktopNavTab.album;
+  }
+
+  /// Opens the settings screen inside the central desktop viewport while keeping side panels docked.
+  static void openSettings() {
+    setNavTab(DesktopNavTab.settings);
+  }
+
+  /// Opens the profile screen inside the central desktop viewport while keeping side panels docked.
+  static void openProfile() {
+    setNavTab(DesktopNavTab.profile);
   }
 
   /// Closes the detail view and returns to the home/library view.
   static void closeDetailView() {
     activePlaylistId.value = null;
+    activeCuratedPlaylistData.value = null;
     activeArtistName.value = null;
     activeAlbumData.value = null;
     if (activeNavTab.value == DesktopNavTab.customPlaylist ||
         activeNavTab.value == DesktopNavTab.artistProfile ||
-        activeNavTab.value == DesktopNavTab.album) {
+        activeNavTab.value == DesktopNavTab.album ||
+        activeNavTab.value == DesktopNavTab.settings ||
+        activeNavTab.value == DesktopNavTab.profile) {
       activeNavTab.value = DesktopNavTab.home;
     }
   }

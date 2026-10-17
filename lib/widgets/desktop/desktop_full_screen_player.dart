@@ -1,12 +1,15 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
-import '../../screens/album_screen.dart';
 import '../../screens/artist_profile_screen.dart';
 import '../../services/music_service.dart';
 import '../../services/preferences_service.dart';
+import '../../services/web_player_bridge.dart';
+import '../../layouts/desktop_layout_state.dart';
 import '../animated_lyrics.dart';
 import '../vinyl_record_player.dart';
 
@@ -56,10 +59,29 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
   final FocusNode _focusNode = FocusNode();
   DesktopPlayerTab _activeTab = DesktopPlayerTab.nowPlaying;
   double _lastVolume = 1.0;
+  double _currentVolume = 1.0;
+  bool _isDraggingVolume = false;
+  StreamSubscription<double>? _volumeSubscription;
 
   @override
   void initState() {
     super.initState();
+    _currentVolume = _musicService.audioPlayer.volume;
+    if (_currentVolume > 0.001) {
+      _lastVolume = _currentVolume;
+    }
+    _volumeSubscription = _musicService.audioPlayer.volumeStream.listen((vol) {
+      if (!_isDraggingVolume &&
+          mounted &&
+          (vol - _currentVolume).abs() > 0.001) {
+        setState(() {
+          _currentVolume = vol;
+          if (vol > 0.001) {
+            _lastVolume = vol;
+          }
+        });
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -67,8 +89,32 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
 
   @override
   void dispose() {
+    _volumeSubscription?.cancel();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _applyVolume(double val) {
+    final clamped = val.clamp(0.0, 1.0);
+    setState(() {
+      _currentVolume = clamped;
+    });
+    _musicService.audioPlayer.setVolume(clamped);
+    if (kIsWeb) {
+      WebPlayerBridge.setVolume(clamped);
+    }
+  }
+
+  void _toggleMute() {
+    final current = _currentVolume;
+    final isMuted = current <= 0.001;
+    if (isMuted) {
+      final restoreVol = _lastVolume > 0.05 ? _lastVolume : 1.0;
+      _applyVolume(restoreVol);
+    } else {
+      _lastVolume = current > 0.001 ? current : 1.0;
+      _applyVolume(0.0);
+    }
   }
 
   void _handleKeyEvent(KeyEvent event) {
@@ -83,11 +129,11 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
     } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
       _musicService.seekRelative(const Duration(seconds: -5));
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      final current = _musicService.audioPlayer.volume;
-      _musicService.audioPlayer.setVolume((current + 0.05).clamp(0.0, 1.0));
+      _applyVolume(_currentVolume + 0.05);
     } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      final current = _musicService.audioPlayer.volume;
-      _musicService.audioPlayer.setVolume((current - 0.05).clamp(0.0, 1.0));
+      _applyVolume(_currentVolume - 0.05);
+    } else if (event.logicalKey == LogicalKeyboardKey.keyM) {
+      _toggleMute();
     } else if (event.logicalKey == LogicalKeyboardKey.keyL) {
       setState(() {
         _activeTab = _activeTab == DesktopPlayerTab.lyrics
@@ -1069,78 +1115,83 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
   // Component: Desktop Volume Slider & Contextual Actions
   // ---------------------------------------------------------------------------
   Widget _buildDesktopBottomUtilities(BuildContext context) {
+    final volume = _currentVolume;
+    final isMuted = volume <= 0.001;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Volume Controller Deck
-        StreamBuilder<double>(
-          stream: _musicService.audioPlayer.volumeStream,
-          builder: (context, snapshot) {
-            final volume = snapshot.data ?? _musicService.audioPlayer.volume;
-            final isMuted = volume <= 0.001;
-
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: isMuted ? 'Unmute' : 'Mute',
-                  icon: Icon(
-                    isMuted
-                        ? Icons.volume_off_rounded
-                        : (volume < 0.5
-                              ? Icons.volume_down_rounded
-                              : Icons.volume_up_rounded),
-                    color: Colors.white70,
-                    size: 20,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: isMuted ? 'Unmute' : 'Mute',
+              icon: Icon(
+                isMuted
+                    ? Icons.volume_off_rounded
+                    : (volume < 0.5
+                          ? Icons.volume_down_rounded
+                          : Icons.volume_up_rounded),
+                color: isMuted
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : Colors.white70,
+                size: 20,
+              ),
+              onPressed: _toggleMute,
+            ),
+            SizedBox(
+              width: 120,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3.5,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 5.5,
                   ),
-                  onPressed: () {
-                    if (isMuted) {
-                      _musicService.audioPlayer.setVolume(
-                        _lastVolume > 0 ? _lastVolume : 1.0,
-                      );
-                    } else {
-                      _lastVolume = volume;
-                      _musicService.audioPlayer.setVolume(0.0);
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 12.0,
+                  ),
+                  activeTrackColor: Colors.white,
+                  inactiveTrackColor: Colors.white24,
+                  thumbColor: Colors.white,
+                ),
+                child: Slider(
+                  key: const Key('desktop_fullscreen_volume_slider'),
+                  value: volume.clamp(0.0, 1.0),
+                  min: 0.0,
+                  max: 1.0,
+                  onChangeStart: (_) {
+                    _isDraggingVolume = true;
+                  },
+                  onChangeEnd: (val) {
+                    _isDraggingVolume = false;
+                    if (val > 0.001) {
+                      _lastVolume = val;
                     }
+                    _applyVolume(val);
+                  },
+                  onChanged: (val) {
+                    if (val > 0.001) {
+                      _lastVolume = val;
+                    }
+                    _applyVolume(val);
                   },
                 ),
-                SizedBox(
-                  width: 110,
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3.5,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 5.0,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 10.0,
-                      ),
-                      activeTrackColor: Colors.white,
-                      inactiveTrackColor: Colors.white24,
-                      thumbColor: Colors.white,
-                    ),
-                    child: Slider(
-                      value: volume.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged: (val) {
-                        _lastVolume = val;
-                        _musicService.audioPlayer.setVolume(val);
-                      },
-                    ),
-                  ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 38,
+              child: Text(
+                '${(volume * 100).toInt()}%',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.50),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
-                Text(
-                  '${(volume * 100).toInt()}%',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.50),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
 
         // Quick Navigation Pills: "View Artist" & "Go to Album"
@@ -1165,13 +1216,8 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ArtistProfileScreen(artistName: widget.song.author),
-                  ),
-                );
+                widget.onClose();
+                DesktopLayoutState.openArtist(widget.song.author);
               },
             ),
             const SizedBox(width: 10),
@@ -1199,18 +1245,14 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
                 final cachedTitle =
                     MusicService.getCachedAlbumTitle(widget.song.id.value) ??
                     MusicService.extractMovieOrAlbumTitle(widget.song.title);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AlbumScreen(
-                      albumId: cachedId ?? '',
-                      albumTitle: cachedTitle ?? widget.song.title,
-                      albumArtwork: MusicService.getHdThumbnail(
-                        widget.song.id.value,
-                      ),
-                      albumArtist: widget.song.author,
-                    ),
+                widget.onClose();
+                DesktopLayoutState.openAlbum(
+                  albumId: cachedId ?? '',
+                  albumTitle: cachedTitle ?? widget.song.title,
+                  albumArtwork: MusicService.getHdThumbnail(
+                    widget.song.id.value,
                   ),
+                  albumArtist: widget.song.author,
                 );
               },
             ),

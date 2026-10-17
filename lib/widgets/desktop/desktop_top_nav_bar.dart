@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../layouts/desktop_layout_state.dart';
 import '../../services/preferences_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
-import '../../screens/settings_screen.dart';
-import '../../screens/profile_screen.dart';
+import 'desktop_search_dropdown.dart';
 
 /// Spotify-grade 64px Desktop Top Global Navigation Bar (#global-nav-bar).
 ///
@@ -23,12 +23,22 @@ class DesktopTopNavBar extends StatefulWidget {
 class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final LayerLink _searchLayerLink = LayerLink();
+  final ValueNotifier<double> _searchWidthNotifier = ValueNotifier<double>(
+    460.0,
+  );
+
+  OverlayEntry? _recentSearchesOverlay;
+  Timer? _dismissTimer;
+  bool _isDropdownHovered = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.text = DesktopLayoutState.globalSearchQuery.value;
     DesktopLayoutState.globalSearchQuery.addListener(_syncSearchQuery);
+    _searchFocusNode.addListener(_onFocusChanged);
+    _searchController.addListener(_onControllerChanged);
   }
 
   void _syncSearchQuery() {
@@ -37,9 +47,91 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
     }
   }
 
+  void _onFocusChanged() {
+    if (_searchFocusNode.hasFocus) {
+      _dismissTimer?.cancel();
+      if (_searchController.text.trim().isEmpty) {
+        _showRecentSearchesOverlay();
+      }
+    } else {
+      if (!_isDropdownHovered) {
+        _scheduleDismiss();
+      }
+    }
+  }
+
+  void _onControllerChanged() {
+    if (_searchFocusNode.hasFocus) {
+      if (_searchController.text.trim().isEmpty) {
+        _showRecentSearchesOverlay();
+      } else {
+        _hideRecentSearchesOverlay();
+      }
+    }
+  }
+
+  void _onDropdownHoverChanged(bool isHovered) {
+    _isDropdownHovered = isHovered;
+    if (!isHovered && !_searchFocusNode.hasFocus) {
+      _scheduleDismiss();
+    } else if (isHovered) {
+      _dismissTimer?.cancel();
+    }
+  }
+
+  void _scheduleDismiss() {
+    _dismissTimer?.cancel();
+    _dismissTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!_searchFocusNode.hasFocus && !_isDropdownHovered) {
+        _hideRecentSearchesOverlay();
+      }
+    });
+  }
+
+  void _showRecentSearchesOverlay() {
+    if (_recentSearchesOverlay != null || !mounted) return;
+
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    _recentSearchesOverlay = OverlayEntry(
+      builder: (context) {
+        return DesktopSearchDropdown(
+          layerLink: _searchLayerLink,
+          searchWidthListenable: _searchWidthNotifier,
+          onDismiss: () {
+            _hideRecentSearchesOverlay();
+            _searchFocusNode.unfocus();
+          },
+          onHoverChanged: _onDropdownHoverChanged,
+        );
+      },
+    );
+
+    overlay.insert(_recentSearchesOverlay!);
+  }
+
+  void _hideRecentSearchesOverlay() {
+    _dismissTimer?.cancel();
+    if (_recentSearchesOverlay != null) {
+      _recentSearchesOverlay?.remove();
+      _recentSearchesOverlay = null;
+    }
+  }
+
+  void _dismissSearchOverlayAndUnfocus() {
+    _hideRecentSearchesOverlay();
+    _searchFocusNode.unfocus();
+  }
+
   @override
   void dispose() {
+    _dismissTimer?.cancel();
+    _hideRecentSearchesOverlay();
+    _searchWidthNotifier.dispose();
     DesktopLayoutState.globalSearchQuery.removeListener(_syncSearchQuery);
+    _searchFocusNode.removeListener(_onFocusChanged);
+    _searchController.removeListener(_onControllerChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -50,9 +142,17 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
     if (DesktopLayoutState.activeNavTab.value != DesktopNavTab.search) {
       DesktopLayoutState.setNavTab(DesktopNavTab.search);
     }
+    if (_searchController.text.trim().isEmpty) {
+      _showRecentSearchesOverlay();
+    }
   }
 
   void _onSearchChanged(String query) {
+    if (query.trim().isNotEmpty) {
+      _hideRecentSearchesOverlay();
+    } else if (_searchFocusNode.hasFocus) {
+      _showRecentSearchesOverlay();
+    }
     DesktopLayoutState.globalSearchQuery.value = query.trim();
     if (DesktopLayoutState.activeNavTab.value != DesktopNavTab.search) {
       DesktopLayoutState.setNavTab(DesktopNavTab.search);
@@ -60,12 +160,14 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   }
 
   void _openBrowseCategories() {
+    _hideRecentSearchesOverlay();
     _searchController.clear();
     DesktopLayoutState.globalSearchQuery.value = '';
     DesktopLayoutState.setNavTab(DesktopNavTab.search);
   }
 
   void _navigateToHome() {
+    _hideRecentSearchesOverlay();
     _searchController.clear();
     DesktopLayoutState.globalSearchQuery.value = '';
     DesktopLayoutState.setNavTab(DesktopNavTab.home);
@@ -84,6 +186,8 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
         ): _focusSearch,
         const SingleActivator(LogicalKeyboardKey.keyL, meta: true, shift: true):
             _focusSearch,
+        const SingleActivator(LogicalKeyboardKey.escape):
+            _dismissSearchOverlayAndUnfocus,
       },
       child: AnimatedBuilder(
         animation: prefs,
@@ -93,13 +197,10 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
           return Container(
             height: 64.0,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0B0F),
+            decoration: const BoxDecoration(
+              color: Color(0xFF000000),
               border: Border(
-                bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 1.0,
-                ),
+                bottom: BorderSide(color: Color(0xFF1E1E1E), width: 1.0),
               ),
             ),
             child: LayoutBuilder(
@@ -109,65 +210,73 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                 final searchWidth = isSuperCompact
                     ? 220.0
                     : (isCompact ? 300.0 : 460.0);
+                _searchWidthNotifier.value = searchWidth;
 
                 return Row(
                   children: [
                     // 1. LEADING: DILSE BRAND LOGO + HOME NAV
-                    InkWell(
-                      borderRadius: BorderRadius.circular(8.0),
-                      onTap: _navigateToHome,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6.0,
-                          vertical: 4.0,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10.0),
-                              child: Image.asset(
-                                'assets/images/dilse_logo.png',
-                                width: 36.0,
-                                height: 36.0,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(
-                                  width: 36.0,
-                                  height: 36.0,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        accentColor,
-                                        accentColor.withValues(alpha: 0.7),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.0),
-                                  ),
-                                  child: const Icon(
-                                    Icons.music_note_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8.0),
+                          onTap: _navigateToHome,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6.0,
+                              vertical: 4.0,
                             ),
-                            if (!isCompact) ...[
-                              const SizedBox(width: 12.0),
-                              const Text(
-                                'DilSe Music',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.3,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  child: Image.asset(
+                                    'assets/images/dilse_logo.png',
+                                    width: 36.0,
+                                    height: 36.0,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Container(
+                                      width: 36.0,
+                                      height: 36.0,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            accentColor,
+                                            accentColor.withValues(alpha: 0.7),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          10.0,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.music_note_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ],
+                                if (!isCompact) ...[
+                                  const SizedBox(width: 12.0),
+                                  const Text(
+                                    'DilSe Music',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
 
                     const Spacer(),
@@ -220,153 +329,186 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
                         const SizedBox(width: 10.0),
 
-                        // Spotify Pill Search Container
-                        Container(
-                          height: 46.0,
-                          width: searchWidth,
-                          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1F1F24),
-                            borderRadius: BorderRadius.circular(23.0),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              width: 1.0,
+                        // Spotify Pill Search Container with LayerLink target
+                        CompositedTransformTarget(
+                          link: _searchLayerLink,
+                          child: Container(
+                            height: 46.0,
+                            width: searchWidth,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 28,
-                                  minHeight: 28,
-                                ),
-                                icon: Icon(
-                                  Icons.search_rounded,
-                                  color: Colors.white.withValues(alpha: 0.65),
-                                  size: 20.0,
-                                ),
-                                onPressed: _focusSearch,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1F1F24),
+                              borderRadius: BorderRadius.circular(23.0),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                width: 1.0,
                               ),
-                              const SizedBox(width: 6.0),
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  focusNode: _searchFocusNode,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13.5,
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 28,
+                                    minHeight: 28,
                                   ),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    border: InputBorder.none,
-                                    hintText: isSuperCompact
-                                        ? 'Search...'
-                                        : 'What do you want to play?',
-                                    hintStyle: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.45,
-                                      ),
+                                  icon: Icon(
+                                    Icons.search_rounded,
+                                    color: Colors.white.withValues(alpha: 0.65),
+                                    size: 20.0,
+                                  ),
+                                  onPressed: _focusSearch,
+                                ),
+                                const SizedBox(width: 6.0),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    style: const TextStyle(
+                                      color: Colors.white,
                                       fontSize: 13.5,
                                     ),
-                                  ),
-                                  onChanged: _onSearchChanged,
-                                  onSubmitted: (query) {
-                                    _onSearchChanged(query);
-                                  },
-                                ),
-                              ),
-                              if (_searchController.text.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () {
-                                    _searchController.clear();
-                                    _onSearchChanged('');
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4.0,
-                                    ),
-                                    child: Icon(
-                                      Icons.close_rounded,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.5,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      hintText: isSuperCompact
+                                          ? 'Search...'
+                                          : 'What do you want to play?',
+                                      hintStyle: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.45,
+                                        ),
+                                        fontSize: 13.5,
                                       ),
-                                      size: 16.0,
                                     ),
+                                    onTap: () {
+                                      if (_searchController.text
+                                          .trim()
+                                          .isEmpty) {
+                                        _showRecentSearchesOverlay();
+                                      }
+                                    },
+                                    onTapOutside: (_) {
+                                      if (!_isDropdownHovered) {
+                                        _scheduleDismiss();
+                                      }
+                                    },
+                                    onChanged: _onSearchChanged,
+                                    onSubmitted: (query) {
+                                      final trimmed = query.trim();
+                                      if (trimmed.isNotEmpty) {
+                                        unawaited(
+                                          PreferencesService()
+                                              .addToSearchHistory(
+                                                trimmed,
+                                                type: 'query',
+                                              ),
+                                        );
+                                      }
+                                      _onSearchChanged(query);
+                                      _dismissSearchOverlayAndUnfocus();
+                                    },
                                   ),
                                 ),
-
-                              if (!isSuperCompact) ...[
-                                // Vertical divider line |
-                                Container(
-                                  height: 18.0,
-                                  width: 1.0,
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 8.0,
-                                  ),
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                ),
-
-                                // Browse/Explore Categories Icon Button (Spotify-style)
-                                Tooltip(
-                                  message: 'Browse Categories',
-                                  child: InkWell(
-                                    onTap: _openBrowseCategories,
-                                    borderRadius: BorderRadius.circular(6.0),
+                                if (_searchController.text.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      _onSearchChanged('');
+                                      if (_searchFocusNode.hasFocus) {
+                                        _showRecentSearchesOverlay();
+                                      }
+                                    },
                                     child: Padding(
-                                      padding: const EdgeInsets.all(4.0),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4.0,
+                                      ),
                                       child: Icon(
-                                        Icons.grid_view_rounded,
+                                        Icons.close_rounded,
                                         color: Colors.white.withValues(
-                                          alpha: 0.65,
+                                          alpha: 0.5,
                                         ),
-                                        size: 18.0,
+                                        size: 16.0,
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
 
-                              if (!isCompact) ...[
-                                const SizedBox(width: 6.0),
-                                // Accelerator Badge (Ctrl+Shift+L)
-                                InkWell(
-                                  onTap: _focusSearch,
-                                  borderRadius: BorderRadius.circular(5.0),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6.0,
-                                      vertical: 3.0,
+                                if (!isSuperCompact) ...[
+                                  // Vertical divider line |
+                                  Container(
+                                    height: 18.0,
+                                    width: 1.0,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 8.0,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.08,
-                                      ),
-                                      borderRadius: BorderRadius.circular(5.0),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.06,
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                  ),
+
+                                  // Browse/Explore Categories Icon Button (Spotify-style)
+                                  Tooltip(
+                                    message: 'Browse Categories',
+                                    child: InkWell(
+                                      onTap: _openBrowseCategories,
+                                      borderRadius: BorderRadius.circular(6.0),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: Icon(
+                                          Icons.grid_view_rounded,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.65,
+                                          ),
+                                          size: 18.0,
                                         ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Ctrl+Shift+L',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                        fontSize: 10.0,
-                                        fontWeight: FontWeight.w600,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
                                       ),
                                     ),
                                   ),
-                                ),
+                                ],
+
+                                if (!isCompact) ...[
+                                  const SizedBox(width: 6.0),
+                                  // Accelerator Badge (Ctrl+Shift+L)
+                                  InkWell(
+                                    onTap: _focusSearch,
+                                    borderRadius: BorderRadius.circular(5.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6.0,
+                                        vertical: 3.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          5.0,
+                                        ),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.06,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Ctrl+Shift+L',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                          fontSize: 10.0,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ],
@@ -424,12 +566,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                               size: 20.0,
                             ),
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen(),
-                                ),
-                              );
+                              DesktopLayoutState.openSettings();
                             },
                           ),
                         ),
@@ -458,21 +595,16 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                           message: 'Profile',
                           child: GestureDetector(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ProfileScreen(),
-                                ),
-                              );
+                              DesktopLayoutState.openProfile();
                             },
                             child: Container(
                               width: 32.0,
                               height: 32.0,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1E1E2C),
+                                color: const Color(0xFF181818),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                  color: const Color(0xFF1E1E1E),
                                   width: 1.0,
                                 ),
                               ),

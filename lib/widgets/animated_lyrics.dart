@@ -444,18 +444,17 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isCurrent
-                  ? themeColor
-                  : (isPassed
-                        ? Colors.white.withValues(alpha: 0.55)
-                        : Colors.white.withValues(alpha: 0.25)),
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.40),
               fontSize: 21,
-              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
               height: 1.4,
               shadows: isCurrent
-                  ? [
+                  ? const [
                       Shadow(
-                        color: themeColor.withValues(alpha: 0.65),
-                        blurRadius: 18,
+                        color: Colors.black54,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
                       ),
                     ]
                   : null,
@@ -467,10 +466,8 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isCurrent
-                  ? Colors.white.withValues(alpha: 0.95)
-                  : (isPassed
-                        ? Colors.white.withValues(alpha: 0.40)
-                        : Colors.white.withValues(alpha: 0.18)),
+                  ? Colors.white.withValues(alpha: 0.90)
+                  : Colors.white.withValues(alpha: 0.35),
               fontSize: 15,
               fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
               fontStyle: FontStyle.italic,
@@ -494,18 +491,17 @@ class _AnimatedLyricsState extends State<AnimatedLyrics> {
         textAlign: TextAlign.center,
         style: TextStyle(
           color: isCurrent
-              ? themeColor
-              : (isPassed
-                    ? Colors.white.withValues(alpha: 0.55)
-                    : Colors.white.withValues(alpha: 0.25)),
+              ? Colors.white
+              : Colors.white.withValues(alpha: 0.40),
           fontSize: 21,
-          fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+          fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
           height: 1.45,
           shadows: isCurrent
-              ? [
+              ? const [
                   Shadow(
-                    color: themeColor.withValues(alpha: 0.65),
-                    blurRadius: 18,
+                    color: Colors.black54,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
                 ]
               : null,

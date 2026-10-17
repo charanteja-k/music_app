@@ -100,5 +100,50 @@ void main() {
       expect(prefs.structuredSearchHistory, isEmpty);
       expect(prefs.searchHistory, isEmpty);
     });
+
+    test(
+      'manages recent_searches_json items with LIFO and deduplication',
+      () async {
+        await prefs.addRecentSearch({
+          'id': 'song-1',
+          'title': 'Kesariya',
+          'type': 'song',
+          'subtitle': 'Arijit Singh',
+        });
+        await prefs.addRecentSearch({
+          'id': 'artist-1',
+          'title': 'Anuv Jain',
+          'type': 'artist',
+          'subtitle': 'Artist',
+        });
+
+        var recent = prefs.getRecentSearches();
+        expect(recent.length, 2);
+        expect(recent.first['title'], 'Anuv Jain');
+        expect(recent.last['title'], 'Kesariya');
+
+        // Re-adding Kesariya bumps it to the top (LIFO deduplication)
+        await prefs.addRecentSearch({
+          'id': 'song-1',
+          'title': 'Kesariya',
+          'type': 'song',
+          'subtitle': 'Arijit Singh',
+        });
+
+        recent = prefs.getRecentSearches();
+        expect(recent.length, 2);
+        expect(recent.first['title'], 'Kesariya');
+
+        // Remove single item
+        await prefs.removeRecentSearch('song-1');
+        recent = prefs.getRecentSearches();
+        expect(recent.length, 1);
+        expect(recent.first['title'], 'Anuv Jain');
+
+        // Clear all
+        await prefs.clearRecentSearches();
+        expect(prefs.getRecentSearches(), isEmpty);
+      },
+    );
   });
 }

@@ -11,6 +11,7 @@ import '../services/music_service.dart';
 import '../services/preferences_service.dart';
 import '../services/spotify_import_service.dart';
 import 'spotify_import_screen.dart';
+import '../widgets/desktop/desktop_import_modal.dart';
 import 'custom_playlist_screen.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/playlist_action_menu.dart';
@@ -112,7 +113,7 @@ class LibraryAlbum {
 }
 
 /// Available filters for segregating playlists inside the Library Playlists section.
-enum PlaylistFilter { all, personal, spotify, savedAlbums }
+enum PlaylistFilter { all, personal, spotify, savedAlbums, artists }
 
 extension PlaylistFilterExt on PlaylistFilter {
   String get label {
@@ -125,6 +126,8 @@ extension PlaylistFilterExt on PlaylistFilter {
         return 'Imported';
       case PlaylistFilter.savedAlbums:
         return 'Saved Albums';
+      case PlaylistFilter.artists:
+        return 'Artists';
     }
   }
 }
@@ -746,6 +749,9 @@ class _LibraryScreenState extends State<LibraryScreen>
               if (filter == PlaylistFilter.savedAlbums) {
                 return _buildSavedAlbumsSection();
               }
+              if (filter == PlaylistFilter.artists) {
+                return _buildFollowedArtistsSection();
+              }
               return _buildPlaylistsSection(isWide: false);
             },
           ),
@@ -801,6 +807,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           (PlaylistFilter.personal, 'My Playlists', personalCount),
           (PlaylistFilter.spotify, 'Imported', spotifyCount),
           (PlaylistFilter.savedAlbums, 'Saved Albums', albumsCount),
+          (PlaylistFilter.artists, 'Artists', _prefs.followedArtists.length),
         ];
 
         return SingleChildScrollView(
@@ -859,6 +866,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ] else if (filter == PlaylistFilter.savedAlbums) ...[
                           Icon(
                             Icons.album_rounded,
+                            size: 13,
+                            color: isSelected ? Colors.white : Colors.white60,
+                          ),
+                          const SizedBox(width: 5),
+                        ] else if (filter == PlaylistFilter.artists) ...[
+                          Icon(
+                            Icons.people_alt_rounded,
                             size: 13,
                             color: isSelected ? Colors.white : Colors.white60,
                           ),
@@ -1001,17 +1015,26 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AlbumScreen(
-                            albumId: album.title,
-                            albumTitle: album.title,
-                            albumArtwork: album.thumbnail,
-                            albumArtist: album.artist,
+                      if (MediaQuery.of(context).size.width >= 640) {
+                        DesktopLayoutState.openAlbum(
+                          albumId: album.title,
+                          albumTitle: album.title,
+                          albumArtwork: album.thumbnail,
+                          albumArtist: album.artist,
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AlbumScreen(
+                              albumId: album.title,
+                              albumTitle: album.title,
+                              albumArtwork: album.thumbnail,
+                              albumArtist: album.artist,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                     },
                   ),
                 ),
@@ -1041,17 +1064,26 @@ class _LibraryScreenState extends State<LibraryScreen>
           borderRadius: BorderRadius.circular(14),
           onTap: () {
             HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AlbumScreen(
-                  albumId: id,
-                  albumTitle: title,
-                  albumArtwork: artwork,
-                  albumArtist: artist,
+            if (MediaQuery.of(context).size.width >= 640) {
+              DesktopLayoutState.openAlbum(
+                albumId: id,
+                albumTitle: title,
+                albumArtwork: artwork,
+                albumArtist: artist,
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AlbumScreen(
+                    albumId: id,
+                    albumTitle: title,
+                    albumArtwork: artwork,
+                    albumArtist: artist,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1300,6 +1332,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         if (activeFilter == PlaylistFilter.savedAlbums) {
           return _buildSavedAlbumsSection();
         }
+        if (activeFilter == PlaylistFilter.artists) {
+          return _buildFollowedArtistsSection();
+        }
 
         final List<Map<String, dynamic>> displayedPlaylists;
         switch (activeFilter) {
@@ -1313,6 +1348,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             displayedPlaylists = spotifyPlaylists;
             break;
           case PlaylistFilter.savedAlbums:
+          case PlaylistFilter.artists:
             displayedPlaylists = [];
             break;
         }
@@ -1410,7 +1446,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                             ),
                           ),
                           onPressed: () {
-                            _selectedSection.value = LibrarySection.spotify;
+                            if (isWide || kIsWeb) {
+                              showDesktopImportModal(context);
+                            } else {
+                              _selectedSection.value = LibrarySection.spotify;
+                            }
                           },
                         )
                       : null,
@@ -2587,6 +2627,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     color: Colors.white.withValues(alpha: 0.45),
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 title: Text(
@@ -2737,12 +2778,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
                 onPressed: () {
                   HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SpotifyImportScreen(),
-                    ),
-                  );
+                  if (isWide || kIsWeb) {
+                    showDesktopImportModal(context);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SpotifyImportScreen(),
+                      ),
+                    );
+                  }
                 },
               ),
             ],
@@ -2773,12 +2818,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SpotifyImportScreen(),
-                        ),
-                      );
+                      if (isWide || kIsWeb) {
+                        showDesktopImportModal(context);
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SpotifyImportScreen(),
+                          ),
+                        );
+                      }
                     },
                   ),
                 )
@@ -3208,16 +3257,28 @@ class _LibraryScreenState extends State<LibraryScreen>
                     : _buildArtistAvatarFallback(artistName),
               ),
             ),
-            title: Text(
-              artistItem?.name ?? artistName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                fontSize: 15,
-                letterSpacing: -0.2,
-              ),
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    artistItem?.name ?? artistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      fontSize: 15,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.verified_rounded,
+                  size: 14,
+                  color: Color(0xFF3897F0),
+                ),
+              ],
             ),
             subtitle: Text(
               artistItem?.genre ?? 'Followed Artist',
@@ -3256,14 +3317,19 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
             onTap: () {
               HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ArtistProfileScreen(
-                    artist: artistItem,
-                    artistName: artistItem?.name ?? artistName,
+              final name = artistItem?.name ?? artistName;
+              if (MediaQuery.of(context).size.width >= 640) {
+                DesktopLayoutState.openArtist(name);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ArtistProfileScreen(
+                      artist: artistItem,
+                      artistName: name,
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             },
           );
         },

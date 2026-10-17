@@ -11,6 +11,7 @@ import '../services/bug_report_service.dart';
 import '../widgets/interactive_update_dialog.dart';
 import '../widgets/equalizer_bottom_sheet.dart';
 import '../widgets/previous_versions_sheet.dart';
+import '../layouts/desktop_layout_state.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -654,6 +655,17 @@ class _SettingsScreenState extends State<SettingsScreen>
           backgroundColor: const Color(0xFF121212),
           appBar: AppBar(
             backgroundColor: const Color(0xFF121212),
+            leading: Navigator.canPop(context)
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.pop(context),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back to Home',
+                    onPressed: () =>
+                        DesktopLayoutState.setNavTab(DesktopNavTab.home),
+                  ),
             title: const Text(
               'Settings',
               style: TextStyle(fontWeight: FontWeight.bold),
