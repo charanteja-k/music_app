@@ -212,6 +212,7 @@ class DesktopLayoutState {
     dynamic gradientColors,
     dynamic icon,
     String? imageUrl,
+    dynamic fetchSongs,
   }) {
     activePlaylistId.value = playlistId;
     activeCuratedPlaylistData.value = {
@@ -222,6 +223,7 @@ class DesktopLayoutState {
       'gradientColors': gradientColors,
       'icon': icon,
       'imageUrl': imageUrl,
+      'fetchSongs': fetchSongs,
     };
     activeArtistName.value = null;
     activeAlbumData.value = null;

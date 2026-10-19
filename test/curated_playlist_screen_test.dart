@@ -55,12 +55,43 @@ void main() {
       expect(find.text('Top Hits'), findsAtLeastNWidgets(1));
       expect(find.text('Play'), findsOneWidget);
       expect(find.text('Shuffle'), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
       expect(find.text('Popular Tracks (2)'), findsOneWidget);
       expect(find.text('Hukum - Thalaivar Alappara'), findsOneWidget);
       expect(find.text('Chaleya'), findsOneWidget);
       expect(find.text('3:45'), findsNWidgets(2));
       expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
       expect(find.byIcon(Icons.more_vert_rounded), findsNWidgets(2));
+      expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
+
+      // Test tapping Save button
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Saved'), findsOneWidget);
+
+      // Test tapping inline like button
+      await tester.tap(find.byIcon(Icons.favorite_border_rounded).first);
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'CuratedPlaylistScreen renders error state with retry button on failure',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CuratedPlaylistScreen(
+            title: 'Empty Playlist',
+            subtitle: 'Will have no tracks',
+            fetchSongs: () async => <Video>[],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No tracks found in this playlist.'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.byIcon(Icons.refresh_rounded), findsOneWidget);
     },
   );
 

@@ -64,6 +64,9 @@ class DesktopMainViewport extends StatelessWidget {
                       subtitle: curatedData['subtitle'] as String,
                       query: curatedData['query'] as String?,
                       initialSongs: curatedData['initialSongs'] as List<Video>?,
+                      fetchSongs:
+                          curatedData['fetchSongs']
+                              as Future<List<Video>> Function()?,
                       gradientColors:
                           curatedData['gradientColors'] as List<Color>?,
                       icon: curatedData['icon'] as IconData?,

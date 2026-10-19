@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/jio_album.dart';
+import '../services/auth_service.dart';
+import '../services/cloud_sync_service.dart';
 import '../services/music_service.dart';
 import '../services/canonical_song_dedup.dart';
 import '../services/studio_search_service.dart';
@@ -67,6 +70,54 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
 
   void _onServiceChanged() {
     if (mounted) setState(() {});
+  }
+
+  bool get _isSavedToLibrary => _musicService.customPlaylists.any(
+    (p) =>
+        (p['name']?.toString().toLowerCase().trim() ?? '') ==
+        widget.title.toLowerCase().trim(),
+  );
+
+  void _toggleSavePlaylistToLibrary() {
+    HapticFeedback.mediumImpact();
+    final existing = _musicService.customPlaylists.firstWhere(
+      (p) =>
+          (p['name']?.toString().toLowerCase().trim() ?? '') ==
+          widget.title.toLowerCase().trim(),
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (existing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${widget.title}" is already in your library.'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF222230),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final newId = _musicService.createPlaylist(widget.title);
+    _musicService.setPlaylistSongs(newId, _tracks, commit: true);
+    if (AuthService().isAuthenticated) {
+      unawaited(CloudSyncService().sync());
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Saved "${widget.title}" to your library!'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF1DB954),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+    setState(() {});
   }
 
   Future<void> _loadTracks() async {
@@ -504,6 +555,48 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 14),
+
+                              // Save to Library Button
+                              OutlinedButton.icon(
+                                onPressed: _tracks.isEmpty
+                                    ? null
+                                    : _toggleSavePlaylistToLibrary,
+                                icon: Icon(
+                                  _isSavedToLibrary
+                                      ? Icons.bookmark_added_rounded
+                                      : Icons.bookmark_add_outlined,
+                                  color: _isSavedToLibrary
+                                      ? primaryColor
+                                      : Colors.white,
+                                  size: 20,
+                                ),
+                                label: Text(
+                                  _isSavedToLibrary ? 'Saved' : 'Save',
+                                  style: TextStyle(
+                                    color: _isSavedToLibrary
+                                        ? primaryColor
+                                        : Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: _isSavedToLibrary
+                                        ? primaryColor.withValues(alpha: 0.6)
+                                        : Colors.white.withValues(alpha: 0.20),
+                                    width: 1.2,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -529,12 +622,54 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 14,
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _errorMessage!.contains('No tracks')
+                                  ? Icons.music_off_rounded
+                                  : Icons.wifi_off_rounded,
+                              size: 48,
+                              color: Colors.white38,
+                            ),
+                            const SizedBox(height: 12),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                              ),
+                              child: Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                setState(() {
+                                  _isLoading = true;
+                                  _errorMessage = null;
+                                });
+                                _loadTracks();
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Retry'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     )
@@ -734,6 +869,29 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                         size: 15,
                                       ),
                                     ),
+                                  IconButton(
+                                    tooltip:
+                                        _musicService.isLiked(video.id.value)
+                                        ? 'Remove from Liked'
+                                        : 'Like Song',
+                                    icon: Icon(
+                                      _musicService.isLiked(video.id.value)
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      color:
+                                          _musicService.isLiked(video.id.value)
+                                          ? const Color(0xFFFA2D48)
+                                          : Colors.white38,
+                                      size: 19,
+                                    ),
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      _musicService.toggleLike(video);
+                                      if (AuthService().isAuthenticated) {
+                                        unawaited(CloudSyncService().sync());
+                                      }
+                                    },
+                                  ),
                                   Builder(
                                     builder: (btnCtx) => IconButton(
                                       icon: const Icon(
@@ -1105,6 +1263,16 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     final lower = title.toLowerCase();
     if (lower.contains('bollywood') || lower.contains('hindi')) {
       return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80';
+    } else if (lower.contains('supermix') || lower.contains('my supermix')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+    } else if (lower.contains('discover')) {
+      return 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80';
+    } else if (lower.contains('new release') || lower.contains('release mix')) {
+      return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80';
+    } else if (lower.contains('forgotten')) {
+      return 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80';
+    } else if (lower.contains('daily mix') || lower.contains('mix')) {
+      return 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80';
     } else if (lower.contains('telugu')) {
       return 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80';
     } else if (lower.contains('pop') || lower.contains('global')) {
@@ -1131,6 +1299,8 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80';
     } else if (lower.contains('malayalam')) {
       return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+    } else if (lower.contains('kannada')) {
+      return 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80';
     } else if (lower.contains('devotional') || lower.contains('bhakti')) {
       return 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=500&q=80';
     } else if (lower.contains('ghazal') || lower.contains('sufi')) {
@@ -1139,6 +1309,10 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80';
     } else if (lower.contains('sleep')) {
       return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80';
+    } else if (lower.contains('classical') || lower.contains('carnatic')) {
+      return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80';
+    } else if (lower.contains('late night') || lower.contains('midnight')) {
+      return 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80';
     }
     return 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80';
   }

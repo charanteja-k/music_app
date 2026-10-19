@@ -1575,6 +1575,9 @@ class SearchScreenState extends State<SearchScreen>
                         gradientColors: cat['colors'] as List<Color>?,
                         icon: cat['icon'] as IconData?,
                         imageUrl: cat['thumbnailUrl'] as String?,
+                        fetchSongs: () => StudioSearchService().searchSongs(
+                          cat['query'] as String,
+                        ),
                       );
                     } else {
                       Navigator.push(
