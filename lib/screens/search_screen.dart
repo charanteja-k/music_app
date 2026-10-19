@@ -104,7 +104,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Bollywood Hits',
       'subtitle': 'Top Trending & Classics',
       'query': 'Bollywood Top Hits 2026',
-      'colors': [const Color(0xFFE13300)],
+      'colors': [const Color(0xFFE13300), const Color(0xFF7A1C00)],
       'icon': Icons.whatshot_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80',
@@ -113,7 +113,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Telugu Beats',
       'subtitle': 'Groove, Melodies & Mass',
       'query': 'Telugu Top Songs',
-      'colors': [const Color(0xFFB06239)],
+      'colors': [const Color(0xFFB06239), const Color(0xFF5E341E)],
       'icon': Icons.music_note_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80',
@@ -122,7 +122,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Pop & Global',
       'subtitle': 'Chartbusters & Hits',
       'query': 'Global Pop Hits',
-      'colors': [const Color(0xFF27856A)],
+      'colors': [const Color(0xFF27856A), const Color(0xFF134235)],
       'icon': Icons.public_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80',
@@ -131,7 +131,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Punjabi Hits',
       'subtitle': 'Bhangra, Dhol & Bass',
       'query': 'Punjabi Top Hits',
-      'colors': [const Color(0xFF8D67AB)],
+      'colors': [const Color(0xFF8D67AB), const Color(0xFF4C375C)],
       'icon': Icons.speaker_group_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=300&q=80',
@@ -140,7 +140,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Lo-Fi & Chill',
       'subtitle': 'Focus, Relax & Study',
       'query': 'Lofi Chill Beats',
-      'colors': [const Color(0xFF477D95)],
+      'colors': [const Color(0xFF477D95), const Color(0xFF233E4A)],
       'icon': Icons.bedtime_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300&q=80',
@@ -149,7 +149,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Workout Energy',
       'subtitle': 'High BPM & Motivation',
       'query': 'Workout Music Beats',
-      'colors': [const Color(0xFFE91429)],
+      'colors': [const Color(0xFFE91429), const Color(0xFF7A0A16)],
       'icon': Icons.bolt_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&q=80',
@@ -158,7 +158,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Romance & Love',
       'subtitle': 'Soulful & Melodies',
       'query': 'Romantic Hindi Songs',
-      'colors': [const Color(0xFF8C1932)],
+      'colors': [const Color(0xFF8C1932), const Color(0xFF4A0D1B)],
       'icon': Icons.favorite_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=300&q=80',
@@ -167,7 +167,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Hip-Hop & Rap',
       'subtitle': 'Bars, Trap & 808s',
       'query': 'Hip Hop Hits',
-      'colors': [const Color(0xFFBA5D07)],
+      'colors': [const Color(0xFFBA5D07), const Color(0xFF633204)],
       'icon': Icons.mic_external_on_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=300&q=80',
@@ -176,7 +176,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Party & Dance',
       'subtitle': 'Club Nights & EDM',
       'query': 'Party Dance Club Hits',
-      'colors': [const Color(0xFF7358FF)],
+      'colors': [const Color(0xFF7358FF), const Color(0xFF3B2D82)],
       'icon': Icons.celebration_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&q=80',
@@ -185,7 +185,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Indie & Acoustic',
       'subtitle': 'Raw, Unplugged & Vibe',
       'query': 'Indian Indie Acoustic Songs',
-      'colors': [const Color(0xFF608108)],
+      'colors': [const Color(0xFF608108), const Color(0xFF324304)],
       'icon': Icons.audiotrack_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=300&q=80',
@@ -194,7 +194,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Tamil Hits',
       'subtitle': 'Kollywood & Folk Melodies',
       'query': 'Tamil Top Hits',
-      'colors': [const Color(0xFFD16A1E)],
+      'colors': [const Color(0xFFD16A1E), const Color(0xFF6E3710)],
       'icon': Icons.music_note_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&q=80',
@@ -203,7 +203,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Malayalam',
       'subtitle': 'Sandalwood & Soulful',
       'query': 'Malayalam Top Songs',
-      'colors': [const Color(0xFF186048)],
+      'colors': [const Color(0xFF186048), const Color(0xFF0C3024)],
       'icon': Icons.nature_people_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80',
@@ -212,7 +212,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Devotional',
       'subtitle': 'Spiritual & Bhakti',
       'query': 'Devotional Songs',
-      'colors': [const Color(0xFFA87452)],
+      'colors': [const Color(0xFFA87452), const Color(0xFF573C2A)],
       'icon': Icons.spa_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&q=80',
@@ -221,7 +221,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Ghazals & Sufi',
       'subtitle': 'Timeless Poetry',
       'query': 'Ghazals Sufi Songs',
-      'colors': [const Color(0xFF50505A)],
+      'colors': [const Color(0xFF50505A), const Color(0xFF28282D)],
       'icon': Icons.menu_book_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=300&q=80',
@@ -230,7 +230,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Rock & Metal',
       'subtitle': 'Riffs & Anthems',
       'query': 'Rock Metal Hits',
-      'colors': [const Color(0xFFB0283B)],
+      'colors': [const Color(0xFFB0283B), const Color(0xFF5C151F)],
       'icon': Icons.electric_bolt_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=300&q=80',
@@ -239,7 +239,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Sleep & Relax',
       'subtitle': 'Ambient & Calm',
       'query': 'Sleep Ambient Relax',
-      'colors': [const Color(0xFF1E3264)],
+      'colors': [const Color(0xFF1E3264), const Color(0xFF0F1A34)],
       'icon': Icons.nightlight_round,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&q=80',

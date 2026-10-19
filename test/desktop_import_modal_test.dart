@@ -139,7 +139,7 @@ Track,Artist,Album,Duration
 
   group('DesktopLeftSidebar Import Entry Points Tests', () {
     testWidgets(
-      'Shows popup menu with Create and Import options when clicking + button',
+      'Shows dedicated Spotify and Add Playlist buttons and opens import modal',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 900);
         tester.view.devicePixelRatio = 1.0;
@@ -159,20 +159,24 @@ Track,Artist,Album,Duration
           ),
         );
 
-        // Find the add icon button in expanded mode
+        // Verify dedicated Spotify Import and Add Playlist buttons in expanded mode
         final addIcon = find.byIcon(Icons.add_rounded);
         expect(addIcon, findsOneWidget);
 
-        // Tap the + button to open popup menu
-        await tester.tap(addIcon);
+        final spotifyTooltip = find.byTooltip(
+          'Import from Spotify / Exportify',
+        );
+        expect(spotifyTooltip, findsOneWidget);
+
+        final createTooltip = find.byTooltip('Create Playlist');
+        expect(createTooltip, findsOneWidget);
+
+        // Tapping the dedicated Spotify import button directly opens DesktopImportModal
+        await tester.tap(spotifyTooltip);
         await tester.pumpAndSettle();
 
-        // Verify popup menu items
-        expect(find.text('Create New Playlist'), findsOneWidget);
-        expect(
-          find.text('Import Playlist (Spotify / Exportify)'),
-          findsOneWidget,
-        );
+        expect(find.byType(DesktopImportModal), findsOneWidget);
+        expect(find.text('Import Playlist'), findsOneWidget);
       },
     );
 

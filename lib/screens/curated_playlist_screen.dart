@@ -263,6 +263,10 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
 
   List<Color> get _effectiveColors {
     if (widget.gradientColors != null && widget.gradientColors!.isNotEmpty) {
+      if (widget.gradientColors!.length == 1) {
+        final c = widget.gradientColors!.first;
+        return [c, Color.lerp(c, Colors.black, 0.45) ?? c];
+      }
       return widget.gradientColors!;
     }
     return [const Color(0xFF6366F1), const Color(0xFF8B5CF6)];
@@ -390,16 +394,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(22),
-                              child:
-                                  widget.imageUrl != null &&
-                                      widget.imageUrl!.isNotEmpty
-                                  ? Image.network(
-                                      widget.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) =>
-                                          _buildFallbackHeroArt(),
-                                    )
-                                  : _buildFallbackHeroArt(),
+                              child: _buildHeroImage(),
                             ),
                           ),
                           const SizedBox(height: 18),
@@ -1002,6 +997,150 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
         child: Icon(Icons.album_rounded, size: 36, color: Colors.white38),
       ),
     );
+  }
+
+  Widget _buildHeroImage() {
+    final primaryUrl = _resolveHeroImageUrl();
+    if (primaryUrl == null || primaryUrl.isEmpty) {
+      return _buildFallbackHeroArt();
+    }
+
+    final String? albumArtwork =
+        _relatedAlbums.isNotEmpty &&
+            _relatedAlbums.first.artwork.trim().isNotEmpty &&
+            _relatedAlbums.first.artwork.trim() != primaryUrl
+        ? _relatedAlbums.first.artwork.trim()
+        : null;
+
+    final String? firstSongThumb = _tracks.isNotEmpty
+        ? MusicService.getHdThumbnail(_tracks.first.id.value)
+        : null;
+    final String genreFallback = _getCuratedGenreFallback(widget.title);
+
+    return Image.network(
+      primaryUrl,
+      fit: BoxFit.cover,
+      cacheWidth: kIsWeb ? null : 300,
+      cacheHeight: kIsWeb ? null : 300,
+      errorBuilder: (_, _, _) {
+        // Priority 1: High-res JioSaavn Album Artwork
+        if (albumArtwork != null && albumArtwork.isNotEmpty) {
+          return Image.network(
+            albumArtwork,
+            fit: BoxFit.cover,
+            cacheWidth: kIsWeb ? null : 300,
+            cacheHeight: kIsWeb ? null : 300,
+            errorBuilder: (_, _, _) => _buildFirstSongOrGenreFallback(
+              firstSongThumb,
+              genreFallback,
+              primaryUrl,
+            ),
+          );
+        }
+        return _buildFirstSongOrGenreFallback(
+          firstSongThumb,
+          genreFallback,
+          primaryUrl,
+        );
+      },
+    );
+  }
+
+  Widget _buildFirstSongOrGenreFallback(
+    String? firstSongThumb,
+    String genreFallback,
+    String primaryUrl,
+  ) {
+    if (firstSongThumb != null &&
+        firstSongThumb.isNotEmpty &&
+        firstSongThumb != primaryUrl) {
+      return Image.network(
+        firstSongThumb,
+        fit: BoxFit.cover,
+        cacheWidth: kIsWeb ? null : 300,
+        cacheHeight: kIsWeb ? null : 300,
+        errorBuilder: (_, _, _) =>
+            _buildGenreOrFallback(genreFallback, primaryUrl),
+      );
+    }
+    return _buildGenreOrFallback(genreFallback, primaryUrl);
+  }
+
+  Widget _buildGenreOrFallback(String genreFallback, String originalUrl) {
+    if (genreFallback != originalUrl) {
+      return Image.network(
+        genreFallback,
+        fit: BoxFit.cover,
+        cacheWidth: kIsWeb ? null : 300,
+        cacheHeight: kIsWeb ? null : 300,
+        errorBuilder: (_, _, _) => _buildFallbackHeroArt(),
+      );
+    }
+    return _buildFallbackHeroArt();
+  }
+
+  String? _resolveHeroImageUrl() {
+    // a) Explicit category.thumbnailUrl if present and non-empty
+    if (widget.imageUrl != null && widget.imageUrl!.trim().isNotEmpty) {
+      return widget.imageUrl!.trim();
+    }
+    // b) Related albums artwork (JioSaavn CDN 500x500 authentic high-res album cover)
+    if (_relatedAlbums.isNotEmpty &&
+        _relatedAlbums.first.artwork.trim().isNotEmpty) {
+      return _relatedAlbums.first.artwork.trim();
+    }
+    // c) Artwork URL of the first song in the category tracklist (songs.first.artworkUrl)
+    if (_tracks.isNotEmpty) {
+      final hd = MusicService.getHdThumbnail(_tracks.first.id.value);
+      if (hd.isNotEmpty) return hd;
+      if (_tracks.first.thumbnails.highResUrl.isNotEmpty) {
+        return _tracks.first.thumbnails.highResUrl;
+      }
+    }
+    // d) A curated high-resolution genre fallback cover
+    return _getCuratedGenreFallback(widget.title);
+  }
+
+  static String _getCuratedGenreFallback(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('bollywood') || lower.contains('hindi')) {
+      return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80';
+    } else if (lower.contains('telugu')) {
+      return 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80';
+    } else if (lower.contains('pop') || lower.contains('global')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+    } else if (lower.contains('punjabi')) {
+      return 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80';
+    } else if (lower.contains('lo-fi') ||
+        lower.contains('chill') ||
+        lower.contains('relax')) {
+      return 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80';
+    } else if (lower.contains('workout') || lower.contains('energy')) {
+      return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80';
+    } else if (lower.contains('romance') || lower.contains('love')) {
+      return 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=500&q=80';
+    } else if (lower.contains('hip-hop') || lower.contains('rap')) {
+      return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80';
+    } else if (lower.contains('party') ||
+        lower.contains('dance') ||
+        lower.contains('club')) {
+      return 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80';
+    } else if (lower.contains('indie') || lower.contains('acoustic')) {
+      return 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80';
+    } else if (lower.contains('tamil')) {
+      return 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80';
+    } else if (lower.contains('malayalam')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+    } else if (lower.contains('devotional') || lower.contains('bhakti')) {
+      return 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=500&q=80';
+    } else if (lower.contains('ghazal') || lower.contains('sufi')) {
+      return 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=500&q=80';
+    } else if (lower.contains('rock') || lower.contains('metal')) {
+      return 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80';
+    } else if (lower.contains('sleep')) {
+      return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80';
   }
 
   Widget _buildFallbackHeroArt() {

@@ -63,4 +63,26 @@ void main() {
       expect(find.byIcon(Icons.more_vert_rounded), findsNWidgets(2));
     },
   );
+
+  testWidgets(
+    'CuratedPlaylistScreen renders safely with single gradient color and category imageUrl',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CuratedPlaylistScreen(
+            title: 'Telugu Beats',
+            subtitle: 'Groove, Melodies & Mass',
+            gradientColors: [Color(0xFFB06239)],
+            imageUrl:
+                'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Telugu Beats'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('Groove, Melodies & Mass'), findsOneWidget);
+      expect(find.byType(CuratedPlaylistScreen), findsOneWidget);
+    },
+  );
 }

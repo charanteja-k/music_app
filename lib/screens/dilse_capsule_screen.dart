@@ -40,6 +40,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
   AnimationController get _progressController => _storyController;
   bool _isPaused = false;
   bool _isSavingImage = false;
+  DateTime? _pointerDownTime;
 
   @override
   void initState() {
@@ -238,22 +239,35 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           // Celebratory Confetti & Particle Layer
           _buildConfettiOverlay(),
 
-          // Slide Content with Tap Detection
-          GestureDetector(
+          // Slide Content with Pointer Hold & Tap Detection
+          Listener(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _pauseProgress(),
-            onTapUp: (details) {
+            onPointerDown: (event) {
+              _pointerDownTime = DateTime.now();
+              _pauseProgress();
+            },
+            onPointerUp: (event) {
+              final downTime = _pointerDownTime;
+              final holdMs = downTime != null
+                  ? DateTime.now().difference(downTime).inMilliseconds
+                  : 0;
+              _pointerDownTime = null;
               _resumeProgress();
-              final screenWidth = MediaQuery.of(context).size.width;
-              if (details.localPosition.dx < screenWidth * 0.32) {
-                _previousSlide();
-              } else {
-                _advanceSlide();
+
+              // Quick tap (< 220ms) triggers navigation; holding only pauses story progression
+              if (holdMs < 220) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                if (event.localPosition.dx < screenWidth * 0.32) {
+                  _previousSlide();
+                } else {
+                  _advanceSlide();
+                }
               }
             },
-            onTapCancel: () => _resumeProgress(),
-            onLongPressStart: (_) => _pauseProgress(),
-            onLongPressEnd: (_) => _resumeProgress(),
+            onPointerCancel: (_) {
+              _pointerDownTime = null;
+              _resumeProgress();
+            },
             child: SafeArea(
               child: Column(
                 children: [

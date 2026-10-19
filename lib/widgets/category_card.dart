@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -116,6 +117,8 @@ class _CategoryCardState extends State<CategoryCard> {
                               ? Image.network(
                                   widget.thumbnailUrl!,
                                   fit: BoxFit.cover,
+                                  cacheWidth: kIsWeb ? null : 150,
+                                  cacheHeight: kIsWeb ? null : 150,
                                   errorBuilder: (context, error, stackTrace) =>
                                       _buildFallbackThumbnail(),
                                 )

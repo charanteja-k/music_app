@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../../layouts/desktop_layout_state.dart';
 import '../../services/music_service.dart';
@@ -428,92 +429,36 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                           ],
                         ),
                       ),
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          hoverColor: Colors.white.withValues(alpha: 0.08),
-                        ),
-                        child: PopupMenuButton<String>(
-                          tooltip: 'Add or import playlist',
-                          padding: EdgeInsets.zero,
-                          color: const Color(0xFF18181F),
-                          elevation: 10,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: Color(0xFF282836)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Button 1: Dedicated Spotify / Exportify Import Button
+                          _SidebarHeaderActionButton(
+                            tooltip: 'Import from Spotify / Exportify',
+                            onPressed: () => showDesktopImportModal(context),
+                            builder: (isHovered) => CustomPaint(
+                              size: const Size(16, 16),
+                              painter: _SpotifyIconPainter(
+                                color: isHovered
+                                    ? const Color(0xFF1DB954)
+                                    : const Color(0xFFB3B3B3),
+                              ),
+                            ),
                           ),
-                          offset: const Offset(0, 36),
-                          onSelected: (val) {
-                            if (val == 'create') {
-                              _showCreatePlaylistDialog();
-                            } else if (val == 'import') {
-                              showDesktopImportModal(context);
-                            }
-                          },
-                          constraints: const BoxConstraints(
-                            minWidth: 280.0,
-                            maxWidth: 320.0,
-                          ),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            alignment: Alignment.center,
-                            child: const Icon(
+                          const SizedBox(width: 8),
+                          // Button 2: Dedicated Add Playlist Button (+)
+                          _SidebarHeaderActionButton(
+                            tooltip: 'Create Playlist',
+                            onPressed: _showCreatePlaylistDialog,
+                            builder: (isHovered) => Icon(
                               Icons.add_rounded,
-                              color: Colors.white70,
-                              size: 22.0,
+                              size: 20,
+                              color: isHovered
+                                  ? Colors.white
+                                  : const Color(0xFFB3B3B3),
                             ),
                           ),
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'create',
-                              height: 42,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.playlist_add_rounded,
-                                    color: Colors.white,
-                                    size: 19,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Create New Playlist',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'import',
-                              height: 42,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.file_download_outlined,
-                                    color: Color(0xFF1DB954),
-                                    size: 19,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Import Playlist (Spotify / Exportify)',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -1764,6 +1709,101 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
         Icons.music_note_rounded,
         size: 22.0,
         color: Color(0xFF737373),
+      ),
+    );
+  }
+}
+
+/// Spotify brand icon vector painter (3 authentic arcs).
+class _SpotifyIconPainter extends CustomPainter {
+  final Color color;
+  const _SpotifyIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Top arc
+    paint.strokeWidth = w * 0.14;
+    final topPath = Path();
+    topPath.moveTo(w * 0.16, h * 0.36);
+    topPath.quadraticBezierTo(w * 0.50, h * 0.16, w * 0.84, h * 0.38);
+    canvas.drawPath(topPath, paint);
+
+    // Middle arc
+    paint.strokeWidth = w * 0.125;
+    final midPath = Path();
+    midPath.moveTo(w * 0.22, h * 0.56);
+    midPath.quadraticBezierTo(w * 0.50, h * 0.40, w * 0.78, h * 0.58);
+    canvas.drawPath(midPath, paint);
+
+    // Bottom arc
+    paint.strokeWidth = w * 0.11;
+    final botPath = Path();
+    botPath.moveTo(w * 0.28, h * 0.76);
+    botPath.quadraticBezierTo(w * 0.50, h * 0.63, w * 0.72, h * 0.77);
+    canvas.drawPath(botPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpotifyIconPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// 32x32 Sidebar Header Action Button with soft circular hover highlights.
+class _SidebarHeaderActionButton extends StatefulWidget {
+  final String tooltip;
+  final VoidCallback onPressed;
+  final Widget Function(bool isHovered) builder;
+
+  const _SidebarHeaderActionButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.builder,
+  });
+
+  @override
+  State<_SidebarHeaderActionButton> createState() =>
+      _SidebarHeaderActionButtonState();
+}
+
+class _SidebarHeaderActionButtonState
+    extends State<_SidebarHeaderActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return DilSeTooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onPressed();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _isHovered
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.transparent,
+            ),
+            alignment: Alignment.center,
+            child: widget.builder(_isHovered),
+          ),
+        ),
       ),
     );
   }

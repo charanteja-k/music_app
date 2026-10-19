@@ -1885,39 +1885,44 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                                           trackHdThumbnail,
                                                                           fit: BoxFit
                                                                               .cover,
-                                                                          errorBuilder: (_, _, _) =>
-                                                                              CanonicalSongDedup.isLikelyYouTubeId(
-                                                                                track.id.value,
-                                                                              )
-                                                                              ? Image.network(
-                                                                                  track.thumbnails.highResUrl,
-                                                                                  fit: BoxFit.cover,
-                                                                                  errorBuilder:
-                                                                                      (
-                                                                                        _,
-                                                                                        _,
-                                                                                        _,
-                                                                                      ) => Container(
-                                                                                        color: const Color(
-                                                                                          0xFF222230,
-                                                                                        ),
-                                                                                        child: const Icon(
-                                                                                          Icons.music_note,
-                                                                                          color: Colors.white54,
-                                                                                          size: 64,
-                                                                                        ),
+                                                                          errorBuilder:
+                                                                              (
+                                                                                _,
+                                                                                _,
+                                                                                _,
+                                                                              ) =>
+                                                                                  CanonicalSongDedup.isLikelyYouTubeId(
+                                                                                    track.id.value,
+                                                                                  )
+                                                                                  ? Image.network(
+                                                                                      track.thumbnails.highResUrl,
+                                                                                      fit: BoxFit.cover,
+                                                                                      errorBuilder:
+                                                                                          (
+                                                                                            _,
+                                                                                            _,
+                                                                                            _,
+                                                                                          ) => Container(
+                                                                                            color: const Color(
+                                                                                              0xFF222230,
+                                                                                            ),
+                                                                                            child: const Icon(
+                                                                                              Icons.music_note,
+                                                                                              color: Colors.white54,
+                                                                                              size: 64,
+                                                                                            ),
+                                                                                          ),
+                                                                                    )
+                                                                                  : Container(
+                                                                                      color: const Color(
+                                                                                        0xFF222230,
                                                                                       ),
-                                                                                )
-                                                                              : Container(
-                                                                                  color: const Color(
-                                                                                    0xFF222230,
-                                                                                  ),
-                                                                                  child: const Icon(
-                                                                                    Icons.music_note,
-                                                                                    color: Colors.white54,
-                                                                                    size: 64,
-                                                                                  ),
-                                                                                ),
+                                                                                      child: const Icon(
+                                                                                        Icons.music_note,
+                                                                                        color: Colors.white54,
+                                                                                        size: 64,
+                                                                                      ),
+                                                                                    ),
                                                                         ),
                                                                       ),
                                                                     )
@@ -1930,23 +1935,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                                         trackHdThumbnail,
                                                                         fit: BoxFit
                                                                             .cover,
-                                                                        errorBuilder: (_, _, _) => Image.network(
-                                                                          track
-                                                                              .thumbnails
-                                                                              .highResUrl,
-                                                                          fit: BoxFit
-                                                                              .cover,
-                                                                          errorBuilder: (_, _, _) => Container(
-                                                                            color: const Color(
-                                                                              0xFF222230,
+                                                                        errorBuilder:
+                                                                            (
+                                                                              _,
+                                                                              _,
+                                                                              _,
+                                                                            ) => Image.network(
+                                                                              track.thumbnails.highResUrl,
+                                                                              fit: BoxFit.cover,
+                                                                              errorBuilder:
+                                                                                  (
+                                                                                    _,
+                                                                                    _,
+                                                                                    _,
+                                                                                  ) => Container(
+                                                                                    color: const Color(
+                                                                                      0xFF222230,
+                                                                                    ),
+                                                                                    child: const Icon(
+                                                                                      Icons.music_note,
+                                                                                      color: Colors.white54,
+                                                                                      size: 64,
+                                                                                    ),
+                                                                                  ),
                                                                             ),
-                                                                            child: const Icon(
-                                                                              Icons.music_note,
-                                                                              color: Colors.white54,
-                                                                              size: 64,
-                                                                            ),
-                                                                          ),
-                                                                        ),
                                                                       ),
                                                                     ),
                                                             ),
@@ -1994,16 +2006,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                                         left:
                                                                             _doubleTapSeekDirection ==
                                                                                 -1
-                                                                            ? const Radius.circular(
-                                                                                26,
-                                                                              )
+                                                                            ? const Radius.circular(26)
                                                                             : Radius.zero,
                                                                         right:
                                                                             _doubleTapSeekDirection ==
                                                                                 1
-                                                                            ? const Radius.circular(
-                                                                                26,
-                                                                              )
+                                                                            ? const Radius.circular(26)
                                                                             : Radius.zero,
                                                                       ),
                                                                       color: Colors
