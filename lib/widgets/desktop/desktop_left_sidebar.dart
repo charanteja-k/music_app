@@ -23,6 +23,46 @@ class DesktopLeftSidebar extends StatefulWidget {
 
   const DesktopLeftSidebar({super.key, required this.width});
 
+  /// Resolves the authentic playlist artwork URL from direct properties
+  /// (`artworkUrl`, `thumbnail`, `thumbnailUrl`, `imageUrl`, `coverUrl`) or from
+  /// the playlist's first track/song entry.
+  static String resolveArtworkUrl(Map<String, dynamic> pl) {
+    final direct =
+        (pl['artworkUrl'] ??
+                pl['thumbnail'] ??
+                pl['thumbnailUrl'] ??
+                pl['imageUrl'] ??
+                pl['coverUrl'] ??
+                '')
+            .toString();
+    if (direct.isNotEmpty) return direct;
+
+    final songs = (pl['songs'] as List?) ?? (pl['tracks'] as List?);
+    if (songs != null && songs.isNotEmpty) {
+      final first = songs.first;
+      if (first is Map) {
+        final thumb =
+            (first['thumbnail'] ??
+                    first['thumbnailUrl'] ??
+                    first['artworkUrl'] ??
+                    first['imageUrl'] ??
+                    '')
+                .toString();
+        if (thumb.isNotEmpty) return thumb;
+        final songId = first['id']?.toString() ?? '';
+        if (songId.isNotEmpty) {
+          final hd = MusicService.getHdThumbnail(songId);
+          if (hd.isNotEmpty) return hd;
+        }
+      } else if (first is Video) {
+        final thumb = MusicService.getHdThumbnail(first.id.value);
+        if (thumb.isNotEmpty) return thumb;
+        return first.thumbnails.lowResUrl;
+      }
+    }
+    return '';
+  }
+
   @override
   State<DesktopLeftSidebar> createState() => _DesktopLeftSidebarState();
 }
@@ -1201,11 +1241,32 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     );
   }
 
+  Widget _buildPlaylistFallback(bool isSpotify, String name) {
+    return Container(
+      color: const Color(0xFF282836),
+      alignment: Alignment.center,
+      child: isSpotify
+          ? const Icon(
+              Icons.stream_rounded,
+              color: Color(0xFF1DB954),
+              size: 22.0,
+            )
+          : Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'P',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 17.0,
+              ),
+            ),
+    );
+  }
+
   Widget _buildPlaylistRow(BuildContext context, Map<String, dynamic> pl) {
     final id = pl['id']?.toString() ?? '';
     final name = pl['name']?.toString() ?? 'Untitled Playlist';
     final isSpotify = pl['isSpotify'] == true;
-    final thumb = pl['thumbnailUrl']?.toString() ?? '';
+    final thumb = DesktopLeftSidebar.resolveArtworkUrl(pl);
     final trackCount =
         pl['trackCount'] as int? ??
         (pl['tracks'] as List?)?.length ??
@@ -1259,31 +1320,33 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF282836),
                     borderRadius: BorderRadius.circular(6.0),
-                    image: thumb.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(thumb),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: thumb.isNotEmpty
-                      ? null
-                      : Center(
-                          child: isSpotify
-                              ? const Icon(
-                                  Icons.stream_rounded,
-                                  color: Color(0xFF1DB954),
-                                  size: 22.0,
-                                )
-                              : Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 17.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6.0),
+                    child: thumb.isNotEmpty
+                        ? Image.network(
+                            thumb,
+                            fit: BoxFit.cover,
+                            cacheWidth: 96,
+                            cacheHeight: 96,
+                            errorBuilder: (_, _, _) =>
+                                _buildPlaylistFallback(isSpotify, name),
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: const Color(0xFF282836),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    size: 20.0,
+                                    color: Color(0xFF737373),
                                   ),
                                 ),
-                        ),
+                              );
+                            },
+                          )
+                        : _buildPlaylistFallback(isSpotify, name),
+                  ),
                 ),
                 const SizedBox(width: 12.0),
 
@@ -1582,39 +1645,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
   bool _isHovered = false;
 
   String _resolveArtworkUrl() {
-    final pl = widget.playlist;
-    final direct =
-        (pl['artworkUrl'] ??
-                pl['thumbnail'] ??
-                pl['imageUrl'] ??
-                pl['coverUrl'] ??
-                '')
-            .toString();
-    if (direct.isNotEmpty) return direct;
-
-    final songs = (pl['songs'] as List?) ?? (pl['tracks'] as List?);
-    if (songs != null && songs.isNotEmpty) {
-      final first = songs.first;
-      if (first is Map) {
-        final thumb =
-            (first['thumbnail'] ??
-                    first['artworkUrl'] ??
-                    first['imageUrl'] ??
-                    '')
-                .toString();
-        if (thumb.isNotEmpty) return thumb;
-        final songId = first['id']?.toString() ?? '';
-        if (songId.isNotEmpty) {
-          final hd = MusicService.getHdThumbnail(songId);
-          if (hd.isNotEmpty) return hd;
-        }
-      } else if (first is Video) {
-        final thumb = MusicService.getHdThumbnail(first.id.value);
-        if (thumb.isNotEmpty) return thumb;
-        return first.thumbnails.lowResUrl;
-      }
-    }
-    return '';
+    return DesktopLeftSidebar.resolveArtworkUrl(widget.playlist);
   }
 
   @override
@@ -1702,14 +1733,25 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
   }
 
   Widget _buildFallback() {
+    final isSpotify = widget.playlist['isSpotify'] == true;
+    final name = widget.playlist['name']?.toString() ?? 'P';
     return Container(
       color: const Color(0xFF1E1E24),
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.music_note_rounded,
-        size: 22.0,
-        color: Color(0xFF737373),
-      ),
+      child: isSpotify
+          ? const Icon(
+              Icons.stream_rounded,
+              color: Color(0xFF1DB954),
+              size: 22.0,
+            )
+          : Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'P',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 17.0,
+              ),
+            ),
     );
   }
 }
