@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -202,12 +203,14 @@ class DesktopContextMenu {
     selectedCallback?.call();
   }
 
-  /// Builds context menu items for a playlist (Custom or Liked Songs).
+  /// Builds context menu items for a playlist (Curated/Daily Mix, User Custom, or Liked Songs).
   static List<DesktopContextMenuItem> playlistItems({
     required BuildContext context,
     required String playlistId,
     required String playlistName,
     bool isSpotifyImport = false,
+    bool isCurated = false,
+    List<Video>? songs,
     VoidCallback? onCreatePlaylist,
     VoidCallback? onDeleted,
     VoidCallback? onPinnedChanged,
@@ -271,8 +274,141 @@ class DesktopContextMenu {
       ];
     }
 
+    final isSystemCurated =
+        isCurated ||
+        playlistId.startsWith('daily_mix') ||
+        playlistId.startsWith('curated_') ||
+        playlistId == 'top_charts';
+
     final isPinned = prefs.isPlaylistPinned(playlistId);
 
+    if (isSystemCurated) {
+      // DEFECT 2 - A: Curated / Daily Mix Playlists (System-Generated)
+      return [
+        DesktopContextMenuItem(
+          title: 'Add to queue',
+          icon: Icons.queue_music_rounded,
+          onTap: () {
+            final trackList = songs ?? [];
+            if (trackList.isEmpty) {
+              final pl = musicService.customPlaylists.firstWhere(
+                (p) => p['id']?.toString() == playlistId,
+                orElse: () => {},
+              );
+              final raw =
+                  (pl['tracks'] as List?) ?? (pl['songs'] as List?) ?? [];
+              for (final item in raw) {
+                if (item is Map<String, dynamic>) {
+                  musicService.addToQueue(songMapToVideo(item));
+                }
+              }
+            } else {
+              for (final song in trackList) {
+                musicService.addToQueue(song);
+              }
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Added songs from "$playlistName" to queue'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Play next',
+          icon: Icons.playlist_play_rounded,
+          onTap: () {
+            final trackList = songs ?? [];
+            if (trackList.isEmpty) {
+              final pl = musicService.customPlaylists.firstWhere(
+                (p) => p['id']?.toString() == playlistId,
+                orElse: () => {},
+              );
+              final raw =
+                  (pl['tracks'] as List?) ?? (pl['songs'] as List?) ?? [];
+              for (final item in raw.reversed) {
+                if (item is Map<String, dynamic>) {
+                  musicService.playNext(songMapToVideo(item));
+                }
+              }
+            } else {
+              for (final song in trackList.reversed) {
+                musicService.playNext(song);
+              }
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Playing songs from "$playlistName" next'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: isPinned ? 'Unpin from Library' : 'Pin to Your Library',
+          icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+          isPinned: isPinned,
+          onTap: () async {
+            await prefs.togglePinPlaylist(playlistId);
+            onPinnedChanged?.call();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isPinned
+                        ? 'Unpinned "$playlistName"'
+                        : 'Pinned "$playlistName" to Library 📌',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Copy all songs to new playlist',
+          icon: Icons.copy_rounded,
+          onTap: () async {
+            final copyName = '$playlistName (Copy)';
+            final newId = musicService.createPlaylist(copyName);
+            final trackList = songs ?? [];
+            for (final s in trackList) {
+              musicService.addSongToPlaylist(newId, s);
+            }
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Created "$copyName" with ${trackList.length} tracks',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: 'Share playlist',
+          icon: Icons.share_rounded,
+          onTap: () {
+            Clipboard.setData(
+              ClipboardData(text: 'DilSe Music Playlist: $playlistName'),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Copied link for "$playlistName"'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      ];
+    }
+
+    // DEFECT 2 - B: User-Created Custom Playlists
     return [
       DesktopContextMenuItem(
         title: 'Add to queue',
@@ -348,26 +484,28 @@ class DesktopContextMenu {
         },
       ),
       DesktopContextMenuItem(
-        title: 'Delete playlist',
-        icon: Icons.delete_outline_rounded,
-        isDestructive: true,
+        title: 'Rename playlist',
+        icon: Icons.edit_outlined,
         onTap: () {
-          PlaylistActionMenu.showDeleteDialog(
+          PlaylistActionMenu.showRenameDialog(
             context,
             playlistId: playlistId,
-            playlistName: playlistName,
-            onDeleted: onDeleted,
+            currentName: playlistName,
+          );
+        },
+      ),
+      DesktopContextMenuItem(
+        title: 'Edit details',
+        icon: Icons.tune_rounded,
+        onTap: () {
+          PlaylistActionMenu.showRenameDialog(
+            context,
+            playlistId: playlistId,
+            currentName: playlistName,
           );
         },
       ),
       const DesktopContextMenuItem.divider(),
-      DesktopContextMenuItem(
-        title: 'Create playlist',
-        icon: Icons.add_rounded,
-        onTap: () {
-          onCreatePlaylist?.call();
-        },
-      ),
       DesktopContextMenuItem(
         title: 'Share playlist',
         icon: Icons.share_rounded,
@@ -380,6 +518,29 @@ class DesktopContextMenu {
               content: Text('Copied link for "$playlistName"'),
               duration: const Duration(seconds: 2),
             ),
+          );
+        },
+      ),
+      DesktopContextMenuItem(
+        title: 'Create playlist',
+        icon: Icons.add_rounded,
+        onTap: () {
+          final newId = musicService.createPlaylist('New Playlist');
+          if (newId.isNotEmpty) {
+            DesktopLayoutState.openPlaylist(newId);
+          }
+        },
+      ),
+      DesktopContextMenuItem(
+        title: 'Delete playlist',
+        icon: Icons.delete_outline_rounded,
+        isDestructive: true,
+        onTap: () {
+          PlaylistActionMenu.showDeleteDialog(
+            context,
+            playlistId: playlistId,
+            playlistName: playlistName,
+            onDeleted: onDeleted,
           );
         },
       ),
@@ -397,6 +558,14 @@ class DesktopContextMenu {
     final isLiked = musicService.isLiked(song.id.value);
 
     return [
+      // 0. Play
+      DesktopContextMenuItem(
+        title: 'Play',
+        icon: Icons.play_arrow_rounded,
+        onTap: () {
+          musicService.playSong(song);
+        },
+      ),
       // 1. Play Next
       DesktopContextMenuItem(
         title: 'Play next',
@@ -453,26 +622,6 @@ class DesktopContextMenu {
           showAddToPlaylistSheet(context, song);
         },
       ),
-      if (currentPlaylistId != null && currentPlaylistId != 'liked_songs')
-        DesktopContextMenuItem(
-          title: 'Remove from this playlist',
-          icon: Icons.playlist_remove_rounded,
-          isDestructive: true,
-          onTap: () {
-            musicService.removeSongFromPlaylist(
-              currentPlaylistId,
-              song.id.value,
-            );
-            onRemovedFromPlaylist?.call();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Removed "${song.title}" from playlist'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          },
-        ),
-      const DesktopContextMenuItem.divider(),
       // 5. Start Song Radio
       DesktopContextMenuItem(
         title: 'Start Song Radio',
@@ -487,6 +636,7 @@ class DesktopContextMenu {
           );
         },
       ),
+      const DesktopContextMenuItem.divider(),
       // 6. Go to Album
       DesktopContextMenuItem(
         title: 'Go to album',
@@ -532,6 +682,49 @@ class DesktopContextMenu {
           DesktopLayoutState.openArtist(song.author);
         },
       ),
+      if (currentPlaylistId != null && currentPlaylistId != 'liked_songs')
+        DesktopContextMenuItem(
+          title: 'Remove from this playlist',
+          icon: Icons.delete_outline_rounded,
+          isDestructive: true,
+          onTap: () {
+            musicService.removeSongFromPlaylist(
+              currentPlaylistId,
+              song.id.value,
+            );
+            onRemovedFromPlaylist?.call();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Removed "${song.title}" from playlist'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      if (!kIsWeb)
+        DesktopContextMenuItem(
+          title: 'Download for offline',
+          icon: Icons.download_rounded,
+          onTap: () async {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Starting download...'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            final success = await musicService.downloadSong(song);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    success ? 'Download complete!' : 'Download failed.',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
       const DesktopContextMenuItem.divider(),
       // 8. Share Song
       DesktopContextMenuItem(
@@ -667,6 +860,8 @@ class DesktopContextMenu {
     required String playlistId,
     required String playlistName,
     bool isSpotifyImport = false,
+    bool isCurated = false,
+    List<Video>? songs,
     VoidCallback? onCreatePlaylist,
     VoidCallback? onDeleted,
     VoidCallback? onPinnedChanged,
@@ -679,6 +874,8 @@ class DesktopContextMenu {
         playlistId: playlistId,
         playlistName: playlistName,
         isSpotifyImport: isSpotifyImport,
+        isCurated: isCurated,
+        songs: songs,
         onCreatePlaylist: onCreatePlaylist,
         onDeleted: onDeleted,
         onPinnedChanged: onPinnedChanged,

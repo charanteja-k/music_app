@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../layouts/desktop_layout_state.dart';
 import '../../services/preferences_service.dart';
+import '../../services/auth_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
-import '../auth/google_profile_header_button.dart';
 import 'desktop_search_dropdown.dart';
 
 /// Spotify-grade 64px Desktop Top Global Navigation Bar (#global-nav-bar).
@@ -30,8 +30,6 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   );
 
   OverlayEntry? _recentSearchesOverlay;
-  Timer? _dismissTimer;
-  bool _isDropdownHovered = false;
 
   @override
   void initState() {
@@ -50,13 +48,8 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
   void _onFocusChanged() {
     if (_searchFocusNode.hasFocus) {
-      _dismissTimer?.cancel();
       if (_searchController.text.trim().isEmpty) {
         _showRecentSearchesOverlay();
-      }
-    } else {
-      if (!_isDropdownHovered) {
-        _scheduleDismiss();
       }
     }
   }
@@ -71,24 +64,6 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
     }
   }
 
-  void _onDropdownHoverChanged(bool isHovered) {
-    _isDropdownHovered = isHovered;
-    if (!isHovered && !_searchFocusNode.hasFocus) {
-      _scheduleDismiss();
-    } else if (isHovered) {
-      _dismissTimer?.cancel();
-    }
-  }
-
-  void _scheduleDismiss() {
-    _dismissTimer?.cancel();
-    _dismissTimer = Timer(const Duration(milliseconds: 150), () {
-      if (!_searchFocusNode.hasFocus && !_isDropdownHovered) {
-        _hideRecentSearchesOverlay();
-      }
-    });
-  }
-
   void _showRecentSearchesOverlay() {
     if (_recentSearchesOverlay != null || !mounted) return;
 
@@ -97,14 +72,21 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
     _recentSearchesOverlay = OverlayEntry(
       builder: (context) {
-        return DesktopSearchDropdown(
-          layerLink: _searchLayerLink,
-          searchWidthListenable: _searchWidthNotifier,
-          onDismiss: () {
-            _hideRecentSearchesOverlay();
-            _searchFocusNode.unfocus();
-          },
-          onHoverChanged: _onDropdownHoverChanged,
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _dismissSearchDropdown,
+                child: const ColoredBox(color: Colors.transparent),
+              ),
+            ),
+            DesktopSearchDropdown(
+              layerLink: _searchLayerLink,
+              searchWidthListenable: _searchWidthNotifier,
+              onDismiss: _dismissSearchDropdown,
+            ),
+          ],
         );
       },
     );
@@ -113,21 +95,19 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   }
 
   void _hideRecentSearchesOverlay() {
-    _dismissTimer?.cancel();
-    if (_recentSearchesOverlay != null) {
+    if (_recentSearchesOverlay != null && _recentSearchesOverlay!.mounted) {
       _recentSearchesOverlay?.remove();
       _recentSearchesOverlay = null;
     }
   }
 
-  void _dismissSearchOverlayAndUnfocus() {
-    _hideRecentSearchesOverlay();
+  void _dismissSearchDropdown() {
     _searchFocusNode.unfocus();
+    _hideRecentSearchesOverlay();
   }
 
   @override
   void dispose() {
-    _dismissTimer?.cancel();
     _hideRecentSearchesOverlay();
     _searchWidthNotifier.dispose();
     DesktopLayoutState.globalSearchQuery.removeListener(_syncSearchQuery);
@@ -194,7 +174,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
         const SingleActivator(LogicalKeyboardKey.keyL, meta: true, shift: true):
             _focusSearch,
         const SingleActivator(LogicalKeyboardKey.escape):
-            _dismissSearchOverlayAndUnfocus,
+            _dismissSearchDropdown,
       },
       child: AnimatedBuilder(
         animation: prefs,
@@ -337,190 +317,197 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                         const SizedBox(width: 10.0),
 
                         // Spotify Pill Search Container with LayerLink target
-                        CompositedTransformTarget(
-                          link: _searchLayerLink,
-                          child: Container(
-                            height: 46.0,
-                            width: searchWidth,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1F1F24),
-                              borderRadius: BorderRadius.circular(23.0),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                width: 1.0,
+                        TapRegion(
+                          groupId: 'desktop_search_bar',
+                          onTapOutside: (_) {
+                            _dismissSearchDropdown();
+                          },
+                          child: CompositedTransformTarget(
+                            link: _searchLayerLink,
+                            child: Container(
+                              height: 46.0,
+                              width: searchWidth,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0,
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 28,
-                                    minHeight: 28,
-                                  ),
-                                  icon: Icon(
-                                    Icons.search_rounded,
-                                    color: Colors.white.withValues(alpha: 0.65),
-                                    size: 20.0,
-                                  ),
-                                  onPressed: _focusSearch,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1F1F24),
+                                borderRadius: BorderRadius.circular(23.0),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  width: 1.0,
                                 ),
-                                const SizedBox(width: 6.0),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    focusNode: _searchFocusNode,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13.5,
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 28,
+                                      minHeight: 28,
                                     ),
-
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      border: InputBorder.none,
-                                      hintText: isSuperCompact
-                                          ? 'Search...'
-                                          : 'What do you want to play?',
-                                      hintStyle: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.45,
-                                        ),
+                                    icon: Icon(
+                                      Icons.search_rounded,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                      size: 20.0,
+                                    ),
+                                    onPressed: _focusSearch,
+                                  ),
+                                  const SizedBox(width: 6.0),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      focusNode: _searchFocusNode,
+                                      style: const TextStyle(
+                                        color: Colors.white,
                                         fontSize: 13.5,
                                       ),
-                                    ),
-                                    onTap: () {
-                                      if (_searchController.text
-                                          .trim()
-                                          .isEmpty) {
-                                        _showRecentSearchesOverlay();
-                                      }
-                                    },
-                                    onTapOutside: (_) {
-                                      if (!_isDropdownHovered) {
-                                        _scheduleDismiss();
-                                      }
-                                    },
-                                    onChanged: _onSearchChanged,
-                                    onSubmitted: (query) {
-                                      final trimmed = query.trim();
-                                      if (trimmed.isNotEmpty) {
-                                        unawaited(
-                                          PreferencesService()
-                                              .addToSearchHistory(
-                                                trimmed,
-                                                type: 'query',
-                                              ),
-                                        );
-                                      }
-                                      _onSearchSubmitted(query);
-                                      _onSearchChanged(query);
-                                      _dismissSearchOverlayAndUnfocus();
-                                    },
-                                  ),
-                                ),
-                                if (_searchController.text.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: () {
-                                      _searchController.clear();
-                                      DesktopLayoutState
-                                              .submittedSearchQuery
-                                              .value =
-                                          '';
-                                      _onSearchChanged('');
-                                      if (_searchFocusNode.hasFocus) {
-                                        _showRecentSearchesOverlay();
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4.0,
-                                      ),
-                                      child: Icon(
-                                        Icons.close_rounded,
-                                        color: Colors.white.withValues(
-                                          alpha: 0.5,
+
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        border: InputBorder.none,
+                                        hintText: isSuperCompact
+                                            ? 'Search...'
+                                            : 'What do you want to play?',
+                                        hintStyle: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.45,
+                                          ),
+                                          fontSize: 13.5,
                                         ),
-                                        size: 16.0,
                                       ),
+                                      onTap: () {
+                                        if (_searchController.text
+                                            .trim()
+                                            .isEmpty) {
+                                          _showRecentSearchesOverlay();
+                                        }
+                                      },
+                                      onChanged: _onSearchChanged,
+                                      onSubmitted: (query) {
+                                        final trimmed = query.trim();
+                                        if (trimmed.isNotEmpty) {
+                                          unawaited(
+                                            PreferencesService()
+                                                .addToSearchHistory(
+                                                  trimmed,
+                                                  type: 'query',
+                                                ),
+                                          );
+                                        }
+                                        _onSearchSubmitted(query);
+                                        _onSearchChanged(query);
+                                        _dismissSearchDropdown();
+                                      },
                                     ),
                                   ),
-
-                                if (!isSuperCompact) ...[
-                                  // Vertical divider line |
-                                  Container(
-                                    height: 18.0,
-                                    width: 1.0,
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 8.0,
-                                    ),
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                  ),
-
-                                  // Browse/Explore Categories Icon Button (Spotify-style)
-                                  Tooltip(
-                                    message: 'Browse Categories',
-                                    child: InkWell(
-                                      onTap: _openBrowseCategories,
-                                      borderRadius: BorderRadius.circular(6.0),
+                                  if (_searchController.text.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () {
+                                        _searchController.clear();
+                                        DesktopLayoutState
+                                                .submittedSearchQuery
+                                                .value =
+                                            '';
+                                        _onSearchChanged('');
+                                        if (_searchFocusNode.hasFocus) {
+                                          _showRecentSearchesOverlay();
+                                        }
+                                      },
                                       child: Padding(
-                                        padding: const EdgeInsets.all(4.0),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4.0,
+                                        ),
                                         child: Icon(
-                                          Icons.grid_view_rounded,
+                                          Icons.close_rounded,
                                           color: Colors.white.withValues(
-                                            alpha: 0.65,
+                                            alpha: 0.5,
                                           ),
-                                          size: 18.0,
+                                          size: 16.0,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
 
-                                if (!isCompact) ...[
-                                  const SizedBox(width: 6.0),
-                                  // Accelerator Badge (Ctrl+Shift+L)
-                                  InkWell(
-                                    onTap: _focusSearch,
-                                    borderRadius: BorderRadius.circular(5.0),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6.0,
-                                        vertical: 3.0,
+                                  if (!isSuperCompact) ...[
+                                    // Vertical divider line |
+                                    Container(
+                                      height: 18.0,
+                                      width: 1.0,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 8.0,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.08,
-                                        ),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                    ),
+
+                                    // Browse/Explore Categories Icon Button (Spotify-style)
+                                    Tooltip(
+                                      message: 'Browse Categories',
+                                      child: InkWell(
+                                        onTap: _openBrowseCategories,
                                         borderRadius: BorderRadius.circular(
-                                          5.0,
+                                          6.0,
                                         ),
-                                        border: Border.all(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.06,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(4.0),
+                                          child: Icon(
+                                            Icons.grid_view_rounded,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.65,
+                                            ),
+                                            size: 18.0,
                                           ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Ctrl+Shift+L',
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.6,
-                                          ),
-                                          fontSize: 10.0,
-                                          fontWeight: FontWeight.w600,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures(),
-                                          ],
                                         ),
                                       ),
                                     ),
-                                  ),
+                                  ],
+
+                                  if (!isCompact) ...[
+                                    const SizedBox(width: 6.0),
+                                    // Accelerator Badge (Ctrl+Shift+L)
+                                    InkWell(
+                                      onTap: _focusSearch,
+                                      borderRadius: BorderRadius.circular(5.0),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6.0,
+                                          vertical: 3.0,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            5.0,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.06,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Ctrl+Shift+L',
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                            fontSize: 10.0,
+                                            fontWeight: FontWeight.w600,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures(),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
                         ),
@@ -603,36 +590,109 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
                         const SizedBox(width: 8.0),
 
-                        // Google Sign-In & YouTube Account Profile Button
-                        const GoogleProfileHeaderButton(compact: true),
+                        // Single Unified User Profile Avatar (Google Account Linked)
+                        AnimatedBuilder(
+                          animation: AuthService(),
+                          builder: (context, _) {
+                            final auth = AuthService();
+                            final isAuth = auth.isAuthenticated;
+                            final photoUrl = auth.userPhotoUrl;
+                            final name = auth.userDisplayName ?? 'User';
+                            final initial = name.trim().isNotEmpty
+                                ? name.trim()[0].toUpperCase()
+                                : 'U';
 
-                        const SizedBox(width: 8.0),
-
-                        // User Profile Avatar
-                        Tooltip(
-                          message: 'Profile',
-                          child: GestureDetector(
-                            onTap: () {
-                              DesktopLayoutState.openProfile();
-                            },
-                            child: Container(
-                              width: 32.0,
-                              height: 32.0,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF181818),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFF1E1E1E),
-                                  width: 1.0,
+                            return Tooltip(
+                              message: isAuth
+                                  ? '$name (Google Connected)'
+                                  : 'Profile',
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    DesktopLayoutState.openProfile();
+                                  },
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 32.0,
+                                        height: 32.0,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF181818),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isAuth
+                                                ? const Color(
+                                                    0xFF4285F4,
+                                                  ).withValues(alpha: 0.6)
+                                                : const Color(0xFF1E1E1E),
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                        child: isAuth
+                                            ? (photoUrl != null &&
+                                                      photoUrl.isNotEmpty
+                                                  ? ClipOval(
+                                                      child: Image.network(
+                                                        photoUrl,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder:
+                                                            (_, _, _) => Center(
+                                                              child: Text(
+                                                                initial,
+                                                                style: const TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 13,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                      ),
+                                                    )
+                                                  : Center(
+                                                      child: Text(
+                                                        initial,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    ))
+                                            : const Icon(
+                                                Icons.person_rounded,
+                                                color: Colors.white70,
+                                                size: 17,
+                                              ),
+                                      ),
+                                      if (isAuth)
+                                        Positioned(
+                                          right: -1,
+                                          bottom: -1,
+                                          child: Container(
+                                            width: 9.0,
+                                            height: 9.0,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF1DB954),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: const Color(0xFF000000),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                color: Colors.white70,
-                                size: 17,
-                              ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ),

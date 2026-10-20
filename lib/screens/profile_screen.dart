@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/preferences_service.dart';
 import '../services/music_service.dart';
+import '../services/auth_service.dart';
+import '../widgets/auth/google_logo.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/profile_avatar_helper.dart';
 import 'dilse_capsule_screen.dart';
@@ -388,6 +390,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Google Account Binding Card (positioned directly beneath profile header)
+                          _buildGoogleAccountCard(context),
+
                           // ✨ DilSe Capsule Hero Banner
                           _buildCapsuleBanner(context),
 
@@ -770,6 +775,268 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Clean Obsidian Google Account Binding Card.
+  Widget _buildGoogleAccountCard(BuildContext context) {
+    final auth = AuthService();
+
+    return AnimatedBuilder(
+      animation: auth,
+      builder: (context, _) {
+        final isConnected = auth.isAuthenticated;
+        final displayName =
+            auth.userDisplayName ??
+            (isConnected ? 'Google Account' : 'Guest Account');
+        final email =
+            auth.userEmail ??
+            (isConnected
+                ? 'Account Connected'
+                : 'Sign in to backup and sync your library across devices');
+        final photoUrl = auth.userPhotoUrl;
+
+        final avatarWidget = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 44.0,
+              height: 44.0,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E28),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isConnected
+                      ? const Color(0xFF4285F4).withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.12),
+                  width: 1.2,
+                ),
+              ),
+              child: Center(
+                child: isConnected && photoUrl != null && photoUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          photoUrl,
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const GoogleLogo(size: 22),
+                        ),
+                      )
+                    : const GoogleLogo(size: 22),
+              ),
+            ),
+            if (isConnected)
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: 12.0,
+                  height: 12.0,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1DB954),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF16161E),
+                      width: 2.0,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+
+        final statusBadge = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7.0, vertical: 2.5),
+          decoration: BoxDecoration(
+            color: isConnected
+                ? const Color(0xFF1DB954).withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6.0),
+            border: Border.all(
+              color: isConnected
+                  ? const Color(0xFF1DB954).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: 1.0,
+            ),
+          ),
+          child: Text(
+            isConnected ? 'Connected' : 'Not Connected',
+            style: TextStyle(
+              color: isConnected ? const Color(0xFF1DB954) : Colors.white60,
+              fontSize: 11.0,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+
+        final identityColumn = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    displayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8.0),
+                statusBadge,
+              ],
+            ),
+            const SizedBox(height: 4.0),
+            Text(
+              email,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w400,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        );
+
+        final actionButton = isConnected
+            ? OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    width: 1.0,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14.0,
+                    vertical: 10.0,
+                  ),
+                ),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF181824),
+                      title: const Text(
+                        'Sign Out of Google?',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      content: const Text(
+                        'Are you sure you want to sign out? Your local playlists and downloads remain intact.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFA2D48),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Sign Out'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await auth.signOut();
+                  }
+                },
+                icon: const Icon(Icons.logout_rounded, size: 16.0),
+                label: const Text(
+                  'Sign Out',
+                  style: TextStyle(fontSize: 13.0, fontWeight: FontWeight.w600),
+                ),
+              )
+            : ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4285F4),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 10.0,
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  HapticFeedback.lightImpact();
+                  await auth.signIn();
+                },
+                icon: const GoogleLogo(size: 16.0),
+                label: const Text(
+                  'Sign In',
+                  style: TextStyle(fontSize: 13.0, fontWeight: FontWeight.w600),
+                ),
+              );
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20.0),
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF16161E),
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 16.0,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 500;
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        avatarWidget,
+                        const SizedBox(width: 14.0),
+                        Expanded(child: identityColumn),
+                      ],
+                    ),
+                    const SizedBox(height: 14.0),
+                    actionButton,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  avatarWidget,
+                  const SizedBox(width: 16.0),
+                  Expanded(child: identityColumn),
+                  const SizedBox(width: 16.0),
+                  actionButton,
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

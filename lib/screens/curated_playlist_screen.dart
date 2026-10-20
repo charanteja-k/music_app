@@ -597,6 +597,58 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 12),
+
+                              // Header 3-Dot More Options Menu (DEFECT 2)
+                              Builder(
+                                builder: (btnCtx) => IconButton(
+                                  tooltip: 'Playlist options',
+                                  icon: Container(
+                                    width: 42,
+                                    height: 42,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.10,
+                                      ),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.more_vert_rounded,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    final renderBox =
+                                        btnCtx.findRenderObject() as RenderBox?;
+                                    final offset =
+                                        renderBox?.localToGlobal(Offset.zero) ??
+                                        Offset.zero;
+                                    final buttonSize =
+                                        renderBox?.size ?? Size.zero;
+                                    final menuPosition = Offset(
+                                      offset.dx,
+                                      offset.dy + buttonSize.height,
+                                    );
+                                    DesktopContextMenu.showPlaylistMenu(
+                                      context: context,
+                                      globalPosition: menuPosition,
+                                      playlistId:
+                                          'curated_${widget.title.toLowerCase().replaceAll(' ', '_')}',
+                                      playlistName: widget.title,
+                                      isCurated: true,
+                                      songs: _tracks,
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
                           ),
                         ],

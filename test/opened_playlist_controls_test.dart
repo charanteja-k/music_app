@@ -164,7 +164,7 @@ void main() {
   testWidgets(
     'Playlist song rows expose three-dot More action and preserve presentation and reorder handle',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -8,6 +9,7 @@ import '../screens/album_screen.dart';
 import '../services/preferences_service.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../models/jio_album.dart';
+import 'desktop/desktop_context_menu.dart';
 
 /// Converts a song Map representation into a youtube_explode Video instance
 /// for seamless interop across existing song action sheets.
@@ -74,6 +76,22 @@ void showSongOptionsBottomSheet(
   String? customThumbnail,
 }) {
   HapticFeedback.lightImpact();
+
+  // DEFECT 1: In desktop mode, strictly route through DesktopContextMenu.
+  // The mobile bottom sheet modal must NEVER appear on desktop viewports.
+  if (kIsWeb || MediaQuery.of(context).size.width >= 1024) {
+    final size = MediaQuery.of(context).size;
+    final centerPos = Offset(size.width / 2, size.height / 3);
+    DesktopContextMenu.showSongMenu(
+      context: context,
+      globalPosition: centerPos,
+      song: song,
+      currentPlaylistId: currentPlaylistId,
+      onRemovedFromPlaylist: onRemoveFromPlaylist,
+    );
+    return;
+  }
+
   final musicService = MusicService();
 
   showModalBottomSheet(

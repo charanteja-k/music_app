@@ -46,6 +46,11 @@ class _HomeScreenState extends State<HomeScreen>
   List<JioAlbum> _trendingAlbums = [];
   CircadianContext? _circadianContext;
   List<DailyMixConfig> _dailyMixConfigs = [];
+  final ScrollController _circadianScrollController = ScrollController();
+  final ScrollController _chartsScrollController = ScrollController();
+  final ScrollController _albumsScrollController = ScrollController();
+  final ScrollController _personalizedScrollController = ScrollController();
+
   // 1-Door Sequential Shelf Loading Flags
   bool _isLoadingDailyMix1 = true;
   bool _isLoadingDailyMix2 = true;
@@ -136,6 +141,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _circadianScrollController.dispose();
+    _chartsScrollController.dispose();
+    _albumsScrollController.dispose();
+    _personalizedScrollController.dispose();
     _musicService.removeListener(_onPrefsChanged);
     _prefs.removeListener(_onPrefsChanged);
     DesktopLayoutState.prioritizedPlaylistDoor.removeListener(_onPrefsChanged);
@@ -923,8 +932,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           _circadianContext!.title.toUpperCase(),
                           _circadianContext!.subtitle,
+                          scrollController: _circadianScrollController,
                         ),
-                        _buildHorizontalChartCards(_circadianMix),
+                        _buildHorizontalChartCards(
+                          _circadianMix,
+                          controller: _circadianScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingCircadian &&
                           _circadianContext != null) ...[
@@ -941,8 +954,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           'TOP CHARTS: INDIA',
                           'Updated Daily',
+                          scrollController: _chartsScrollController,
                         ),
-                        _buildHorizontalChartCards(_topChartsIndia),
+                        _buildHorizontalChartCards(
+                          _topChartsIndia,
+                          controller: _chartsScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingCharts) ...[
                         _buildSectionHeader(
@@ -955,7 +972,9 @@ class _HomeScreenState extends State<HomeScreen>
 
                       // BLOCKBUSTER SOUNDTRACKS & ALBUMS
                       if (_trendingAlbums.isNotEmpty) ...[
-                        _buildAlbumsSection(),
+                        _buildAlbumsSection(
+                          controller: _albumsScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingAlbums) ...[
                         _buildSectionHeader(
@@ -971,8 +990,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           'MADE FOR YOU',
                           'Curated for your taste',
+                          scrollController: _personalizedScrollController,
                         ),
-                        _buildHorizontalChartCards(_personalizedMixes),
+                        _buildHorizontalChartCards(
+                          _personalizedMixes,
+                          controller: _personalizedScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingPersonalized) ...[
                         _buildSectionHeader(
@@ -1667,7 +1690,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildAlbumsSection() {
+  Widget _buildAlbumsSection({ScrollController? controller}) {
     if (_trendingAlbums.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -1676,10 +1699,12 @@ class _HomeScreenState extends State<HomeScreen>
         _buildSectionHeader(
           'BLOCKBUSTER SOUNDTRACKS',
           'Full Movie & Studio Albums',
+          scrollController: controller,
         ),
         SizedBox(
           height: 220,
           child: ListView.builder(
+            controller: controller,
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1898,42 +1923,60 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSectionHeader(String title, String subtitle) {
+  Widget _buildSectionHeader(
+    String title,
+    String subtitle, {
+    ScrollController? scrollController,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            subtitle.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.45),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subtitle.toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
-          ),
+          if (scrollController != null)
+            _ShelfChevronControls(controller: scrollController),
         ],
       ),
     );
   }
 
-  Widget _buildHorizontalChartCards(List<Video> videos) {
+  Widget _buildHorizontalChartCards(
+    List<Video> videos, {
+    ScrollController? controller,
+  }) {
     if (videos.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 215,
       child: ListView.builder(
+        controller: controller,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -2261,4 +2304,155 @@ class _HomeQuickAccessItem {
     required this.onTap,
     this.onSecondaryTap,
   });
+}
+
+class _ShelfChevronControls extends StatefulWidget {
+  final ScrollController controller;
+
+  const _ShelfChevronControls({required this.controller});
+
+  @override
+  State<_ShelfChevronControls> createState() => _ShelfChevronControlsState();
+}
+
+class _ShelfChevronControlsState extends State<_ShelfChevronControls> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(_ShelfChevronControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onScroll);
+      widget.controller.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (mounted) setState(() {});
+  }
+
+  void _scrollLeft() {
+    if (!widget.controller.hasClients) return;
+    final target = (widget.controller.offset - 480.0).clamp(
+      0.0,
+      widget.controller.position.maxScrollExtent,
+    );
+    widget.controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _scrollRight() {
+    if (!widget.controller.hasClients) return;
+    final target = (widget.controller.offset + 480.0).clamp(
+      0.0,
+      widget.controller.position.maxScrollExtent,
+    );
+    widget.controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasClients = widget.controller.hasClients;
+    final canScrollLeft = hasClients && widget.controller.offset > 0.0;
+    final canScrollRight =
+        hasClients &&
+        widget.controller.position.maxScrollExtent > 0 &&
+        widget.controller.offset <
+            widget.controller.position.maxScrollExtent - 1.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ChevronButton(
+          icon: Icons.chevron_left_rounded,
+          tooltip: 'Previous',
+          enabled: canScrollLeft,
+          onTap: _scrollLeft,
+        ),
+        const SizedBox(width: 8.0),
+        _ChevronButton(
+          icon: Icons.chevron_right_rounded,
+          tooltip: 'Next',
+          enabled: canScrollRight,
+          onTap: _scrollRight,
+        ),
+      ],
+    );
+  }
+}
+
+class _ChevronButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ChevronButton({
+    required this.icon,
+    required this.tooltip,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_ChevronButton> createState() => _ChevronButtonState();
+}
+
+class _ChevronButtonState extends State<_ChevronButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: widget.enabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+        child: GestureDetector(
+          onTap: widget.enabled ? widget.onTap : null,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: widget.enabled ? 1.0 : 0.3,
+            child: Container(
+              width: 28.0,
+              height: 28.0,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isHovered && widget.enabled
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
+              ),
+              child: Center(
+                child: Icon(widget.icon, size: 18.0, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

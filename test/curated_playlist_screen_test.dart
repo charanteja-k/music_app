@@ -61,7 +61,7 @@ void main() {
       expect(find.text('Chaleya'), findsOneWidget);
       expect(find.text('3:45'), findsNWidgets(2));
       expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.more_vert_rounded), findsNWidgets(2));
+      expect(find.byIcon(Icons.more_vert_rounded), findsNWidgets(3));
       expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
 
       // Test tapping Save button

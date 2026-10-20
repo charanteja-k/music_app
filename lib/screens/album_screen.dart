@@ -642,6 +642,50 @@ class _AlbumScreenState extends State<AlbumScreen>
               );
             },
           ),
+          const SizedBox(width: 12),
+          // More Options 3-Dot Button (DEFECT 2 - C)
+          Builder(
+            builder: (btnCtx) => GestureDetector(
+              onTap: () {
+                final renderBox = btnCtx.findRenderObject() as RenderBox?;
+                final offset =
+                    renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+                final buttonSize = renderBox?.size ?? Size.zero;
+                final menuPosition = Offset(
+                  offset.dx,
+                  offset.dy + buttonSize.height,
+                );
+                final songVideos = _album!.songs
+                    .map((s) => songMapToVideo(s))
+                    .toList();
+                DesktopContextMenu.showAlbumMenu(
+                  context: context,
+                  globalPosition: menuPosition,
+                  albumTitle: _album!.title,
+                  albumArtist: _album!.artist,
+                  albumId: _album!.id,
+                  albumArtwork: _album!.artwork,
+                  songs: songVideos,
+                );
+              },
+              child: Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.more_vert_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
