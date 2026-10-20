@@ -7,6 +7,7 @@ import '../services/preferences_service.dart';
 import '../services/music_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/auth/google_logo.dart';
+import '../widgets/auth/google_profile_header_button.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/profile_avatar_helper.dart';
 import 'dilse_capsule_screen.dart';
@@ -976,8 +977,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   elevation: 0,
                 ),
                 onPressed: () async {
-                  HapticFeedback.lightImpact();
-                  await auth.signIn();
+                  await showGoogleSignInDialog(context);
                 },
                 icon: const GoogleLogo(size: 16.0),
                 label: const Text(

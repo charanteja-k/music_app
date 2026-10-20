@@ -17,70 +17,69 @@ class GoogleProfileHeaderButton extends StatefulWidget {
       _GoogleProfileHeaderButtonState();
 }
 
-class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
-  bool _isHovered = false;
-  bool _isLoading = false;
+/// Public launcher for the unified Google Sign-In dialog modal.
+Future<bool?> showGoogleSignInDialog(BuildContext context) async {
+  HapticFeedback.lightImpact();
+  final didSignIn = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => const _GoogleSignInModal(),
+  );
 
-  Future<void> _handleSignIn() async {
-    HapticFeedback.lightImpact();
-    final didSignIn = await showDialog<bool>(
+  if ((didSignIn == true || AuthService().isAuthenticated) && context.mounted) {
+    await handlePostSignInSetup(context);
+  }
+  return didSignIn;
+}
+
+/// Helper that handles first-time account setup, guest migration, and welcome snackbar.
+Future<void> handlePostSignInSetup(BuildContext context) async {
+  final auth = AuthService();
+  final prefs = PreferencesService();
+  final userId = auth.userId ?? 'user';
+
+  final isNewAccount = prefs.isFirstTimeAccountSignIn(userId);
+  final hasGuestData = prefs.hasGuestData();
+
+  if (isNewAccount && hasGuestData && context.mounted) {
+    final choice = await showDialog<String>(
       context: context,
-      builder: (ctx) => const _GoogleSignInModal(),
+      barrierDismissible: false,
+      builder: (ctx) => _DataPreservationDialog(
+        userName: auth.userDisplayName ?? 'Music Lover',
+      ),
     );
 
-    if ((didSignIn == true || AuthService().isAuthenticated) && mounted) {
-      setState(() => _isLoading = true);
-      try {
-        await _handlePostSignInSetup();
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
-      }
+    if (choice == 'fresh') {
+      await DataSnapshotService().createSafetySnapshot(
+        triggerReason: 'Guest Data Migration',
+      );
+      await prefs.clearListeningHistory();
+      await prefs.clearMostPlayedSongs();
     }
+    await prefs.markAccountSignedIn(userId);
+  } else {
+    await prefs.markAccountSignedIn(userId);
   }
 
-  Future<void> _handlePostSignInSetup() async {
-    final auth = AuthService();
-    final prefs = PreferencesService();
-    final userId = auth.userId ?? 'user';
-
-    // Check if this is the first time signing into this account on this device
-    final isNewAccount = prefs.isFirstTimeAccountSignIn(userId);
-    final hasGuestData = prefs.hasGuestData();
-
-    if (isNewAccount && hasGuestData && mounted) {
-      final choice = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => _DataPreservationDialog(
-          userName: auth.userDisplayName ?? 'Music Lover',
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Welcome, ${auth.userDisplayName ?? "Music Lover"}! Signed in with Google.',
         ),
-      );
+        backgroundColor: const Color(0xFF1E88E5),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
 
-      if (choice == 'fresh') {
-        // Safely backup guest data to safety snapshot before clearing
-        await DataSnapshotService().createSafetySnapshot(
-          triggerReason: 'Guest Data Migration',
-        );
-        await prefs.clearListeningHistory();
-        await prefs.clearMostPlayedSongs();
-      }
-      await prefs.markAccountSignedIn(userId);
-    } else {
-      await prefs.markAccountSignedIn(userId);
-    }
+class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
+  bool _isHovered = false;
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Welcome, ${auth.userDisplayName ?? "Music Lover"}! Signed in with Google.',
-          ),
-          backgroundColor: const Color(0xFF1E88E5),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+  Future<void> _handleSignIn() async {
+    await showGoogleSignInDialog(context);
   }
 
   void _showAccountDialog() {
@@ -118,7 +117,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
       child: Tooltip(
         message: 'Sign in with Google',
         child: GestureDetector(
-          onTap: _isLoading ? null : _handleSignIn,
+          onTap: _handleSignIn,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: 32,
@@ -135,18 +134,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
                 width: 1.0,
               ),
             ),
-            child: Center(
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const GoogleLogo(size: 16),
-            ),
+            child: const Center(child: GoogleLogo(size: 16)),
           ),
         ),
       ),
@@ -200,7 +188,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
       onExit: (_) => setState(() => _isHovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: _isLoading ? null : _handleSignIn,
+        onTap: _handleSignIn,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -225,22 +213,12 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
                   ]
                 : null,
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_isLoading)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              else
-                const GoogleLogo(size: 18),
-              const SizedBox(width: 8),
-              const Flexible(
+              GoogleLogo(size: 18),
+              SizedBox(width: 8),
+              Flexible(
                 child: Text(
                   'Sign in with Google',
                   style: TextStyle(
@@ -1038,34 +1016,75 @@ class _GoogleSignInModalState extends State<_GoogleSignInModal> {
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: const Color(
                             0xFFE53935,
                           ).withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: const Color(
                               0xFFE53935,
                             ).withValues(alpha: 0.35),
                           ),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              color: Color(0xFFEF5350),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 12,
-                                  height: 1.3,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Color(0xFFEF5350),
+                                  size: 18,
                                 ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      fontSize: 12,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 12,
+                                ),
+                              ),
+                              onPressed: () async {
+                                await AuthService().signInDemo(
+                                  name: 'Tejas (Tester)',
+                                  email: 'tejas.dilse@gmail.com',
+                                );
+                                if (context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.account_circle_outlined,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Sign in with Test Account',
+                                style: TextStyle(fontSize: 12.5),
                               ),
                             ),
                           ],
