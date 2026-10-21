@@ -1077,7 +1077,8 @@ class _HomeScreenState extends State<HomeScreen>
       _HomeQuickAccessItem(
         title: dailyMix1?.title ?? 'Daily Mix 1',
         icon: Icons.shuffle_rounded,
-        iconGradient: const [Color(0xFFE040FB), Color(0xFF1DB954)],
+        solidColor: const Color(0xFF2E3856),
+        iconGradient: const [Color(0xFF2E3856), Color(0xFF1E2438)],
         isLoading: _isLoadingDailyMix1 && _dailyMix1.isEmpty,
         imageUrl: _dailyMix1.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_dailyMix1.first).isNotEmpty
@@ -1092,14 +1093,15 @@ class _HomeScreenState extends State<HomeScreen>
               dailyMix1?.query ??
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Mix',
           initialSongs: _dailyMix1,
-          gradientColors: const [Color(0xFFE040FB), Color(0xFF1DB954)],
+          gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
           icon: Icons.shuffle_rounded,
         ),
       ),
       _HomeQuickAccessItem(
         title: 'Liked Songs',
         icon: Icons.favorite_rounded,
-        iconGradient: const [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+        solidColor: const Color(0xFF5038A0),
+        iconGradient: const [Color(0xFF5038A0), Color(0xFF382270)],
         imageUrl: _musicService.likedSongs.isNotEmpty
             ? _musicService.likedSongs.first['thumbnail']
             : null,
@@ -1114,7 +1116,8 @@ class _HomeScreenState extends State<HomeScreen>
       _HomeQuickAccessItem(
         title: dailyMix2?.title ?? 'Daily Mix 2',
         icon: Icons.graphic_eq_rounded,
-        iconGradient: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
+        solidColor: const Color(0xFF223544),
+        iconGradient: const [Color(0xFF223544), Color(0xFF162430)],
         isLoading: _isLoadingDailyMix2 && _dailyMix2.isEmpty,
         imageUrl: _dailyMix2.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_dailyMix2.first).isNotEmpty
@@ -1129,14 +1132,15 @@ class _HomeScreenState extends State<HomeScreen>
               dailyMix2?.query ??
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Hits',
           initialSongs: _dailyMix2,
-          gradientColors: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
+          gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
           icon: Icons.graphic_eq_rounded,
         ),
       ),
       _HomeQuickAccessItem(
         title: 'Top Charts',
         icon: Icons.trending_up_rounded,
-        iconGradient: const [Color(0xFFFF512F), Color(0xFFDD2476)],
+        solidColor: const Color(0xFF382B24),
+        iconGradient: const [Color(0xFF382B24), Color(0xFF241A14)],
         imageUrl: _topChartsIndia.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_topChartsIndia.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
@@ -1149,14 +1153,15 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               'Top Charts India ${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'}',
           initialSongs: _topChartsIndia,
-          gradientColors: const [Color(0xFFFF512F), Color(0xFFDD2476)],
+          gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
           icon: Icons.trending_up_rounded,
         ),
       ),
       _HomeQuickAccessItem(
         title: 'New Releases',
         icon: Icons.fiber_new_rounded,
-        iconGradient: const [Color(0xFF11998E), Color(0xFF38EF7D)],
+        solidColor: const Color(0xFF1E382A),
+        iconGradient: const [Color(0xFF1E382A), Color(0xFF12241A)],
         imageUrl: _newReleases.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_newReleases.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_newReleases.first)
@@ -1169,14 +1174,15 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
           initialSongs: _newReleases,
-          gradientColors: const [Color(0xFF11998E), Color(0xFF38EF7D)],
+          gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
           icon: Icons.fiber_new_rounded,
         ),
       ),
       _HomeQuickAccessItem(
         title: 'Trending',
         icon: Icons.whatshot_rounded,
-        iconGradient: const [Color(0xFFF857A6), Color(0xFFFF5858)],
+        solidColor: const Color(0xFF38222A),
+        iconGradient: const [Color(0xFF38222A), Color(0xFF24141A)],
         isLoading: _isLoadingTrending && _trendingNow.isEmpty,
         imageUrl: _trendingNow.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_trendingNow.first).isNotEmpty
@@ -1190,7 +1196,7 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Trending',
           initialSongs: _trendingNow,
-          gradientColors: const [Color(0xFFF857A6), Color(0xFFFF5858)],
+          gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
           icon: Icons.whatshot_rounded,
         ),
       ),
@@ -1257,11 +1263,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, _, _) => Container(
                                     decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: item.iconGradient,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
+                                      color: item.solidColor,
                                     ),
                                     child: Icon(
                                       item.icon,
@@ -2289,6 +2291,7 @@ class _HomeScreenState extends State<HomeScreen>
 class _HomeQuickAccessItem {
   final String title;
   final IconData icon;
+  final Color solidColor;
   final List<Color> iconGradient;
   final String? imageUrl;
   final bool isLoading;
@@ -2298,7 +2301,8 @@ class _HomeQuickAccessItem {
   const _HomeQuickAccessItem({
     required this.title,
     required this.icon,
-    required this.iconGradient,
+    this.solidColor = const Color(0xFF242434),
+    this.iconGradient = const [Color(0xFF242434), Color(0xFF1E1E2C)],
     this.imageUrl,
     this.isLoading = false,
     required this.onTap,
