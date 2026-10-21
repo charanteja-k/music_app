@@ -540,14 +540,14 @@ class DesktopContextMenu {
     if (queueIndex != null) {
       return [
         DesktopContextMenuItem(
-          title: 'Play now',
+          title: 'Play Now',
           icon: Icons.play_arrow_rounded,
           onTap: () {
             musicService.playPlaylist(musicService.playlist, queueIndex);
           },
         ),
         DesktopContextMenuItem(
-          title: 'Move to top',
+          title: 'Move to Top',
           icon: Icons.vertical_align_top_rounded,
           onTap: () {
             final currentIdx = musicService.currentIndex;
@@ -562,7 +562,7 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'Remove from queue',
+          title: 'Remove from Queue',
           icon: Icons.playlist_remove_rounded,
           iconColor: const Color(0xFFFF5252),
           isDestructive: true,
@@ -578,7 +578,7 @@ class DesktopContextMenu {
         ),
         const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
-          title: isLiked ? 'Remove from Liked Songs' : 'Save to your Liked Songs',
+          title: isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs',
           icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           iconColor: isLiked ? const Color(0xFFFA2D48) : null,
           onTap: () {
@@ -596,14 +596,14 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'Add to playlist',
+          title: 'Add to Playlist',
           icon: Icons.playlist_add_rounded,
           onTap: () {
             showAddToPlaylistSheet(context, song);
           },
         ),
         DesktopContextMenuItem(
-          title: 'Go to album',
+          title: 'Go to Album',
           icon: Icons.album_rounded,
           onTap: () async {
             final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
@@ -639,7 +639,7 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'View artist profile',
+          title: 'View Artist Profile',
           icon: Icons.person_rounded,
           onTap: () {
             DesktopLayoutState.openArtist(song.author);
@@ -647,7 +647,7 @@ class DesktopContextMenu {
         ),
         const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
-          title: 'Share song',
+          title: 'Share Song',
           icon: Icons.share_rounded,
           onTap: () {
             Clipboard.setData(
@@ -668,7 +668,7 @@ class DesktopContextMenu {
     if (isNowPlaying) {
       return [
         DesktopContextMenuItem(
-          title: isLiked ? 'Remove from Liked Songs' : 'Save to your Liked Songs',
+          title: isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs',
           icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           iconColor: isLiked ? const Color(0xFFFA2D48) : null,
           onTap: () {
@@ -686,7 +686,7 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'Add to playlist',
+          title: 'Add to Playlist',
           icon: Icons.playlist_add_rounded,
           onTap: () {
             showAddToPlaylistSheet(context, song);
@@ -707,7 +707,7 @@ class DesktopContextMenu {
         ),
         const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
-          title: 'Go to album',
+          title: 'Go to Album',
           icon: Icons.album_rounded,
           onTap: () async {
             final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
@@ -743,7 +743,7 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'View artist profile',
+          title: 'View Artist Profile',
           icon: Icons.person_rounded,
           onTap: () {
             DesktopLayoutState.openArtist(song.author);
@@ -751,7 +751,7 @@ class DesktopContextMenu {
         ),
         const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
-          title: 'Share song',
+          title: 'Share Song',
           icon: Icons.share_rounded,
           onTap: () {
             Clipboard.setData(
