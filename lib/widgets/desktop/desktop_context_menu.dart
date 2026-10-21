@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../../layouts/desktop_layout_state.dart';
+import '../../models/jio_album.dart';
 import '../../services/music_service.dart';
 import '../../services/preferences_service.dart';
 import '../playlist_action_menu.dart';
@@ -367,6 +368,39 @@ class DesktopContextMenu {
             }
           },
         ),
+        DesktopContextMenuItem(
+          title: 'Save to Your Library',
+          icon: Icons.bookmark_border_rounded,
+          onTap: () {
+            final existing = musicService.customPlaylists.firstWhere(
+              (p) =>
+                  (p['name']?.toString().toLowerCase().trim() ?? '') ==
+                  playlistName.toLowerCase().trim(),
+              orElse: () => <String, dynamic>{},
+            );
+            if (existing.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('"$playlistName" is already in your library.'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            final newId = musicService.createPlaylist(playlistName);
+            final trackList = songs ?? [];
+            if (trackList.isNotEmpty) {
+              musicService.setPlaylistSongs(newId, trackList, commit: true);
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved "$playlistName" to your library!'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
           title: 'Share playlist',
           icon: Icons.share_rounded,
@@ -974,11 +1008,40 @@ class DesktopContextMenu {
     final isSaved = prefs.isAlbumSaved(albumId ?? albumTitle);
 
     return [
-      if (songs != null && songs.isNotEmpty) ...[
-        DesktopContextMenuItem(
-          title: 'Add to queue',
-          icon: Icons.queue_music_rounded,
-          onTap: () {
+      DesktopContextMenuItem(
+        title: 'Play Album',
+        icon: Icons.play_arrow_rounded,
+        onTap: () async {
+          if (songs != null && songs.isNotEmpty) {
+            musicService.playPlaylist(songs, 0);
+          } else if (albumId != null && albumId.isNotEmpty) {
+            final loaded = await musicService.fetchAlbumTracks(albumId);
+            if (loaded != null && loaded.songs.isNotEmpty) {
+              final videoList = loaded.songs.map(songMapToVideo).toList();
+              musicService.playPlaylist(videoList, 0);
+            } else if (context.mounted) {
+              DesktopLayoutState.openAlbum(
+                albumId: albumId,
+                albumTitle: albumTitle,
+                albumArtwork: albumArtwork,
+                albumArtist: albumArtist,
+              );
+            }
+          } else {
+            DesktopLayoutState.openAlbum(
+              albumId: albumId,
+              albumTitle: albumTitle,
+              albumArtwork: albumArtwork,
+              albumArtist: albumArtist,
+            );
+          }
+        },
+      ),
+      DesktopContextMenuItem(
+        title: 'Add to queue',
+        icon: Icons.queue_music_rounded,
+        onTap: () async {
+          if (songs != null && songs.isNotEmpty) {
             for (final song in songs) {
               musicService.addToQueue(song);
             }
@@ -990,12 +1053,32 @@ class DesktopContextMenu {
                 duration: const Duration(seconds: 2),
               ),
             );
-          },
-        ),
-        DesktopContextMenuItem(
-          title: 'Play next',
-          icon: Icons.playlist_play_rounded,
-          onTap: () {
+          } else if (albumId != null && albumId.isNotEmpty) {
+            final loaded = await musicService.fetchAlbumTracks(albumId);
+            if (loaded != null && loaded.songs.isNotEmpty) {
+              final videoList = loaded.songs.map(songMapToVideo).toList();
+              for (final song in videoList) {
+                musicService.addToQueue(song);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Added ${videoList.length} songs from "$albumTitle" to queue',
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          }
+        },
+      ),
+      DesktopContextMenuItem(
+        title: 'Play next',
+        icon: Icons.playlist_play_rounded,
+        onTap: () async {
+          if (songs != null && songs.isNotEmpty) {
             for (final song in songs.reversed) {
               musicService.playNext(song);
             }
@@ -1007,10 +1090,28 @@ class DesktopContextMenu {
                 duration: const Duration(seconds: 2),
               ),
             );
-          },
-        ),
-        const DesktopContextMenuItem.divider(),
-      ],
+          } else if (albumId != null && albumId.isNotEmpty) {
+            final loaded = await musicService.fetchAlbumTracks(albumId);
+            if (loaded != null && loaded.songs.isNotEmpty) {
+              final videoList = loaded.songs.map(songMapToVideo).toList();
+              for (final song in videoList.reversed) {
+                musicService.playNext(song);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Playing ${videoList.length} songs from "$albumTitle" next',
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          }
+        },
+      ),
+      const DesktopContextMenuItem.divider(),
       DesktopContextMenuItem(
         title: isSaved ? 'Remove from Your Library' : 'Save to Your Library',
         icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
@@ -1183,3 +1284,185 @@ Future<void> showUnifiedTrackMenu({
   queueIndex: queueIndex,
   isNowPlaying: isNowPlaying,
 );
+
+/// Unified playlist menu popup for both right-click and 3-dot button triggers on desktop.
+Future<void> showUnifiedPlaylistMenu({
+  required BuildContext context,
+  required Offset globalPosition,
+  required dynamic playlist,
+  bool isSidebar = false,
+  VoidCallback? onCreatePlaylist,
+  VoidCallback? onDeleted,
+  VoidCallback? onPinnedChanged,
+}) async {
+  String playlistId = '';
+  String playlistName = '';
+  bool isSpotify = false;
+  bool isCurated = false;
+  List<Video>? songs;
+
+  if (playlist is String) {
+    playlistId = playlist;
+    if (playlistId == 'liked_songs') {
+      playlistName = 'Liked Songs';
+    } else {
+      final found = MusicService().customPlaylists.firstWhere(
+        (p) => p['id']?.toString() == playlistId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (found.isNotEmpty) {
+        playlistName = found['name']?.toString() ?? 'Playlist';
+        isSpotify = found['isSpotify'] == true;
+        final rawSongs =
+            (found['tracks'] as List?) ?? (found['songs'] as List?) ?? [];
+        songs = rawSongs
+            .whereType<Map<String, dynamic>>()
+            .map(songMapToVideo)
+            .toList();
+      } else {
+        playlistName = playlistId.replaceAll('_', ' ');
+        if (playlistId.startsWith('curated_') ||
+            playlistId.startsWith('daily_mix') ||
+            playlistId == 'top_charts_india' ||
+            playlistId == 'top_charts' ||
+            playlistId == 'new_releases' ||
+            playlistId == 'trending_now') {
+          isCurated = true;
+        }
+      }
+    }
+  } else if (playlist is Map) {
+    playlistId = (playlist['id'] ?? playlist['playlistId'] ?? '').toString();
+    playlistName = (playlist['name'] ??
+            playlist['title'] ??
+            (playlistId == 'liked_songs' ? 'Liked Songs' : 'Playlist'))
+        .toString();
+    isSpotify = playlist['isSpotify'] == true ||
+        (playlist['source']?.toString().contains('spotify') ?? false);
+    isCurated = playlist['isCurated'] == true ||
+        playlistId.startsWith('curated_') ||
+        playlistId.startsWith('daily_mix') ||
+        playlistId == 'top_charts_india' ||
+        playlistId == 'top_charts' ||
+        playlistId == 'new_releases' ||
+        playlistId == 'trending_now';
+    final raw =
+        playlist['songs'] ?? playlist['tracks'] ?? playlist['initialSongs'];
+    if (raw is List<Video>) {
+      songs = raw;
+    } else if (raw is List) {
+      songs = raw
+          .map((item) {
+            if (item is Video) return item;
+            if (item is Map<String, dynamic>) return songMapToVideo(item);
+            if (item is Map) {
+              return songMapToVideo(Map<String, dynamic>.from(item));
+            }
+            return null;
+          })
+          .whereType<Video>()
+          .toList();
+    }
+  }
+
+  return DesktopContextMenu.showPlaylistMenu(
+    context: context,
+    globalPosition: globalPosition,
+    playlistId: playlistId,
+    playlistName: playlistName,
+    isSpotifyImport: isSpotify,
+    isCurated: isCurated,
+    songs: songs,
+    onCreatePlaylist: onCreatePlaylist,
+    onDeleted: onDeleted,
+    onPinnedChanged: onPinnedChanged,
+  );
+}
+
+/// Unified album menu popup for both right-click and 3-dot button triggers on desktop.
+Future<void> showUnifiedAlbumMenu({
+  required BuildContext context,
+  required Offset globalPosition,
+  required dynamic album,
+}) async {
+  String albumTitle = '';
+  String? albumArtist;
+  String? albumId;
+  String? albumArtwork;
+  List<Video>? songs;
+
+  if (album is JioAlbum) {
+    albumId = album.id;
+    albumTitle = album.title;
+    albumArtist = album.artist;
+    albumArtwork = album.artwork;
+    if (album.songs.isNotEmpty) {
+      songs = album.songs.map(songMapToVideo).toList();
+    }
+  } else if (album is Map) {
+    albumId = (album['id'] ?? album['albumId'] ?? '').toString();
+    albumTitle = (album['title'] ??
+            album['name'] ??
+            album['albumTitle'] ??
+            'Album')
+        .toString();
+    albumArtist = (album['artist'] ?? album['albumArtist'] ?? '').toString();
+    albumArtwork =
+        (album['artwork'] ?? album['thumbnail'] ?? album['albumArtwork'] ?? '')
+            .toString();
+    final rawSongs = album['songs'] ?? album['tracks'];
+    if (rawSongs is List<Video>) {
+      songs = rawSongs;
+    } else if (rawSongs is List) {
+      songs = rawSongs
+          .map((item) {
+            if (item is Video) return item;
+            if (item is Map<String, dynamic>) return songMapToVideo(item);
+            if (item is Map) {
+              return songMapToVideo(Map<String, dynamic>.from(item));
+            }
+            return null;
+          })
+          .whereType<Video>()
+          .toList();
+    }
+  } else if (album != null) {
+    try {
+      albumTitle = (album.title as String?) ?? 'Album';
+    } catch (_) {}
+    try {
+      albumArtist = album.artist as String?;
+    } catch (_) {}
+    try {
+      albumArtwork = (album.thumbnail as String?) ?? (album.artwork as String?);
+    } catch (_) {}
+    try {
+      final rawSongs = album.songs;
+      if (rawSongs is List<Video>) {
+        songs = rawSongs;
+      } else if (rawSongs is List) {
+        songs = rawSongs
+            .map((item) {
+              if (item is Video) return item;
+              if (item is Map<String, dynamic>) return songMapToVideo(item);
+              if (item is Map) {
+                return songMapToVideo(Map<String, dynamic>.from(item));
+              }
+              return null;
+            })
+            .whereType<Video>()
+            .toList();
+      }
+    } catch (_) {}
+  }
+
+  return DesktopContextMenu.showAlbumMenu(
+    context: context,
+    globalPosition: globalPosition,
+    albumTitle: albumTitle,
+    albumArtist: albumArtist,
+    albumId: albumId,
+    albumArtwork: albumArtwork,
+    songs: songs,
+  );
+}

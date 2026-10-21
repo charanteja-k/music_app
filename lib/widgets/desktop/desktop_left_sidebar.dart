@@ -235,11 +235,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   DesktopLayoutState.openPlaylist('liked_songs');
                 },
                 onSecondaryTapDown: (details) {
-                  DesktopContextMenu.showPlaylistMenu(
+                  showUnifiedPlaylistMenu(
                     context: context,
                     globalPosition: details.globalPosition,
-                    playlistId: 'liked_songs',
-                    playlistName: 'Liked Songs',
+                    playlist: 'liked_songs',
+                    isSidebar: true,
                   );
                 },
               ),
@@ -287,14 +287,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                           },
                           onSecondaryTapDown: (details) {
                             if (id.isNotEmpty) {
-                              final name = pl['name']?.toString() ?? 'Playlist';
-                              final isSpotify = pl['isSpotify'] == true;
-                              DesktopContextMenu.showPlaylistMenu(
+                              showUnifiedPlaylistMenu(
                                 context: context,
                                 globalPosition: details.globalPosition,
-                                playlistId: id,
-                                playlistName: name,
-                                isSpotifyImport: isSpotify,
+                                playlist: pl,
+                                isSidebar: true,
                                 onCreatePlaylist: _showCreatePlaylistDialog,
                               );
                             }
@@ -1143,11 +1140,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
       onExit: (_) => setState(() => _hoveredRowId = null),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
-          DesktopContextMenu.showPlaylistMenu(
+          showUnifiedPlaylistMenu(
             context: context,
             globalPosition: details.globalPosition,
-            playlistId: 'liked_songs',
-            playlistName: 'Liked Songs',
+            playlist: 'liked_songs',
+            isSidebar: true,
           );
         },
         child: InkWell(
@@ -1280,12 +1277,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
       child: GestureDetector(
         onSecondaryTapDown: (details) {
           if (id.isNotEmpty) {
-            DesktopContextMenu.showPlaylistMenu(
+            showUnifiedPlaylistMenu(
               context: context,
               globalPosition: details.globalPosition,
-              playlistId: id,
-              playlistName: name,
-              isSpotifyImport: isSpotify,
+              playlist: pl,
+              isSidebar: true,
               onCreatePlaylist: _showCreatePlaylistDialog,
             );
           }

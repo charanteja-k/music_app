@@ -256,37 +256,59 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                         letterSpacing: -0.3,
                       ),
                     ),
-                    background: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (isLikedSongs)
-                          _buildLikedSongsArtwork()
-                        else if (firstThumbnail != null &&
-                            firstThumbnail.isNotEmpty)
-                          Image.network(
-                            firstThumbnail,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildDefaultArtwork(),
-                          )
-                        else
-                          _buildDefaultArtwork(),
-                        // Gradient overlay
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.black.withValues(alpha: 0.3),
-                                const Color(0xFF121212).withValues(alpha: 0.95),
-                                const Color(0xFF121212),
-                              ],
-                              stops: const [0.0, 0.7, 1.0],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
+                    background: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onSecondaryTapDown: (details) {
+                        showUnifiedPlaylistMenu(
+                          context: context,
+                          globalPosition: details.globalPosition,
+                          playlist: isLikedSongs
+                              ? 'liked_songs'
+                              : {
+                                  'id': widget.playlistId,
+                                  'name': name,
+                                  'isSpotify': PreferencesService()
+                                      .isSpotifyImportedPlaylist(
+                                        widget.playlistId,
+                                      ),
+                                  'songs': songs,
+                                },
+                        );
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (isLikedSongs)
+                            _buildLikedSongsArtwork()
+                          else if (firstThumbnail != null &&
+                              firstThumbnail.isNotEmpty)
+                            Image.network(
+                              firstThumbnail,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildDefaultArtwork(),
+                            )
+                          else
+                            _buildDefaultArtwork(),
+                          // Gradient overlay
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.3),
+                                  const Color(
+                                    0xFF121212,
+                                  ).withValues(alpha: 0.95),
+                                  const Color(0xFF121212),
+                                ],
+                                stops: const [0.0, 0.7, 1.0],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -400,7 +422,43 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        if (!isLikedSongs)
+                        if (isLikedSongs)
+                          Builder(
+                            builder: (btnCtx) => IconButton(
+                              tooltip: 'Playlist options',
+                              icon: Container(
+                                width: 38,
+                                height: 38,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.10),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.more_vert_rounded,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                              ),
+                              onPressed: () {
+                                final renderBox =
+                                    btnCtx.findRenderObject() as RenderBox?;
+                                final offset =
+                                    renderBox?.localToGlobal(Offset.zero) ??
+                                    Offset.zero;
+                                final size = renderBox?.size ?? Size.zero;
+                                showUnifiedPlaylistMenu(
+                                  context: context,
+                                  globalPosition: Offset(
+                                    offset.dx,
+                                    offset.dy + size.height,
+                                  ),
+                                  playlist: 'liked_songs',
+                                );
+                              },
+                            ),
+                          )
+                        else
                           PlaylistActionMenu(
                             playlistId: widget.playlistId,
                             playlistName: name,

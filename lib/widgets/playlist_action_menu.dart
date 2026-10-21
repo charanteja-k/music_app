@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/music_service.dart';
 import '../services/preferences_service.dart';
+import 'desktop/desktop_context_menu.dart';
 
 /// Reusable three-dot More action menu for playlists.
 /// Encapsulates playlist-level management actions (Rename, Delete, Source toggling)
@@ -274,6 +276,56 @@ class PlaylistActionMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = kIsWeb || MediaQuery.of(context).size.width >= 1024;
+
+    void openUnifiedMenu(BuildContext btnCtx) {
+      final renderBox = btnCtx.findRenderObject() as RenderBox?;
+      final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+      final size = renderBox?.size ?? Size.zero;
+      final anchor = Offset(offset.dx, offset.dy + size.height);
+      showUnifiedPlaylistMenu(
+        context: context,
+        globalPosition: anchor,
+        playlist: {
+          'id': playlistId,
+          'name': playlistName,
+          'isSpotify': isSpotifyImport,
+        },
+        onDeleted: () {
+          onDeleted?.call();
+          if (closeScreenOnDelete) {
+            Navigator.of(context).pop();
+          }
+        },
+      );
+    }
+
+    if (isDesktop) {
+      if (customTrigger != null) {
+        return Builder(
+          builder: (btnCtx) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => openUnifiedMenu(btnCtx),
+            child: customTrigger,
+          ),
+        );
+      }
+      return Builder(
+        builder: (btnCtx) => IconButton(
+          tooltip: 'More options',
+          icon: Icon(
+            Icons.more_vert_rounded,
+            color: iconColor ?? Colors.white54,
+            size: iconSize,
+          ),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          splashRadius: 20,
+          onPressed: () => openUnifiedMenu(btnCtx),
+        ),
+      );
+    }
+
     final menu = customTrigger != null
         ? PopupMenuButton<String>(
             tooltip: 'More options',
