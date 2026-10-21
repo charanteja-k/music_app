@@ -6,6 +6,7 @@ import '../../services/preferences_service.dart';
 import '../../services/auth_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
 import 'desktop_search_dropdown.dart';
+import '../profile_avatar_helper.dart';
 
 /// Spotify-grade 64px Desktop Top Global Navigation Bar (#global-nav-bar).
 ///
@@ -578,22 +579,44 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
                         const SizedBox(width: 8.0),
 
-                        // Single Unified User Profile Avatar (Google Account Linked)
+                        // Single Unified User Profile Avatar (Custom Photo & Google Account Linked)
                         AnimatedBuilder(
-                          animation: AuthService(),
+                          animation: Listenable.merge([
+                            AuthService(),
+                            PreferencesService(),
+                          ]),
                           builder: (context, _) {
                             final auth = AuthService();
+                            final prefs = PreferencesService();
                             final isAuth = auth.isAuthenticated;
+                            final customImagePath = prefs.profileImagePath;
+                            final hasCustom = hasProfileImage(customImagePath);
                             final photoUrl = auth.userPhotoUrl;
-                            final name = auth.userDisplayName ?? 'User';
+                            final hasGooglePhoto =
+                                isAuth &&
+                                photoUrl != null &&
+                                photoUrl.isNotEmpty;
+                            final name =
+                                isAuth &&
+                                    auth.userDisplayName != null &&
+                                    auth.userDisplayName!.isNotEmpty
+                                ? auth.userDisplayName!
+                                : (prefs.userName.isNotEmpty &&
+                                          prefs.userName != 'Friend'
+                                      ? prefs.userName
+                                      : 'User');
                             final initial = name.trim().isNotEmpty
                                 ? name.trim()[0].toUpperCase()
                                 : 'U';
 
+                            final customImageProvider = hasCustom
+                                ? getProfileImageProvider(customImagePath)
+                                : null;
+
                             return Tooltip(
                               message: isAuth
                                   ? '$name (Google Connected)'
-                                  : 'Profile',
+                                  : (name != 'User' ? name : 'Profile'),
                               child: MouseRegion(
                                 cursor: SystemMouseCursors.click,
                                 child: GestureDetector(
@@ -614,16 +637,40 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                                 ? const Color(
                                                     0xFF4285F4,
                                                   ).withValues(alpha: 0.6)
-                                                : const Color(0xFF1E1E1E),
+                                                : Colors.white.withValues(
+                                                    alpha: 0.18,
+                                                  ),
                                             width: 1.0,
                                           ),
                                         ),
-                                        child: isAuth
-                                            ? (photoUrl != null &&
-                                                      photoUrl.isNotEmpty
-                                                  ? ClipOval(
-                                                      child: Image.network(
+                                        child: ClipOval(
+                                          child: customImageProvider != null
+                                              ? Image(
+                                                  image: customImageProvider,
+                                                  width: 32.0,
+                                                  height: 32.0,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, _, _) =>
+                                                      Center(
+                                                        child: Text(
+                                                          initial,
+                                                          style:
+                                                              const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                )
+                                              : (hasGooglePhoto
+                                                    ? Image.network(
                                                         photoUrl,
+                                                        width: 32.0,
+                                                        height: 32.0,
                                                         fit: BoxFit.cover,
                                                         errorBuilder:
                                                             (_, _, _) => Center(
@@ -639,24 +686,33 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                                                 ),
                                                               ),
                                                             ),
-                                                      ),
-                                                    )
-                                                  : Center(
-                                                      child: Text(
-                                                        initial,
-                                                        style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 13,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ))
-                                            : const Icon(
-                                                Icons.person_rounded,
-                                                color: Colors.white70,
-                                                size: 17,
-                                              ),
+                                                      )
+                                                    : (prefs
+                                                                  .userName
+                                                                  .isNotEmpty &&
+                                                              prefs.userName !=
+                                                                  'Friend'
+                                                          ? Center(
+                                                              child: Text(
+                                                                initial,
+                                                                style: const TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 13,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
+                                                              ),
+                                                            )
+                                                          : const Icon(
+                                                              Icons
+                                                                  .person_rounded,
+                                                              color: Colors
+                                                                  .white70,
+                                                              size: 17,
+                                                            ))),
+                                        ),
                                       ),
                                       if (isAuth)
                                         Positioned(
