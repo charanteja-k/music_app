@@ -180,7 +180,7 @@ flowchart TD
 
 Playback transitions are managed via dual synchronized audio players (`_playerA` and `_playerB`). When a track transition begins, the outgoing player follows a cosine attenuation curve while the incoming standby player ramps along an equal-power sine trajectory, eliminating decibel dips and clicks between consecutive songs.
 
-$$\text{Vol}_{\text{outgoing}}(t) = \cos\left(\frac{\pi t}{2T}\right), \quad \text{Vol}_{\text{incoming}}(t) = \sin\left(\frac{\pi t}{2T}\right) \implies \text{Vol}_{\text{outgoing}}^2(t) + \text{Vol}_{\text{incoming}}^2(t) = 1.0$$
+$$\text{Vol}_{\text{out}}(t) = \cos\left(\frac{\pi t}{2T}\right), \quad \text{Vol}_{\text{in}}(t) = \sin\left(\frac{\pi t}{2T}\right) \implies \text{Vol}_{\text{out}}^2(t) + \text{Vol}_{\text{in}}^2(t) = 1.0$$
 
 ```mermaid
 %%{init: {
@@ -230,7 +230,7 @@ flowchart TD
 
 DilSe processes listening preferences and affinity matrices 100% on-device with zero network transmissions.
 
-$$\text{Score}(t) = (0.25 \times \text{pos\_weight}) + \text{artist\_affinity} - \text{skip\_penalty} + \text{top\_artist\_bonus} + \text{lang\_match\_bonus} + \text{liked\_bonus}$$
+$$\text{Score}(t) = (0.25 \times \text{PositionWeight}) + \text{ArtistAffinity} - \text{SkipPenalty} + \text{TopArtistBonus} + \text{LanguageBonus} + \text{LikedBonus}$$
 
 ```mermaid
 %%{init: {
@@ -294,7 +294,7 @@ This architecture suffers from critical structural vulnerabilities:
 
 #### The DilSe Edge Architecture:
 
-$$\text{Client Device} \xrightarrow[\quad\text{Residential / Cellular IP}\quad]{\text{Direct HTTPS Range Request}} \text{Global CDN Edge} \quad (\text{Bandwidth} = \$0,\; \Delta t \le 180\text{ms})$$
+$$\text{Client Device} \xrightarrow[\quad\text{Residential / Cellular IP}\quad]{\text{Direct HTTPS Range Request}} \text{Global CDN Edge} \quad (\text{Bandwidth Cost} = 0,\; \Delta t \le 180\text{ms})$$
 
 The backend and Cloudflare edge workers exclusively transfer lightweight search and metadata responses (typically $< 8\text{KB}$ per request). The client device resolves the stream identifier natively and streams audio **directly from regional edge CDNs**, unlocking infinite scalability and deterministic playback stability.
 
