@@ -45,6 +45,7 @@ void showPlaylistSongOptionsBottomSheet(
   required String playlistId,
   VoidCallback? onPlayNow,
   VoidCallback? onRemoved,
+  Offset? globalPosition,
 }) {
   final video = songMapToVideo(songMap);
   final thumb = (songMap['thumbnail'] as String?) ?? '';
@@ -63,6 +64,7 @@ void showPlaylistSongOptionsBottomSheet(
             MusicService().removeSongFromPlaylist(playlistId, songId);
             onRemoved?.call();
           },
+    globalPosition: globalPosition,
   );
 }
 
@@ -74,6 +76,7 @@ void showSongOptionsBottomSheet(
   VoidCallback? onRemoveFromPlaylist,
   VoidCallback? onPlayNow,
   String? customThumbnail,
+  Offset? globalPosition,
 }) {
   HapticFeedback.lightImpact();
 
@@ -81,10 +84,10 @@ void showSongOptionsBottomSheet(
   // The mobile bottom sheet modal must NEVER appear on desktop viewports.
   if (kIsWeb || MediaQuery.of(context).size.width >= 1024) {
     final size = MediaQuery.of(context).size;
-    final centerPos = Offset(size.width / 2, size.height / 3);
+    final pos = globalPosition ?? Offset(size.width / 2, size.height / 3);
     DesktopContextMenu.showSongMenu(
       context: context,
-      globalPosition: centerPos,
+      globalPosition: pos,
       song: song,
       currentPlaylistId: currentPlaylistId,
       onRemovedFromPlaylist: onRemoveFromPlaylist,

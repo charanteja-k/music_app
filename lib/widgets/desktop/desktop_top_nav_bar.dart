@@ -312,7 +312,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
 
                         // Spotify Pill Search Container with LayerLink target
                         TapRegion(
-                          groupId: 'desktop_search_bar',
+                          groupId: 'desktop_search_overlay',
                           onTapOutside: (_) {
                             _dismissSearchDropdown();
                           },
@@ -355,6 +355,15 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                     child: TextField(
                                       controller: _searchController,
                                       focusNode: _searchFocusNode,
+                                      onKeyEvent: (node, event) {
+                                        if (event is KeyDownEvent &&
+                                            event.logicalKey ==
+                                                LogicalKeyboardKey.escape) {
+                                          _dismissSearchDropdown();
+                                          return KeyEventResult.handled;
+                                        }
+                                        return KeyEventResult.ignored;
+                                      },
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 13.5,

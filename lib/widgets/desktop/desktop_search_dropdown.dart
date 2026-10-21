@@ -44,7 +44,7 @@ class DesktopSearchDropdown extends StatelessWidget {
             followerAnchor: Alignment.topCenter,
             offset: const Offset(0, 6.0),
             child: TapRegion(
-              groupId: 'desktop_search_bar',
+              groupId: 'desktop_search_overlay',
               child: MouseRegion(
                 onEnter: (_) => onHoverChanged?.call(true),
                 onExit: (_) => onHoverChanged?.call(false),

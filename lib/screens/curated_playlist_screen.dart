@@ -316,11 +316,11 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     if (widget.gradientColors != null && widget.gradientColors!.isNotEmpty) {
       if (widget.gradientColors!.length == 1) {
         final c = widget.gradientColors!.first;
-        return [c, Color.lerp(c, Colors.black, 0.45) ?? c];
+        return [c, const Color(0xFF121217)];
       }
       return widget.gradientColors!;
     }
-    return [const Color(0xFF6366F1), const Color(0xFF8B5CF6)];
+    return [const Color(0xFF4D727A), const Color(0xFF121217)];
   }
 
   String _formatDuration(Duration? duration) {
@@ -1198,7 +1198,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2E1065), Color(0xFF1E1B4B)],
+          colors: [Color(0xFF1A1A24), Color(0xFF121217)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1230,16 +1230,32 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     return Image.network(
       primaryUrl,
       fit: BoxFit.cover,
-      cacheWidth: kIsWeb ? null : 300,
-      cacheHeight: kIsWeb ? null : 300,
+      cacheWidth: 320,
+      cacheHeight: 320,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: const Color(0xFF16161E),
+          child: const Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white24),
+              ),
+            ),
+          ),
+        );
+      },
       errorBuilder: (_, _, _) {
         // Priority 1: High-res JioSaavn Album Artwork
         if (albumArtwork != null && albumArtwork.isNotEmpty) {
           return Image.network(
             albumArtwork,
             fit: BoxFit.cover,
-            cacheWidth: kIsWeb ? null : 300,
-            cacheHeight: kIsWeb ? null : 300,
+            cacheWidth: 320,
+            cacheHeight: 320,
             errorBuilder: (_, _, _) => _buildFirstSongOrGenreFallback(
               firstSongThumb,
               genreFallback,
@@ -1267,8 +1283,8 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return Image.network(
         firstSongThumb,
         fit: BoxFit.cover,
-        cacheWidth: kIsWeb ? null : 300,
-        cacheHeight: kIsWeb ? null : 300,
+        cacheWidth: 320,
+        cacheHeight: 320,
         errorBuilder: (_, _, _) =>
             _buildGenreOrFallback(genreFallback, primaryUrl),
       );
@@ -1281,8 +1297,8 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return Image.network(
         genreFallback,
         fit: BoxFit.cover,
-        cacheWidth: kIsWeb ? null : 300,
-        cacheHeight: kIsWeb ? null : 300,
+        cacheWidth: 320,
+        cacheHeight: 320,
         errorBuilder: (_, _, _) => _buildFallbackHeroArt(),
       );
     }

@@ -1841,11 +1841,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 child: Text(
                   palette.firstWhere(
-                    (p) =>
-                        (p['color'] as Color).toARGB32() ==
-                        _prefs.themeColor.toARGB32(),
-                    orElse: () => {'name': 'Custom'},
-                  )['name'] as String,
+                        (p) =>
+                            (p['color'] as Color).toARGB32() ==
+                            _prefs.themeColor.toARGB32(),
+                        orElse: () => {'name': 'Custom'},
+                      )['name']
+                      as String,
                   style: TextStyle(
                     color: _prefs.themeColor,
                     fontSize: 11.0,

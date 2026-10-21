@@ -117,8 +117,8 @@ class _CategoryCardState extends State<CategoryCard> {
                               ? Image.network(
                                   widget.thumbnailUrl!,
                                   fit: BoxFit.cover,
-                                  cacheWidth: kIsWeb ? null : 150,
-                                  cacheHeight: kIsWeb ? null : 150,
+                                  cacheWidth: 320,
+                                  cacheHeight: 320,
                                   errorBuilder: (context, error, stackTrace) =>
                                       _buildFallbackThumbnail(),
                                 )

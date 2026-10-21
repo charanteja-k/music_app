@@ -140,7 +140,7 @@ class _DesktopPopupDividerEntryState extends State<_DesktopPopupDividerEntry> {
     return Container(
       height: 1.0,
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      color: Colors.white.withValues(alpha: 0.06),
+      color: Colors.white.withValues(alpha: 0.08),
     );
   }
 }
@@ -188,7 +188,7 @@ class DesktopContextMenu {
       items: entries,
       elevation: 16.0,
       shadowColor: Colors.black.withValues(alpha: 0.6),
-      color: const Color(0xFF1A1A1E),
+      color: const Color(0xFF16161E),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8.0),
         side: BorderSide(
@@ -368,29 +368,6 @@ class DesktopContextMenu {
           },
         ),
         DesktopContextMenuItem(
-          title: 'Copy all songs to new playlist',
-          icon: Icons.copy_rounded,
-          onTap: () async {
-            final copyName = '$playlistName (Copy)';
-            final newId = musicService.createPlaylist(copyName);
-            final trackList = songs ?? [];
-            for (final s in trackList) {
-              musicService.addSongToPlaylist(newId, s);
-            }
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Created "$copyName" with ${trackList.length} tracks',
-                  ),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
-          },
-        ),
-        const DesktopContextMenuItem.divider(),
-        DesktopContextMenuItem(
           title: 'Share playlist',
           icon: Icons.share_rounded,
           onTap: () {
@@ -519,16 +496,6 @@ class DesktopContextMenu {
               duration: const Duration(seconds: 2),
             ),
           );
-        },
-      ),
-      DesktopContextMenuItem(
-        title: 'Create playlist',
-        icon: Icons.add_rounded,
-        onTap: () {
-          final newId = musicService.createPlaylist('New Playlist');
-          if (newId.isNotEmpty) {
-            DesktopLayoutState.openPlaylist(newId);
-          }
         },
       ),
       DesktopContextMenuItem(
