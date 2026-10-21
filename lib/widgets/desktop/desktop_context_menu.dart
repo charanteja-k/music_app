@@ -579,7 +579,9 @@ class DesktopContextMenu {
         const DesktopContextMenuItem.divider(),
         DesktopContextMenuItem(
           title: isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs',
-          icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          icon: isLiked
+              ? Icons.favorite_rounded
+              : Icons.favorite_border_rounded,
           iconColor: isLiked ? const Color(0xFFFA2D48) : null,
           onTap: () {
             musicService.toggleLike(song);
@@ -669,7 +671,9 @@ class DesktopContextMenu {
       return [
         DesktopContextMenuItem(
           title: isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs',
-          icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          icon: isLiked
+              ? Icons.favorite_rounded
+              : Icons.favorite_border_rounded,
           iconColor: isLiked ? const Color(0xFFFA2D48) : null,
           onTap: () {
             musicService.toggleLike(song);

@@ -140,6 +140,90 @@ void main() {
       expect(titles, contains('Share song'));
     });
 
+    testWidgets(
+      'Song menu with queueIndex generates contextual queue actions',
+      (tester) async {
+        late BuildContext capturedContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  capturedContext = ctx;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+
+        final video = songMapToVideo({
+          'id': 'queue_song_1',
+          'title': 'Kesariya',
+          'author': 'Arijit Singh',
+        });
+
+        final items = DesktopContextMenu.songItems(
+          context: capturedContext,
+          song: video,
+          queueIndex: 2,
+        );
+
+        final titles = items.map((i) => i.title).whereType<String>().toList();
+        expect(titles, contains('Play Now'));
+        expect(titles, contains('Move to Top'));
+        expect(titles, contains('Remove from Queue'));
+        expect(titles, contains('Save to Liked Songs'));
+        expect(titles, contains('Add to Playlist'));
+        expect(titles, contains('Go to Album'));
+        expect(titles, contains('View Artist Profile'));
+        expect(titles, contains('Share Song'));
+        expect(titles.contains('Add to queue'), isFalse);
+      },
+    );
+
+    testWidgets(
+      'Song menu with isNowPlaying generates playback-appropriate actions',
+      (tester) async {
+        late BuildContext capturedContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  capturedContext = ctx;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+
+        final video = songMapToVideo({
+          'id': 'playing_song_1',
+          'title': 'Channa Mereya',
+          'author': 'Arijit Singh',
+        });
+
+        final items = DesktopContextMenu.songItems(
+          context: capturedContext,
+          song: video,
+          isNowPlaying: true,
+        );
+
+        final titles = items.map((i) => i.title).whereType<String>().toList();
+        expect(titles, contains('Save to Liked Songs'));
+        expect(titles, contains('Add to Playlist'));
+        expect(titles, contains('Start Song Radio'));
+        expect(titles, contains('Go to Album'));
+        expect(titles, contains('View Artist Profile'));
+        expect(titles, contains('Share Song'));
+        expect(titles.contains('Play Next'), isFalse);
+        expect(titles.contains('Play next'), isFalse);
+        expect(titles.contains('Add to queue'), isFalse);
+      },
+    );
+
     testWidgets('Album menu generates album actions', (tester) async {
       late BuildContext capturedContext;
       await tester.pumpWidget(

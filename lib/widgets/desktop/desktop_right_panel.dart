@@ -1151,74 +1151,74 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                 ),
                 child: Container(
                   padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF161622),
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1.0,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161622),
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1.0,
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: Image.network(
-                        currentArtwork,
-                        width: 48.0,
-                        height: 48.0,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8.0),
+                        child: Image.network(
+                          currentArtwork,
                           width: 48.0,
                           height: 48.0,
-                          color: const Color(0xFF282836),
-                          child: const Icon(
-                            Icons.music_note_rounded,
-                            color: Colors.white24,
-                            size: 22,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            width: 48.0,
+                            height: 48.0,
+                            color: const Color(0xFF282836),
+                            child: const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white24,
+                              size: 22,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10.0),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentTrack.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w700,
+                      const SizedBox(width: 10.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentTrack.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.0,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3.0),
-                          Text(
-                            currentTrack.author,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.60),
-                              fontSize: 11.5,
+                            const SizedBox(height: 3.0),
+                            Text(
+                              currentTrack.author,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.60),
+                                fontSize: 11.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8.0),
-                    AnimatedEqualizer(
-                      isPlaying: _musicService.isPlaying,
-                      color: PreferencesService().themeColor,
-                      size: 20.0,
-                    ),
-                  ],
+                      const SizedBox(width: 8.0),
+                      AnimatedEqualizer(
+                        isPlaying: _musicService.isPlaying,
+                        color: PreferencesService().themeColor,
+                        size: 20.0,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
             const SizedBox(height: 10.0),
 

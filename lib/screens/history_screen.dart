@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
 import '../constants/app_theme_tokens.dart';
 import '../services/music_service.dart';
 import '../services/preferences_service.dart';
@@ -8,6 +7,7 @@ import '../widgets/animated_equalizer.dart';
 import '../widgets/dilse_scrollbar.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/song_options_bottom_sheet.dart';
+import '../widgets/desktop/desktop_context_menu.dart';
 
 /// Full-screen Listening History Hub with real-time search, shuffle, and single-track replay.
 class HistoryScreen extends StatefulWidget {
@@ -275,92 +275,88 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 width: 0.75,
               ),
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 4,
-              ),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _musicService.playHistorySong(song);
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onSecondaryTapDown: (details) {
+                showUnifiedTrackMenu(
+                  context: context,
+                  globalPosition: details.globalPosition,
+                  song: songMapToVideo(song),
+                );
               },
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.network(
-                        song['thumbnail'] ?? '',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: AppThemeTokens.surfaceElevated,
-                          child: const Icon(
-                            Icons.music_note_rounded,
-                            color: Colors.white54,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                      if (isCurrent)
-                        Container(
-                          color: Colors.black54,
-                          child: Center(
-                            child: AnimatedEqualizer(
-                              isPlaying: _musicService.isPlaying,
-                              size: 20,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _musicService.playHistorySong(song);
+                },
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          song['thumbnail'] ?? '',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: AppThemeTokens.surfaceElevated,
+                            child: const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white54,
+                              size: 22,
                             ),
                           ),
                         ),
-                    ],
+                        if (isCurrent)
+                          Container(
+                            color: Colors.black54,
+                            child: Center(
+                              child: AnimatedEqualizer(
+                                isPlaying: _musicService.isPlaying,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              title: Text(
-                song['title'] ?? 'Unknown Track',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
-                  fontSize: 14,
+                title: Text(
+                  song['title'] ?? 'Unknown Track',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                song['author'] ?? 'Unknown Artist',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppThemeTokens.textSecondary,
-                  fontSize: 12.5,
+                subtitle: Text(
+                  song['author'] ?? 'Unknown Artist',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppThemeTokens.textSecondary,
+                    fontSize: 12.5,
+                  ),
                 ),
-              ),
-              trailing: IconButton(
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  color: Colors.white60,
-                  size: 20,
+                trailing: IconButton(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Colors.white60,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    final video = songMapToVideo(song);
+                    showSongOptionsBottomSheet(context, video);
+                  },
                 ),
-                onPressed: () {
-                  final video = Video(
-                    VideoId(song['id'] ?? ''),
-                    song['title'] ?? '',
-                    song['author'] ?? '',
-                    ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
-                    DateTime.now(),
-                    '',
-                    null,
-                    '',
-                    null,
-                    ThumbnailSet(song['id'] ?? ''),
-                    null,
-                    Engagement(0, null, null),
-                    false,
-                  );
-                  showSongOptionsBottomSheet(context, video);
-                },
               ),
             ),
           );
