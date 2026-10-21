@@ -1274,11 +1274,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 )
                               : Container(
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: item.iconGradient,
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
+                                    color: item.solidColor,
                                   ),
                                   child: Icon(
                                     item.icon,
