@@ -214,7 +214,45 @@ class PreferencesService extends ChangeNotifier {
   Map<int, double> _equalizerBands = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0};
   double _bassBoost = 0.0;
   double _virtualizer = 0.0;
-  Color _themeColor = const Color(0xFFFA2D48); // Default DilSe Crimson
+  static const List<Map<String, dynamic>> organicPalette = [
+    {
+      'name': 'Sage Leaf',
+      'subtitle': 'Muted herbal eucalyptus',
+      'color': Color(0xFF8FA382),
+    },
+    {
+      'name': 'Baked Terracotta',
+      'subtitle': 'Natural earthen clay',
+      'color': Color(0xFFBD6B52),
+    },
+    {
+      'name': 'Desert Sandstone',
+      'subtitle': 'Warm canyon mineral',
+      'color': Color(0xFFC89D54),
+    },
+    {
+      'name': 'River Slate',
+      'subtitle': 'Tidepool stone wash',
+      'color': Color(0xFF4D727A),
+    },
+    {
+      'name': 'Forest Moss',
+      'subtitle': 'Evergreen canopy green',
+      'color': Color(0xFF44624A),
+    },
+    {
+      'name': 'Desert Flora',
+      'subtitle': 'Muted wildflower tone',
+      'color': Color(0xFFAF7373),
+    },
+    {
+      'name': 'Weathered Cedar',
+      'subtitle': 'Driftwood timber charcoal',
+      'color': Color(0xFF8A705E),
+    },
+  ];
+
+  Color _themeColor = const Color(0xFF8FA382); // Default Sage Leaf (Organic)
   double _cacheSizeMB = 500.0;
   String _customServerUrl = '';
   String _cloudflareWorkerUrl = '';
@@ -395,7 +433,7 @@ class PreferencesService extends ChangeNotifier {
       } catch (_) {}
     }
 
-    int colorValue = _prefs.getInt('themeColor') ?? 0xFFFA2D48;
+    int colorValue = _prefs.getInt('themeColor') ?? 0xFF8FA382;
     _themeColor = Color(colorValue);
     _cacheSizeMB = _prefs.getDouble('cacheSizeMB') ?? 500.0;
     _customServerUrl = _prefs.getString('customServerUrl') ?? '';
