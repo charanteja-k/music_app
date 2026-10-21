@@ -71,11 +71,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   final List<Color> _availableColors = [
-    const Color(0xFFFA2D48), // Apple Red
-    const Color(0xFF1DB954), // Spotify Green
-    const Color(0xFF9C27B0), // Purple
-    const Color(0xFF2196F3), // Blue
-    const Color(0xFFFF9800), // Orange
+    const Color(0xFF8FA382), // Sage Leaf
+    const Color(0xFFBD6B52), // Baked Terracotta
+    const Color(0xFFC89D54), // Desert Sandstone
+    const Color(0xFF4D727A), // River Slate
+    const Color(0xFF44624A), // Forest Moss
+    const Color(0xFFAF7373), // Desert Flora
+    const Color(0xFF8A705E), // Weathered Cedar
   ];
 
   void _showSleepTimerSheet(BuildContext context) {
@@ -1798,74 +1800,161 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildThemeStudio() {
+    final palette = PreferencesService.organicPalette;
     return Container(
-      height: 120,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: _availableColors.length,
-        itemBuilder: (context, index) {
-          final color = _availableColors[index];
-          final isSelected = _prefs.themeColor.toARGB32() == color.toARGB32();
-          return GestureDetector(
-            onTap: () => _prefs.setThemeColor(color),
-            child: Container(
-              width: 100,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E24),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? color : Colors.white10,
-                  width: isSelected ? 2 : 1,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16161E),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Organic Accent Palette',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                        ),
-                      ]
-                    : null,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white, size: 18)
-                        : null,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 3.0,
+                ),
+                decoration: BoxDecoration(
+                  color: _prefs.themeColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _prefs.themeColor.withValues(alpha: 0.35),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 60,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                ),
+                child: Text(
+                  palette.firstWhere(
+                    (p) =>
+                        (p['color'] as Color).toARGB32() ==
+                        _prefs.themeColor.toARGB32(),
+                    orElse: () => {'name': 'Custom'},
+                  )['name'] as String,
+                  style: TextStyle(
+                    color: _prefs.themeColor,
+                    fontSize: 11.0,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Curated botanical and mineral solid tones. Zero synthetic neon glare.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 12.0,
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 84,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: palette.length,
+              itemBuilder: (context, index) {
+                final item = palette[index];
+                final color = item['color'] as Color;
+                final name = item['name'] as String;
+                final subtitle = item['subtitle'] as String;
+                final isSelected =
+                    _prefs.themeColor.toARGB32() == color.toARGB32();
+
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _prefs.setThemeColor(color);
+                  },
+                  child: Container(
+                    width: 112,
+                    margin: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withValues(alpha: 0.12)
+                          : Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? color.withValues(alpha: 0.55)
+                            : Colors.white.withValues(alpha: 0.05),
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.85)
+                                  : Colors.transparent,
+                              width: 2.0,
+                            ),
+                          ),
+                          child: isSelected
+                              ? const Center(
+                                  child: Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 11.5,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 9.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
