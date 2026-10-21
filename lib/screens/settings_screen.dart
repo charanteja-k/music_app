@@ -70,16 +70,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     } catch (_) {}
   }
 
-  final List<Color> _availableColors = [
-    const Color(0xFF8FA382), // Sage Leaf
-    const Color(0xFFBD6B52), // Baked Terracotta
-    const Color(0xFFC89D54), // Desert Sandstone
-    const Color(0xFF4D727A), // River Slate
-    const Color(0xFF44624A), // Forest Moss
-    const Color(0xFFAF7373), // Desert Flora
-    const Color(0xFF8A705E), // Weathered Cedar
-  ];
-
   void _showSleepTimerSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,

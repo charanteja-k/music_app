@@ -24,7 +24,7 @@ class DesktopTopNavBar extends StatefulWidget {
 
 class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+  late final FocusNode _searchFocusNode;
   final LayerLink _searchLayerLink = LayerLink();
   final ValueNotifier<double> _searchWidthNotifier = ValueNotifier<double>(
     460.0,
@@ -35,6 +35,16 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          _dismissSearchDropdown();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+    );
     _searchController.text = DesktopLayoutState.globalSearchQuery.value;
     DesktopLayoutState.globalSearchQuery.addListener(_syncSearchQuery);
     _searchFocusNode.addListener(_onFocusChanged);
@@ -355,15 +365,6 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                     child: TextField(
                                       controller: _searchController,
                                       focusNode: _searchFocusNode,
-                                      onKeyEvent: (node, event) {
-                                        if (event is KeyDownEvent &&
-                                            event.logicalKey ==
-                                                LogicalKeyboardKey.escape) {
-                                          _dismissSearchDropdown();
-                                          return KeyEventResult.handled;
-                                        }
-                                        return KeyEventResult.ignored;
-                                      },
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 13.5,
