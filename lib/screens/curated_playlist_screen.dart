@@ -17,6 +17,7 @@ import '../widgets/dilse_scrollbar.dart';
 import '../widgets/shimmer_loading.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../widgets/desktop/desktop_context_menu.dart';
+import '../widgets/desktop/desktop_playlist_enrichment.dart';
 import 'album_screen.dart';
 
 class CuratedPlaylistScreen extends StatefulWidget {
@@ -990,6 +991,20 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             ),
                           );
                         }, childCount: _tracks.length),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: DesktopPlaylistEnrichment(
+                        playlistId: null,
+                        existingSongs: _tracks,
+                        onAddTrack: (song) {
+                          setState(() {
+                            _tracks.add(song);
+                          });
+                          if (AuthService().isAuthenticated) {
+                            unawaited(CloudSyncService().sync());
+                          }
+                        },
                       ),
                     ),
                   ],

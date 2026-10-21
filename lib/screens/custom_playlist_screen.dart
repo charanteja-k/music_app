@@ -13,6 +13,7 @@ import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/dilse_scrollbar.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/desktop/desktop_context_menu.dart';
+import '../widgets/desktop/desktop_playlist_enrichment.dart';
 import '../layouts/desktop_layout_state.dart';
 
 class CustomPlaylistScreen extends StatefulWidget {
@@ -1221,42 +1222,47 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                 ] else ...[
                   // BODY B: Standard Non-Search Playlist Mode
                   if (songs.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isLikedSongs
-                                  ? Icons.favorite_border_rounded
-                                  : Icons.music_note_rounded,
-                              size: 64,
-                              color: Colors.white.withValues(alpha: 0.2),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              isLikedSongs
-                                  ? 'No liked songs yet'
-                                  : 'No songs in this playlist yet',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 40,
+                          horizontal: 24,
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isLikedSongs
+                                    ? Icons.favorite_border_rounded
+                                    : Icons.music_note_rounded,
+                                size: 64,
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              isLikedSongs
-                                  ? 'Songs you like will appear here'
-                                  : 'Use the search bar above or search tab to add songs',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 13,
+                              const SizedBox(height: 12),
+                              Text(
+                                isLikedSongs
+                                    ? 'No liked songs yet'
+                                    : 'No songs in this playlist yet',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              Text(
+                                isLikedSongs
+                                    ? 'Songs you like will appear here'
+                                    : 'Find and add songs using the search and recommendations below',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -1771,6 +1777,15 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                         );
                       },
                     ),
+                  SliverToBoxAdapter(
+                    child: DesktopPlaylistEnrichment(
+                      playlistId: widget.playlistId,
+                      existingSongs: songs,
+                      onSongAdded: () {
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ),
                 ],
 
                 // Bottom spacing: dynamic clearance for floating MiniPlayer
