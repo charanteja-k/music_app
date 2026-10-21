@@ -424,7 +424,22 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                       child: Column(
                         children: [
                           // Hero Album / Vinyl Card
-                          Container(
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onSecondaryTapDown: (details) {
+                              showUnifiedPlaylistMenu(
+                                context: context,
+                                globalPosition: details.globalPosition,
+                                playlist: {
+                                  'id':
+                                      'curated_${widget.title.toLowerCase().replaceAll(' ', '_')}',
+                                  'title': widget.title,
+                                  'isCurated': true,
+                                  'songs': _tracks,
+                                },
+                              );
+                            },
+                            child: Container(
                             width: 170,
                             height: 170,
                             decoration: BoxDecoration(
@@ -449,7 +464,8 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                               child: _buildHeroImage(),
                             ),
                           ),
-                          const SizedBox(height: 18),
+                        ),
+                        const SizedBox(height: 18),
 
                           // Title
                           Text(
@@ -638,14 +654,16 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                       offset.dx,
                                       offset.dy + buttonSize.height,
                                     );
-                                    DesktopContextMenu.showPlaylistMenu(
+                                    showUnifiedPlaylistMenu(
                                       context: context,
                                       globalPosition: menuPosition,
-                                      playlistId:
-                                          'curated_${widget.title.toLowerCase().replaceAll(' ', '_')}',
-                                      playlistName: widget.title,
-                                      isCurated: true,
-                                      songs: _tracks,
+                                      playlist: {
+                                        'id':
+                                            'curated_${widget.title.toLowerCase().replaceAll(' ', '_')}',
+                                        'title': widget.title,
+                                        'isCurated': true,
+                                        'songs': _tracks,
+                                      },
                                     );
                                   },
                                 ),
@@ -1101,14 +1119,12 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
           );
         }
       },
+      behavior: HitTestBehavior.opaque,
       onSecondaryTapDown: (details) {
-        DesktopContextMenu.showAlbumMenu(
+        showUnifiedAlbumMenu(
           context: context,
           globalPosition: details.globalPosition,
-          albumTitle: album.title,
-          albumArtist: album.artist,
-          albumId: album.id,
-          albumArtwork: album.artwork,
+          album: album,
         );
       },
       child: SizedBox(

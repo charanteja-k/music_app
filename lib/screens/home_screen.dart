@@ -1096,6 +1096,16 @@ class _HomeScreenState extends State<HomeScreen>
           gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
           icon: Icons.shuffle_rounded,
         ),
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'daily_mix_1',
+            'title': dailyMix1?.title ?? 'Daily Mix 1',
+            'isCurated': true,
+            'songs': _dailyMix1,
+          },
+        ),
       ),
       _HomeQuickAccessItem(
         title: 'Liked Songs',
@@ -1106,11 +1116,10 @@ class _HomeScreenState extends State<HomeScreen>
             ? _musicService.likedSongs.first['thumbnail']
             : null,
         onTap: openLikedSongs,
-        onSecondaryTap: (pos) => DesktopContextMenu.showPlaylistMenu(
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
-          playlistId: 'liked_songs',
-          playlistName: 'Liked Songs',
+          playlist: 'liked_songs',
         ),
       ),
       _HomeQuickAccessItem(
@@ -1135,6 +1144,16 @@ class _HomeScreenState extends State<HomeScreen>
           gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
           icon: Icons.graphic_eq_rounded,
         ),
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'daily_mix_2',
+            'title': dailyMix2?.title ?? 'Daily Mix 2',
+            'isCurated': true,
+            'songs': _dailyMix2,
+          },
+        ),
       ),
       _HomeQuickAccessItem(
         title: 'Top Charts',
@@ -1155,6 +1174,16 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _topChartsIndia,
           gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
           icon: Icons.trending_up_rounded,
+        ),
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'top_charts_india',
+            'title': 'Top Charts India',
+            'isCurated': true,
+            'songs': _topChartsIndia,
+          },
         ),
       ),
       _HomeQuickAccessItem(
@@ -1177,6 +1206,16 @@ class _HomeScreenState extends State<HomeScreen>
           gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
           icon: Icons.fiber_new_rounded,
         ),
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'new_releases',
+            'title': 'New Releases',
+            'isCurated': true,
+            'songs': _newReleases,
+          },
+        ),
       ),
       _HomeQuickAccessItem(
         title: 'Trending',
@@ -1198,6 +1237,16 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _trendingNow,
           gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
           icon: Icons.whatshot_rounded,
+        ),
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'trending_now',
+            'title': 'Trending Now',
+            'isCurated': true,
+            'songs': _trendingNow,
+          },
         ),
       ),
     ];
@@ -1738,13 +1787,10 @@ class _HomeScreenState extends State<HomeScreen>
                   }
                 },
                 onSecondaryTapDown: (details) {
-                  DesktopContextMenu.showAlbumMenu(
+                  showUnifiedAlbumMenu(
                     context: context,
                     globalPosition: details.globalPosition,
-                    albumTitle: album.title,
-                    albumArtist: album.artist,
-                    albumId: album.id,
-                    albumArtwork: album.artwork,
+                    album: album,
                   );
                 },
                 child: Container(
@@ -1987,6 +2033,13 @@ class _HomeScreenState extends State<HomeScreen>
             onTap: () {
               HapticFeedback.lightImpact();
               _musicService.playPlaylist(videos, index);
+            },
+            onSecondaryTapDown: (details) {
+              showUnifiedTrackMenu(
+                context: context,
+                globalPosition: details.globalPosition,
+                song: song,
+              );
             },
             child: Container(
               width: 152,
