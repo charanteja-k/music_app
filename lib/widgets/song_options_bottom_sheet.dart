@@ -77,6 +77,8 @@ void showSongOptionsBottomSheet(
   VoidCallback? onPlayNow,
   String? customThumbnail,
   Offset? globalPosition,
+  int? queueIndex,
+  bool isNowPlaying = false,
 }) {
   HapticFeedback.lightImpact();
 
@@ -91,6 +93,8 @@ void showSongOptionsBottomSheet(
       song: song,
       currentPlaylistId: currentPlaylistId,
       onRemovedFromPlaylist: onRemoveFromPlaylist,
+      queueIndex: queueIndex,
+      isNowPlaying: isNowPlaying,
     );
     return;
   }

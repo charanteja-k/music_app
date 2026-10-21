@@ -530,9 +530,243 @@ class DesktopContextMenu {
     required Video song,
     String? currentPlaylistId,
     VoidCallback? onRemovedFromPlaylist,
+    int? queueIndex,
+    bool isNowPlaying = false,
   }) {
     final musicService = MusicService();
     final isLiked = musicService.isLiked(song.id.value);
+
+    // 1. Contextual Menu for "Next in Queue" Items
+    if (queueIndex != null) {
+      return [
+        DesktopContextMenuItem(
+          title: 'Play now',
+          icon: Icons.play_arrow_rounded,
+          onTap: () {
+            musicService.playPlaylist(musicService.playlist, queueIndex);
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Move to top',
+          icon: Icons.vertical_align_top_rounded,
+          onTap: () {
+            final currentIdx = musicService.currentIndex;
+            final targetIdx = currentIdx >= 0 ? currentIdx + 1 : 0;
+            musicService.reorderQueue(queueIndex, targetIdx);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Moved "${song.title}" to top of queue'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Remove from queue',
+          icon: Icons.playlist_remove_rounded,
+          iconColor: const Color(0xFFFF5252),
+          isDestructive: true,
+          onTap: () {
+            musicService.removeFromQueue(queueIndex);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Removed "${song.title}" from queue'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: isLiked ? 'Remove from Liked Songs' : 'Save to your Liked Songs',
+          icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          iconColor: isLiked ? const Color(0xFFFA2D48) : null,
+          onTap: () {
+            musicService.toggleLike(song);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isLiked
+                      ? 'Removed from Liked Songs'
+                      : 'Saved to Liked Songs ❤️',
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Add to playlist',
+          icon: Icons.playlist_add_rounded,
+          onTap: () {
+            showAddToPlaylistSheet(context, song);
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Go to album',
+          icon: Icons.album_rounded,
+          onTap: () async {
+            final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
+            if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
+              DesktopLayoutState.openAlbum(album: cachedAlbum);
+              return;
+            }
+            final cachedId = MusicService.getCachedAlbumId(song.id.value);
+            final cachedTitle =
+                MusicService.getCachedAlbumTitle(song.id.value) ??
+                MusicService.extractMovieOrAlbumTitle(song.title);
+            if ((cachedId != null && cachedId.isNotEmpty) ||
+                (cachedTitle != null && cachedTitle.isNotEmpty)) {
+              DesktopLayoutState.openAlbum(
+                albumId: cachedId,
+                albumTitle: cachedTitle,
+                albumArtwork: MusicService.getHdThumbnail(song.id.value),
+                albumArtist: song.author,
+              );
+              return;
+            }
+            final resolved = await musicService.resolveAlbumForSong(song);
+            if (resolved != null && resolved.songs.isNotEmpty) {
+              DesktopLayoutState.openAlbum(album: resolved);
+            } else if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('No album found for "${song.title}"'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'View artist profile',
+          icon: Icons.person_rounded,
+          onTap: () {
+            DesktopLayoutState.openArtist(song.author);
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: 'Share song',
+          icon: Icons.share_rounded,
+          onTap: () {
+            Clipboard.setData(
+              ClipboardData(text: '${song.title} - ${song.author}'),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Copied "${song.title}" to clipboard'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      ];
+    }
+
+    // 2. Contextual Menu for "Now Playing" Card
+    if (isNowPlaying) {
+      return [
+        DesktopContextMenuItem(
+          title: isLiked ? 'Remove from Liked Songs' : 'Save to your Liked Songs',
+          icon: isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          iconColor: isLiked ? const Color(0xFFFA2D48) : null,
+          onTap: () {
+            musicService.toggleLike(song);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isLiked
+                      ? 'Removed from Liked Songs'
+                      : 'Saved to Liked Songs ❤️',
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Add to playlist',
+          icon: Icons.playlist_add_rounded,
+          onTap: () {
+            showAddToPlaylistSheet(context, song);
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'Start Song Radio',
+          icon: Icons.radio_rounded,
+          onTap: () {
+            musicService.startSongRadio(song);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Starting radio for "${song.title}"'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: 'Go to album',
+          icon: Icons.album_rounded,
+          onTap: () async {
+            final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
+            if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
+              DesktopLayoutState.openAlbum(album: cachedAlbum);
+              return;
+            }
+            final cachedId = MusicService.getCachedAlbumId(song.id.value);
+            final cachedTitle =
+                MusicService.getCachedAlbumTitle(song.id.value) ??
+                MusicService.extractMovieOrAlbumTitle(song.title);
+            if ((cachedId != null && cachedId.isNotEmpty) ||
+                (cachedTitle != null && cachedTitle.isNotEmpty)) {
+              DesktopLayoutState.openAlbum(
+                albumId: cachedId,
+                albumTitle: cachedTitle,
+                albumArtwork: MusicService.getHdThumbnail(song.id.value),
+                albumArtist: song.author,
+              );
+              return;
+            }
+            final resolved = await musicService.resolveAlbumForSong(song);
+            if (resolved != null && resolved.songs.isNotEmpty) {
+              DesktopLayoutState.openAlbum(album: resolved);
+            } else if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('No album found for "${song.title}"'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
+        DesktopContextMenuItem(
+          title: 'View artist profile',
+          icon: Icons.person_rounded,
+          onTap: () {
+            DesktopLayoutState.openArtist(song.author);
+          },
+        ),
+        const DesktopContextMenuItem.divider(),
+        DesktopContextMenuItem(
+          title: 'Share song',
+          icon: Icons.share_rounded,
+          onTap: () {
+            Clipboard.setData(
+              ClipboardData(text: '${song.title} - ${song.author}'),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Copied "${song.title}" to clipboard'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      ];
+    }
 
     return [
       // 0. Play
@@ -867,6 +1101,8 @@ class DesktopContextMenu {
     required Video song,
     String? currentPlaylistId,
     VoidCallback? onRemovedFromPlaylist,
+    int? queueIndex,
+    bool isNowPlaying = false,
   }) {
     return show(
       context: context,
@@ -876,6 +1112,8 @@ class DesktopContextMenu {
         song: song,
         currentPlaylistId: currentPlaylistId,
         onRemovedFromPlaylist: onRemovedFromPlaylist,
+        queueIndex: queueIndex,
+        isNowPlaying: isNowPlaying,
       ),
     );
   }
@@ -930,10 +1168,14 @@ Future<void> showUnifiedTrackMenu({
   required Video song,
   String? currentPlaylistId,
   VoidCallback? onRemovedFromPlaylist,
+  int? queueIndex,
+  bool isNowPlaying = false,
 }) => DesktopContextMenu.showSongMenu(
   context: context,
   globalPosition: globalPosition,
   song: song,
   currentPlaylistId: currentPlaylistId,
   onRemovedFromPlaylist: onRemovedFromPlaylist,
+  queueIndex: queueIndex,
+  isNowPlaying: isNowPlaying,
 );

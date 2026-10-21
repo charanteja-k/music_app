@@ -9,6 +9,7 @@ import '../../services/dynamic_artist_service.dart';
 import '../../screens/player_screen.dart';
 import '../animated_lyrics.dart';
 import '../animated_equalizer.dart';
+import 'desktop_context_menu.dart';
 
 /// Spotify-grade 280px Adaptive Desktop Right Context Panel (#Desktop_PanelContainer_Id).
 ///
