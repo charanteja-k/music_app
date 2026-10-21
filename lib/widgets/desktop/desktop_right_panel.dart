@@ -244,10 +244,19 @@ class _DesktopNowPlayingTab extends StatelessWidget {
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                    );
+                  },
+                  onSecondaryTapDown: (details) {
+                    showUnifiedTrackMenu(
+                      context: context,
+                      globalPosition: details.globalPosition,
+                      song: song,
+                      isNowPlaying: true,
                     );
                   },
                   child: Tooltip(
@@ -297,37 +306,48 @@ class _DesktopNowPlayingTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        song.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2.0),
-                      GestureDetector(
-                        onTap: () {
-                          DesktopLayoutState.openArtist(song.author);
-                        },
-                        child: Text(
-                          song.author,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 13.0,
-                            fontWeight: FontWeight.w500,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onSecondaryTapDown: (details) {
+                      showUnifiedTrackMenu(
+                        context: context,
+                        globalPosition: details.globalPosition,
+                        song: song,
+                        isNowPlaying: true,
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          song.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2.0),
+                        GestureDetector(
+                          onTap: () {
+                            DesktopLayoutState.openArtist(song.author);
+                          },
+                          child: Text(
+                            song.author,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
@@ -804,20 +824,41 @@ class _DesktopNextInQueueCard extends StatelessWidget {
               ),
             )
           else ...[
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6.0),
-                  child: Builder(
-                    builder: (context) {
-                      final art = MusicService.resolveArtworkUrl(nextTrack);
-                      return art.isNotEmpty
-                          ? Image.network(
-                              art,
-                              width: 44.0,
-                              height: 44.0,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onSecondaryTapDown: (details) {
+                showUnifiedTrackMenu(
+                  context: context,
+                  globalPosition: details.globalPosition,
+                  song: nextTrack,
+                  queueIndex: nextIndex,
+                );
+              },
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6.0),
+                    child: Builder(
+                      builder: (context) {
+                        final art = MusicService.resolveArtworkUrl(nextTrack);
+                        return art.isNotEmpty
+                            ? Image.network(
+                                art,
+                                width: 44.0,
+                                height: 44.0,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  width: 44.0,
+                                  height: 44.0,
+                                  color: const Color(0xFF282836),
+                                  child: const Icon(
+                                    Icons.music_note_rounded,
+                                    color: Colors.white30,
+                                    size: 20,
+                                  ),
+                                ),
+                              )
+                            : Container(
                                 width: 44.0,
                                 height: 44.0,
                                 color: const Color(0xFF282836),
@@ -826,50 +867,40 @@ class _DesktopNextInQueueCard extends StatelessWidget {
                                   color: Colors.white30,
                                   size: 20,
                                 ),
-                              ),
-                            )
-                          : Container(
-                              width: 44.0,
-                              height: 44.0,
-                              color: const Color(0xFF282836),
-                              child: const Icon(
-                                Icons.music_note_rounded,
-                                color: Colors.white30,
-                                size: 20,
-                              ),
-                            );
-                    },
+                              );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10.0),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        nextTrack.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13.0,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: 10.0),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nextTrack.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.0,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2.0),
-                      Text(
-                        nextTrack.author,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 11.5,
+                        const SizedBox(height: 2.0),
+                        Text(
+                          nextTrack.author,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 11.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
@@ -984,6 +1015,22 @@ class _DesktopQueueTab extends StatefulWidget {
 class _DesktopQueueTabState extends State<_DesktopQueueTab> {
   final MusicService _musicService = MusicService();
 
+  void _openTrackContextMenu(
+    BuildContext context,
+    Offset globalPosition,
+    Video song, {
+    int? queueIndex,
+    bool isNowPlaying = false,
+  }) {
+    showUnifiedTrackMenu(
+      context: context,
+      globalPosition: globalPosition,
+      song: song,
+      queueIndex: queueIndex,
+      isNowPlaying: isNowPlaying,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -1094,8 +1141,16 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                 horizontal: 10.0,
                 vertical: 4.0,
               ),
-              child: Container(
-                padding: const EdgeInsets.all(8.0),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onSecondaryTapDown: (details) => _openTrackContextMenu(
+                  context,
+                  details.globalPosition,
+                  currentTrack,
+                  isNowPlaying: true,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: const Color(0xFF161622),
                   borderRadius: BorderRadius.circular(12.0),
@@ -1163,6 +1218,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                 ),
               ),
             ),
+          ),
 
             const SizedBox(height: 10.0),
 
@@ -1242,108 +1298,118 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                           key: ValueKey('queue_next_${track.id.value}_$index'),
                           color: Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              _musicService.playPlaylist(
-                                playlist,
-                                absoluteIndex,
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6.0,
-                                vertical: 6.0,
-                              ),
-                              child: Row(
-                                children: [
-                                  // Index Badge
-                                  Container(
-                                    width: 22.0,
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.45,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onSecondaryTapDown: (details) =>
+                                _openTrackContextMenu(
+                                  context,
+                                  details.globalPosition,
+                                  track,
+                                  queueIndex: absoluteIndex,
+                                ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                _musicService.playPlaylist(
+                                  playlist,
+                                  absoluteIndex,
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6.0,
+                                  vertical: 6.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Index Badge
+                                    Container(
+                                      width: 22.0,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.45,
+                                          ),
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
                                         ),
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6.0),
+                                    // Squircle Artwork
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      child: Image.network(
+                                        artwork,
+                                        width: 40.0,
+                                        height: 40.0,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          width: 40.0,
+                                          height: 40.0,
+                                          color: const Color(0xFF282836),
+                                          child: const Icon(
+                                            Icons.music_note_rounded,
+                                            color: Colors.white24,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10.0),
+                                    // Track Title & Artist
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            track.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2.0),
+                                          Text(
+                                            track.author,
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.55,
+                                              ),
+                                              fontSize: 11.0,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ],
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6.0),
-                                  // Squircle Artwork
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    child: Image.network(
-                                      artwork,
-                                      width: 40.0,
-                                      height: 40.0,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
-                                        width: 40.0,
-                                        height: 40.0,
-                                        color: const Color(0xFF282836),
+                                    // Trailing Drag Handle
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6.0,
+                                          vertical: 8.0,
+                                        ),
                                         child: const Icon(
-                                          Icons.music_note_rounded,
-                                          color: Colors.white24,
-                                          size: 18,
+                                          Icons.drag_handle_rounded,
+                                          color: Colors.white38,
+                                          size: 20.0,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10.0),
-                                  // Track Title & Artist
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          track.title,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2.0),
-                                        Text(
-                                          track.author,
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.55,
-                                            ),
-                                            fontSize: 11.0,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Trailing Drag Handle
-                                  ReorderableDragStartListener(
-                                    index: index,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6.0,
-                                        vertical: 8.0,
-                                      ),
-                                      child: const Icon(
-                                        Icons.drag_handle_rounded,
-                                        color: Colors.white38,
-                                        size: 20.0,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
