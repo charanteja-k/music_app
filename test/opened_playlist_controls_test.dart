@@ -83,11 +83,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // 6. Verify Rename and Delete options are accessible through the More menu
-      expect(find.text('Rename'), findsOneWidget);
-      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Rename playlist'), findsOneWidget);
+      expect(find.text('Delete playlist'), findsOneWidget);
 
       // 7. Test Rename flow
-      await tester.tap(find.text('Rename'));
+      await tester.tap(find.text('Rename playlist'));
       await tester.pumpAndSettle();
 
       expect(find.text('Rename Playlist'), findsOneWidget);
@@ -144,7 +144,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Delete
-      await tester.tap(find.text('Delete'));
+      await tester.tap(find.text('Delete playlist'));
       await tester.pumpAndSettle();
 
       expect(find.text('Delete Playlist'), findsOneWidget);
