@@ -499,6 +499,16 @@ class DesktopContextMenu {
         },
       ),
       DesktopContextMenuItem(
+        title: 'Create playlist',
+        icon: Icons.add_rounded,
+        onTap: () {
+          final newId = musicService.createPlaylist('New Playlist');
+          if (newId.isNotEmpty) {
+            DesktopLayoutState.openPlaylist(newId);
+          }
+        },
+      ),
+      DesktopContextMenuItem(
         title: 'Delete playlist',
         icon: Icons.delete_outline_rounded,
         isDestructive: true,
