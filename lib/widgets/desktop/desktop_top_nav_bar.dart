@@ -227,14 +227,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                       width: 36.0,
                                       height: 36.0,
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            accentColor,
-                                            accentColor.withValues(alpha: 0.7),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
+                                        color: accentColor,
                                         borderRadius: BorderRadius.circular(
                                           10.0,
                                         ),
@@ -528,12 +521,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                             icon: Container(
                               padding: const EdgeInsets.all(5.0),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    accentColor,
-                                    accentColor.withValues(alpha: 0.7),
-                                  ],
-                                ),
+                                color: const Color(0xFF24242E),
                                 borderRadius: BorderRadius.circular(7.0),
                               ),
                               child: const Icon(

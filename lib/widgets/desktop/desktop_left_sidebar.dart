@@ -1167,16 +1167,12 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
             ),
             child: Row(
               children: [
-                // 48x48 Gradient Liked Songs Squircle
+                // 48x48 Solid Liked Songs Squircle
                 Container(
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF450AF5), Color(0xFFC4EFD9)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: const Color(0xFF5038A0),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: const Icon(
@@ -1591,11 +1587,7 @@ class _CompactLikedSongsTileState extends State<_CompactLikedSongsTile> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF450AF5), Color(0xFF8E8EE5)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: const Color(0xFF5038A0),
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
                       color: widget.isSelected

@@ -763,7 +763,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: themeColor,
+                color: const Color(0xFF282838),
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF0B0B0F), width: 2.5),
               ),
@@ -1053,23 +1053,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFFE040FB).withValues(alpha: 0.22),
-              const Color(0xFF00E5FF).withValues(alpha: 0.14),
-              const Color(0xFF1DB954).withValues(alpha: 0.18),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: const Color(0xFF14141E),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-            width: 1.2,
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE040FB).withValues(alpha: 0.15),
+              color: Colors.black.withValues(alpha: 0.35),
               blurRadius: 18,
               offset: const Offset(0, 4),
             ),
@@ -1082,12 +1074,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE040FB), Color(0xFF1DB954)],
-                ),
+                color: const Color(0xFF242434),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE040FB).withValues(alpha: 0.4),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 10,
                   ),
                 ],
@@ -1095,7 +1085,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Center(
                 child: Icon(
                   Icons.auto_awesome_rounded,
-                  color: Colors.white,
+                  color: Color(0xFF1DB954),
                   size: 24,
                 ),
               ),
@@ -1212,7 +1202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildCompactMetricCard(
         context,
         icon: Icons.favorite_rounded,
-        iconColor: const Color(0xFFFF4081),
+        iconColor: const Color(0xFF5038A0),
         title: 'Liked Songs',
         value: '${music.likedSongs.length}',
         subtitle: 'Favorites saved',
@@ -1400,9 +1390,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: themeColor.withValues(alpha: 0.15),
+                color: const Color(0xFF1DB954).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: themeColor.withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: const Color(0xFF1DB954).withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1410,16 +1402,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     width: 6,
                     height: 6,
-                    decoration: BoxDecoration(
-                      color: themeColor,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1DB954),
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 5),
-                  Text(
+                  const Text(
                     'Live Sync',
                     style: TextStyle(
-                      color: themeColor,
+                      color: Color(0xFF1DB954),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1483,19 +1475,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             height: 72,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: isFirst
-                                    ? [themeColor, const Color(0xFFFF6584)]
-                                    : [
-                                        const Color(0xFF2C2C3E),
-                                        const Color(0xFF1A1A26),
-                                      ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: const Color(0xFF222230),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.4),
+                                  color: Colors.black.withValues(alpha: 0.35),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1521,7 +1504,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isFirst
-                                  ? themeColor
+                                  ? const Color(0xFF1DB954)
                                   : const Color(0xFF282838),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
@@ -1531,8 +1514,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Text(
                               '#$rank',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: isFirst ? Colors.black : Colors.white,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w900,
                               ),
