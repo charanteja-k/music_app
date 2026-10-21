@@ -440,32 +440,32 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                               );
                             },
                             child: Container(
-                            width: 170,
-                            height: 170,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(22),
-                              gradient: LinearGradient(
-                                colors: _effectiveColors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: topGradientColor.withValues(
-                                    alpha: 0.35,
-                                  ),
-                                  blurRadius: 28,
-                                  offset: const Offset(0, 12),
+                              width: 170,
+                              height: 170,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(22),
+                                gradient: LinearGradient(
+                                  colors: _effectiveColors,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(22),
-                              child: _buildHeroImage(),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: topGradientColor.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                    blurRadius: 28,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child: _buildHeroImage(),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
                           // Title
                           Text(

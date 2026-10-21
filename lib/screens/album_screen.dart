@@ -433,100 +433,112 @@ class _AlbumScreenState extends State<AlbumScreen>
     String artist,
     String year,
   ) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Blurred background
-        if (artwork.isNotEmpty)
-          Image.network(
-            artwork,
-            fit: BoxFit.cover,
-            errorBuilder: (_, e2, st) =>
-                const ColoredBox(color: Color(0xFF1A1A2E)),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        if (_album != null) {
+          showUnifiedAlbumMenu(
+            context: context,
+            globalPosition: details.globalPosition,
+            album: _album!,
+          );
+        }
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Blurred background
+          if (artwork.isNotEmpty)
+            Image.network(
+              artwork,
+              fit: BoxFit.cover,
+              errorBuilder: (_, e2, st) =>
+                  const ColoredBox(color: Color(0xFF1A1A2E)),
+            ),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(color: Colors.black.withValues(alpha: 0.55)),
           ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(color: Colors.black.withValues(alpha: 0.55)),
-        ),
-        // Album art + info
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 24,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Cover art
-              Hero(
-                tag: 'album-art-${widget.albumId ?? widget.album?.id}',
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: artwork.isNotEmpty
-                        ? Image.network(
-                            artwork,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, e2, st) =>
-                                _buildStylizedVinylCover(
-                                  title,
-                                  artist,
-                                  size: 160,
-                                ),
-                          )
-                        : _buildStylizedVinylCover(title, artist, size: 160),
+          // Album art + info
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Cover art
+                Hero(
+                  tag: 'album-art-${widget.albumId ?? widget.album?.id}',
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: artwork.isNotEmpty
+                          ? Image.network(
+                              artwork,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, e2, st) =>
+                                  _buildStylizedVinylCover(
+                                    title,
+                                    artist,
+                                    size: 160,
+                                  ),
+                            )
+                          : _buildStylizedVinylCover(title, artist, size: 160),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (artist.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
                       Text(
-                        artist,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                         textAlign: TextAlign.center,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (artist.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          artist,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -655,17 +667,10 @@ class _AlbumScreenState extends State<AlbumScreen>
                   offset.dx,
                   offset.dy + buttonSize.height,
                 );
-                final songVideos = _album!.songs
-                    .map((s) => songMapToVideo(s))
-                    .toList();
-                DesktopContextMenu.showAlbumMenu(
+                showUnifiedAlbumMenu(
                   context: context,
                   globalPosition: menuPosition,
-                  albumTitle: _album!.title,
-                  albumArtist: _album!.artist,
-                  albumId: _album!.id,
-                  albumArtwork: _album!.artwork,
-                  songs: songVideos,
+                  album: _album!,
                 );
               },
               child: Container(

@@ -2023,6 +2023,14 @@ class SearchScreenState extends State<SearchScreen>
   Widget _buildAlbumItemCard(JioAlbum album, {required String heroPrefix}) {
     final isSingle = album.songCount <= 1;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        showUnifiedAlbumMenu(
+          context: context,
+          globalPosition: details.globalPosition,
+          album: album,
+        );
+      },
       onTap: () {
         HapticFeedback.lightImpact();
         _prefs.addToSearchHistory(album.title, type: 'album');

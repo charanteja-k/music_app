@@ -309,5 +309,140 @@ void main() {
         expect(find.text('Test Option 2'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'Curated playlist includes Save to Your Library and hides Delete/Rename',
+      (tester) async {
+        late BuildContext capturedContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  capturedContext = ctx;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+
+        final items = DesktopContextMenu.playlistItems(
+          context: capturedContext,
+          playlistId: 'curated_daily_mix_1',
+          playlistName: 'Daily Mix 1',
+          isCurated: true,
+        );
+
+        final titles = items.map((i) => i.title).whereType<String>().toList();
+        expect(titles, contains('Add to queue'));
+        expect(titles, contains('Play next'));
+        expect(titles, contains('Save to Your Library'));
+        expect(titles, contains('Share playlist'));
+        expect(titles.any((t) => t.toLowerCase().contains('delete')), isFalse);
+        expect(titles.any((t) => t.toLowerCase().contains('rename')), isFalse);
+      },
+    );
+
+    testWidgets('Album menu includes Play Album and queue operations', (
+      tester,
+    ) async {
+      late BuildContext capturedContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) {
+                capturedContext = ctx;
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+
+      final items = DesktopContextMenu.albumItems(
+        context: capturedContext,
+        albumTitle: 'Rockstar',
+        albumArtist: 'A.R. Rahman',
+        albumId: 'album_rockstar',
+      );
+
+      final titles = items.map((i) => i.title).whereType<String>().toList();
+      expect(titles, contains('Play Album'));
+      expect(titles, contains('Add to queue'));
+      expect(titles, contains('Play next'));
+      expect(titles, contains('Save to Your Library'));
+      expect(titles, contains('Go to artist'));
+      expect(titles, contains('Share album'));
+    });
+
+    testWidgets(
+      'showUnifiedPlaylistMenu and showUnifiedAlbumMenu execute without error',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        late BuildContext capturedContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  capturedContext = ctx;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+
+        // Test showUnifiedPlaylistMenu on custom playlist
+        showUnifiedPlaylistMenu(
+          context: capturedContext,
+          globalPosition: const Offset(50, 50),
+          playlist: {'id': 'pl_test', 'name': 'Test Playlist'},
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Delete playlist'), findsOneWidget);
+
+        // Tap outside to dismiss
+        await tester.tapAt(const Offset(500, 500));
+        await tester.pumpAndSettle();
+
+        // Test showUnifiedPlaylistMenu on Liked Songs
+        showUnifiedPlaylistMenu(
+          context: capturedContext,
+          globalPosition: const Offset(60, 60),
+          playlist: 'liked_songs',
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Add to queue'), findsOneWidget);
+        expect(find.text('Delete playlist'), findsNothing);
+
+        // Tap outside to dismiss
+        await tester.tapAt(const Offset(500, 500));
+        await tester.pumpAndSettle();
+
+        // Test showUnifiedAlbumMenu on Map
+        showUnifiedAlbumMenu(
+          context: capturedContext,
+          globalPosition: const Offset(70, 70),
+          album: {
+            'id': 'alb_test',
+            'title': 'Test Album',
+            'artist': 'Test Artist',
+          },
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Play Album'), findsOneWidget);
+        expect(find.text('Share album'), findsOneWidget);
+
+        // Tap outside to dismiss
+        await tester.tapAt(const Offset(500, 500));
+        await tester.pumpAndSettle();
+      },
+    );
   });
 }

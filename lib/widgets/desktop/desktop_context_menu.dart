@@ -1,4 +1,4 @@
-ximport 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -1333,13 +1333,16 @@ Future<void> showUnifiedPlaylistMenu({
     }
   } else if (playlist is Map) {
     playlistId = (playlist['id'] ?? playlist['playlistId'] ?? '').toString();
-    playlistName = (playlist['name'] ??
-            playlist['title'] ??
-            (playlistId == 'liked_songs' ? 'Liked Songs' : 'Playlist'))
-        .toString();
-    isSpotify = playlist['isSpotify'] == true ||
+    playlistName =
+        (playlist['name'] ??
+                playlist['title'] ??
+                (playlistId == 'liked_songs' ? 'Liked Songs' : 'Playlist'))
+            .toString();
+    isSpotify =
+        playlist['isSpotify'] == true ||
         (playlist['source']?.toString().contains('spotify') ?? false);
-    isCurated = playlist['isCurated'] == true ||
+    isCurated =
+        playlist['isCurated'] == true ||
         playlistId.startsWith('curated_') ||
         playlistId.startsWith('daily_mix') ||
         playlistId == 'top_charts_india' ||
@@ -1401,11 +1404,9 @@ Future<void> showUnifiedAlbumMenu({
     }
   } else if (album is Map) {
     albumId = (album['id'] ?? album['albumId'] ?? '').toString();
-    albumTitle = (album['title'] ??
-            album['name'] ??
-            album['albumTitle'] ??
-            'Album')
-        .toString();
+    albumTitle =
+        (album['title'] ?? album['name'] ?? album['albumTitle'] ?? 'Album')
+            .toString();
     albumArtist = (album['artist'] ?? album['albumArtist'] ?? '').toString();
     albumArtwork =
         (album['artwork'] ?? album['thumbnail'] ?? album['albumArtwork'] ?? '')
@@ -1427,6 +1428,9 @@ Future<void> showUnifiedAlbumMenu({
           .toList();
     }
   } else if (album != null) {
+    try {
+      albumId = album.id as String?;
+    } catch (_) {}
     try {
       albumTitle = (album.title as String?) ?? 'Album';
     } catch (_) {}
