@@ -297,21 +297,8 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
         ? songs.first['thumbnail'] as String?
         : null;
 
-    final topArtists = PlaylistArtistFilter.getTopArtistsWithCounts(
-      songs,
-      limit: 12,
-    );
-
-    // Filter local songs using PlaylistArtistFilter
-    final isSearching = _searchQuery.isNotEmpty;
-    final searchResult = isSearching
-        ? PlaylistArtistFilter.searchPlaylist(songs: songs, query: _searchQuery)
-        : const PlaylistSearchResult(matchedIndices: []);
-    final localMatches = searchResult.matchedIndices
-        .map((i) => songs[i])
-        .toList();
-    final localIndices = searchResult.matchedIndices;
-
+    final isDesktop = MediaQuery.of(context).size.width >= 1024;
+    final displayedSongs = _getDisplayedSongs(songs);
     final themeColor = Theme.of(context).primaryColor;
 
     return Scaffold(
@@ -319,10 +306,12 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
       body: Stack(
         children: [
           DilSeScrollbar(
+            controller: _scrollController,
             child: CustomScrollView(
+              controller: _scrollController,
               slivers: [
                 SliverAppBar(
-                  backgroundColor: const Color(0xFF181822),
+                  backgroundColor: const Color(0xFF181818),
                   expandedHeight: 260,
                   pinned: true,
                   stretch: true,
@@ -596,149 +585,42 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                   ),
                 ),
 
-                // Search Bar in Playlist
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                    child: Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF181818).withValues(alpha: 0.90),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSearching
-                              ? themeColor.withValues(alpha: 0.55)
-                              : Colors.white.withValues(alpha: 0.08),
-                          width: 1.0,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14.5,
-                        ),
-                        cursorColor: themeColor,
-                        decoration: InputDecoration(
-                          hintText: 'Search songs in this playlist...',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.40),
-                            fontSize: 14,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: isSearching ? themeColor : Colors.white54,
-                            size: 20,
-                          ),
-                          suffixIcon: isSearching
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    color: Colors.white60,
-                                    size: 18,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _onSearchQueryChanged('');
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 13,
-                          ),
-                        ),
-                        onChanged: _onSearchQueryChanged,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Artist Quick Filter Chips
-                if (topArtists.isNotEmpty)
+                // Spotify Desktop Playlist Toolbar & Sticky Table Header
+                if (isDesktop) ...[
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: SizedBox(
-                        height: 36,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: topArtists.length,
-                          itemBuilder: (context, idx) {
-                            final artistItem = topArtists[idx];
-                            final isSelected =
-                                PlaylistArtistFilter.isArtistMatch(
-                                  _searchQuery,
-                                  artistItem.name,
-                                );
-
-                            final activeTextColor = isSelected
-                                ? (ThemeData.estimateBrightnessForColor(
-                                            themeColor,
-                                          ) ==
-                                          Brightness.dark
-                                      ? Colors.white
-                                      : Colors.black)
-                                : Colors.white.withValues(alpha: 0.85);
-                            final activeIconColor = isSelected
-                                ? activeTextColor
-                                : Colors.white60;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: FilterChip(
-                                showCheckmark: false,
-                                avatar: Icon(
-                                  Icons.person_rounded,
-                                  size: 14,
-                                  color: activeIconColor,
-                                ),
-                                label: Text(
-                                  '${artistItem.name} (${artistItem.count})',
-                                  style: TextStyle(
-                                    color: activeTextColor,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                selected: isSelected,
-                                selectedColor: themeColor,
-                                backgroundColor: const Color(
-                                  0xFF181818,
-                                ).withValues(alpha: 0.85),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                  side: BorderSide(
-                                    color: isSelected
-                                        ? themeColor
-                                        : Colors.white.withValues(alpha: 0.10),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                onSelected: (selected) {
-                                  HapticFeedback.selectionClick();
-                                  if (isSelected) {
-                                    _searchController.clear();
-                                    _onSearchQueryChanged('');
-                                  } else {
-                                    _searchController.text = artistItem.name;
-                                    _onSearchQueryChanged(artistItem.name);
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                    child: DesktopPlaylistToolbar(
+                      showAddButton: true,
+                      showEditDetailsButton: !isLikedSongs,
+                      searchQuery: _searchQuery,
+                      onSearchChanged: (query) =>
+                          setState(() => _searchQuery = query),
+                      onAddTap: () {
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      onEditDetailsTap: () =>
+                          _showEditDetailsModal(context, name),
+                      currentSort: _currentSort,
+                      currentViewMode: _currentViewMode,
+                      onSortChanged: (sort) {
+                        setState(() => _currentSort = sort);
+                        PreferencesService().setPlaylistSortOption(sort);
+                      },
+                      onViewModeChanged: (mode) {
+                        setState(() => _currentViewMode = mode);
+                        PreferencesService().setPlaylistViewMode(mode);
+                      },
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: _buildStickyTableHeader(context),
+                  ),
+                ],
 
                 // BODY A: When in Search Mode
                 if (isSearching) ...[
