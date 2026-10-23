@@ -1,21 +1,16 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../services/music_service.dart';
-import '../services/playlist_artist_filter.dart';
 import '../services/preferences_service.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/playlist_action_menu.dart';
 import '../widgets/song_options_bottom_sheet.dart';
 import '../widgets/dilse_scrollbar.dart';
-import '../widgets/shimmer_loading.dart';
 import '../widgets/desktop/desktop_context_menu.dart';
 import '../widgets/desktop/desktop_playlist_enrichment.dart';
 import '../widgets/desktop/desktop_playlist_toolbar.dart';
-import '../widgets/desktop/desktop_playlist_sort_dropdown.dart';
 import '../layouts/desktop_layout_state.dart';
 
 class CustomPlaylistScreen extends StatefulWidget {
@@ -1189,9 +1184,9 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                 ),
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     )
                   else
                     SliverList(
