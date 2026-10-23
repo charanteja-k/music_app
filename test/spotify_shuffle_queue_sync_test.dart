@@ -17,6 +17,25 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('com.ryanheise.just_audio.methods'),
+          (call) async {
+            if (call.method == 'init') {
+              final id = (call.arguments as Map?)?['id'] as String?;
+              if (id != null) {
+                TestDefaultBinaryMessengerBinding
+                    .instance
+                    .defaultBinaryMessenger
+                    .setMockMethodCallHandler(
+                      MethodChannel('com.ryanheise.just_audio.methods.$id'),
+                      (subCall) async => {},
+                    );
+              }
+            }
+            return {};
+          },
+        );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.example.music_app/widget'),
           (call) async => null,
         );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -29,6 +48,7 @@ void main() {
   });
 
   Video makeVideo(String id, String title, String author) {
+    MusicService.cacheWebStreamUrl(id, 'https://example.com/$id.mp3');
     return Video(
       VideoId(id),
       title,
@@ -51,17 +71,21 @@ void main() {
       final service = MusicService();
       final songs = List.generate(
         10,
-        (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+        (i) => makeVideo(
+          'vid_${i.toString().padLeft(7, '0')}',
+          'Title $i',
+          'Artist $i',
+        ),
       );
 
       await service.playPlaylist(songs, 2);
 
       expect(service.isShuffle, isFalse);
       expect(service.currentIndex, 2);
-      expect(service.currentSong?.id.value, 'song_2');
+      expect(service.currentSong?.id.value, 'vid_0000002');
       expect(service.playbackQueue.length, 10);
       expect(service.upcomingQueue.length, 7);
-      expect(service.upcomingQueue.first.id.value, 'song_3');
+      expect(service.upcomingQueue.first.id.value, 'vid_0000003');
     });
 
     test(
@@ -70,17 +94,21 @@ void main() {
         final service = MusicService();
         final songs = List.generate(
           20,
-          (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+          (i) => makeVideo(
+            'vid_${i.toString().padLeft(7, '0')}',
+            'Title $i',
+            'Artist $i',
+          ),
         );
 
         await service.playPlaylist(songs, 3);
         final currentBefore = service.currentSong;
-        expect(currentBefore?.id.value, 'song_3');
+        expect(currentBefore?.id.value, 'vid_0000003');
 
         service.toggleShuffle();
 
         expect(service.isShuffle, isTrue);
-        expect(service.currentSong?.id.value, 'song_3');
+        expect(service.currentSong?.id.value, 'vid_0000003');
         expect(service.currentIndex, 3);
         expect(service.playbackQueue.length, 20);
         expect(service.upcomingQueue.length, 16);
@@ -89,7 +117,7 @@ void main() {
         final allIds = service.playbackQueue.map((s) => s.id.value).toSet();
         expect(allIds.length, 20);
         for (int i = 0; i < 20; i++) {
-          expect(allIds.contains('song_$i'), isTrue);
+          expect(allIds.contains('vid_${i.toString().padLeft(7, '0')}'), isTrue);
         }
       },
     );
@@ -100,7 +128,11 @@ void main() {
         final service = MusicService();
         final songs = List.generate(
           20,
-          (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+          (i) => makeVideo(
+            'vid_${i.toString().padLeft(7, '0')}',
+            'Title $i',
+            'Artist $i',
+          ),
         );
 
         await service.playPlaylist(songs, 5);
@@ -110,13 +142,16 @@ void main() {
         service.toggleShuffle();
         expect(service.isShuffle, isFalse);
         expect(service.currentIndex, 5);
-        expect(service.currentSong?.id.value, 'song_5');
+        expect(service.currentSong?.id.value, 'vid_0000005');
 
         // Verify exact original order is restored
         for (int i = 0; i < 20; i++) {
-          expect(service.playbackQueue[i].id.value, 'song_$i');
+          expect(
+            service.playbackQueue[i].id.value,
+            'vid_${i.toString().padLeft(7, '0')}',
+          );
         }
-        expect(service.upcomingQueue.first.id.value, 'song_6');
+        expect(service.upcomingQueue.first.id.value, 'vid_0000006');
       },
     );
 
@@ -126,16 +161,20 @@ void main() {
         final service = MusicService();
         final songs = List.generate(
           15,
-          (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+          (i) => makeVideo(
+            'vid_${i.toString().padLeft(7, '0')}',
+            'Title $i',
+            'Artist $i',
+          ),
         );
 
         await service.playShuffledPlaylist(songs, initialIndex: 4);
 
         expect(service.isShuffle, isTrue);
         expect(service.currentIndex, 0);
-        expect(service.currentSong?.id.value, 'song_4');
+        expect(service.currentSong?.id.value, 'vid_0000004');
         expect(service.playbackQueue.length, 15);
-        expect(service.playbackQueue.first.id.value, 'song_4');
+        expect(service.playbackQueue.first.id.value, 'vid_0000004');
         expect(service.upcomingQueue.length, 14);
       },
     );
@@ -146,7 +185,11 @@ void main() {
         final service = MusicService();
         final songs = List.generate(
           10,
-          (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+          (i) => makeVideo(
+            'vid_${i.toString().padLeft(7, '0')}',
+            'Title $i',
+            'Artist $i',
+          ),
         );
 
         await service.playPlaylist(songs, 0);
@@ -157,7 +200,7 @@ void main() {
         expect(service.currentSong?.id.value, expectedNextTrack.id.value);
         expect(service.currentIndex, 1);
         expect(service.playedHistory.isNotEmpty, isTrue);
-        expect(service.playedHistory.last.id.value, 'song_0');
+        expect(service.playedHistory.last.id.value, 'vid_0000000');
       },
     );
 
@@ -167,16 +210,19 @@ void main() {
         final service = MusicService();
         final songs = List.generate(
           10,
-          (i) => makeVideo('song_$i', 'Title $i', 'Artist $i'),
+          (i) => makeVideo(
+            'vid_${i.toString().padLeft(7, '0')}',
+            'Title $i',
+            'Artist $i',
+          ),
         );
 
         await service.playPlaylist(songs, 0);
-        await service
-            .nextSong(); // Moves to song_1, pushes song_0 to playedHistory
-        expect(service.currentSong?.id.value, 'song_1');
+        await service.nextSong(); // Moves to vid_0000001, pushes vid_0000000 to playedHistory
+        expect(service.currentSong?.id.value, 'vid_0000001');
 
-        await service.previousSong(); // Pops song_0 from playedHistory
-        expect(service.currentSong?.id.value, 'song_0');
+        await service.previousSong(); // Pops vid_0000000 from playedHistory
+        expect(service.currentSong?.id.value, 'vid_0000000');
         expect(service.currentIndex, 0);
       },
     );
