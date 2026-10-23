@@ -7071,7 +7071,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
 
   @visibleForTesting
   void setPlaylistForTesting(List<Video> list, {int initialIndex = 0}) {
+    _originalPlaylist = List.from(list);
     _playbackQueue = List.from(list);
+    _playedHistory.clear();
+    _isShuffle = false;
     _currentIndex = initialIndex;
     if (_playbackQueue.isNotEmpty &&
         initialIndex >= 0 &&
@@ -7090,6 +7093,12 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   @visibleForTesting
   void setLoopModeForTesting(LoopMode mode) {
     _loopMode = mode;
+  }
+
+  @visibleForTesting
+  void setPlayedHistoryForTesting(List<Video> history) {
+    _playedHistory.clear();
+    _playedHistory.addAll(history);
   }
 
   @visibleForTesting
@@ -7117,7 +7126,10 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   @visibleForTesting
   void resetForTesting() {
     _currentSong = null;
+    _originalPlaylist.clear();
     _playbackQueue.clear();
+    _playedHistory.clear();
+    _isShuffle = false;
     _currentIndex = 0;
     _savedPosition = null;
     _savedDuration = null;
