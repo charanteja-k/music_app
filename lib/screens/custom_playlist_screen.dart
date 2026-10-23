@@ -205,38 +205,6 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     return list;
   }
 
-  String _formatDurationMs(num? durationMs) {
-    if (durationMs == null || durationMs <= 0) return '';
-    final dur = Duration(milliseconds: durationMs.toInt());
-    final minutes = dur.inMinutes;
-    final seconds = dur.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
-  String _formatDateAdded(dynamic addedAt) {
-    if (addedAt == null) return 'Recently';
-    if (addedAt is DateTime) {
-      return '${addedAt.year}-${addedAt.month.toString().padLeft(2, '0')}-${addedAt.day.toString().padLeft(2, '0')}';
-    }
-    final s = addedAt.toString();
-    if (s.length >= 10) return s.substring(0, 10);
-    return s.isNotEmpty ? s : 'Recently';
-  }
-
-  String _formatDuration(Duration? d) {
-    if (d == null) return '';
-    final nonNegative = d.isNegative ? Duration.zero : d;
-    final hours = nonNegative.inHours;
-    final minutes = nonNegative.inMinutes.remainder(60);
-    final seconds = (nonNegative.inSeconds.remainder(
-      60,
-    )).toString().padLeft(2, '0');
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:$seconds';
-    }
-    return '$minutes:$seconds';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isLikedSongs = widget.playlistId == 'liked_songs';
@@ -612,9 +580,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                       },
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _buildStickyTableHeader(context),
-                  ),
+                  SliverToBoxAdapter(child: _buildStickyTableHeader(context)),
                 ],
 
                 if (isDesktop) ...[
@@ -628,61 +594,59 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                     )
                   else
                     SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final song = displayedSongs[index];
-                          final songId = (song['id'] as String?) ?? '';
-                          final isCurrent =
-                              _musicService.currentSong?.id.value == songId;
-                          final originalIndex =
-                              songs.indexWhere((s) => s['id'] == songId);
-                          final displayIndex =
-                              _currentSort == PlaylistSortOption.customOrder
-                                  ? (originalIndex >= 0
-                                      ? originalIndex + 1
-                                      : index + 1)
-                                  : index + 1;
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final song = displayedSongs[index];
+                        final songId = (song['id'] as String?) ?? '';
+                        final isCurrent =
+                            _musicService.currentSong?.id.value == songId;
+                        final originalIndex = songs.indexWhere(
+                          (s) => s['id'] == songId,
+                        );
+                        final displayIndex =
+                            _currentSort == PlaylistSortOption.customOrder
+                            ? (originalIndex >= 0
+                                  ? originalIndex + 1
+                                  : index + 1)
+                            : index + 1;
 
-                          return _DesktopTrackRowWidget(
-                            key: ValueKey('desktop_song_${songId}_$index'),
-                            song: song,
-                            songId: songId,
-                            index: displayIndex,
-                            isCurrent: isCurrent,
-                            isPlaying: isCurrent && _musicService.isPlaying,
-                            viewMode: _currentViewMode,
-                            playlistId: widget.playlistId,
-                            isLikedSongs: isLikedSongs,
-                            themeColor: themeColor,
-                            onPlay: () {
-                              HapticFeedback.lightImpact();
-                              if (isLikedSongs) {
-                                final likedIdx = _musicService.likedSongs
-                                    .indexWhere((s) => s['id'] == songId);
-                                if (likedIdx >= 0) {
-                                  _musicService.playLikedSong(
-                                    _musicService.likedSongs[likedIdx],
-                                  );
-                                } else {
-                                  _musicService.playSong(songMapToVideo(song));
-                                }
+                        return _DesktopTrackRowWidget(
+                          key: ValueKey('desktop_song_${songId}_$index'),
+                          song: song,
+                          songId: songId,
+                          index: displayIndex,
+                          isCurrent: isCurrent,
+                          isPlaying: isCurrent && _musicService.isPlaying,
+                          viewMode: _currentViewMode,
+                          playlistId: widget.playlistId,
+                          isLikedSongs: isLikedSongs,
+                          themeColor: themeColor,
+                          onPlay: () {
+                            HapticFeedback.lightImpact();
+                            if (isLikedSongs) {
+                              final likedIdx = _musicService.likedSongs
+                                  .indexWhere((s) => s['id'] == songId);
+                              if (likedIdx >= 0) {
+                                _musicService.playLikedSong(
+                                  _musicService.likedSongs[likedIdx],
+                                );
                               } else {
-                                final pIdx = songs.indexWhere(
-                                  (s) => s['id'] == songId,
-                                );
-                                _musicService.playCustomPlaylist(
-                                  widget.playlistId,
-                                  pIdx >= 0 ? pIdx : index,
-                                );
+                                _musicService.playSong(songMapToVideo(song));
                               }
-                            },
-                            onRemoved: () {
-                              if (mounted) setState(() {});
-                            },
-                          );
-                        },
-                        childCount: displayedSongs.length,
-                      ),
+                            } else {
+                              final pIdx = songs.indexWhere(
+                                (s) => s['id'] == songId,
+                              );
+                              _musicService.playCustomPlaylist(
+                                widget.playlistId,
+                                pIdx >= 0 ? pIdx : index,
+                              );
+                            }
+                          },
+                          onRemoved: () {
+                            if (mounted) setState(() {});
+                          },
+                        );
+                      }, childCount: displayedSongs.length),
                     ),
                   if (!isLikedSongs)
                     SliverToBoxAdapter(
@@ -706,231 +670,219 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                     )
                   else if (isLikedSongs)
                     SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final song = displayedSongs[index];
-                          final songId = (song['id'] as String?) ?? '';
-                          final isCurrent =
-                              _musicService.currentSong?.id.value == songId;
-                          final thumb = song['thumbnail'] as String? ?? '';
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final song = displayedSongs[index];
+                        final songId = (song['id'] as String?) ?? '';
+                        final isCurrent =
+                            _musicService.currentSong?.id.value == songId;
+                        final thumb = song['thumbnail'] as String? ?? '';
 
-                          return Dismissible(
-                            key: ValueKey('liked_dismiss_${songId}_$index'),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                              ),
-                              color: Colors.redAccent.withValues(alpha: 0.8),
-                              child: const Icon(
-                                Icons.favorite_border_rounded,
-                                color: Colors.white,
-                                size: 26,
-                              ),
+                        return Dismissible(
+                          key: ValueKey('liked_dismiss_${songId}_$index'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            color: Colors.redAccent.withValues(alpha: 0.8),
+                            child: const Icon(
+                              Icons.favorite_border_rounded,
+                              color: Colors.white,
+                              size: 26,
                             ),
-                            onDismissed: (_) {
-                              HapticFeedback.mediumImpact();
-                              _musicService.removeLikedSong(songId);
-                            },
-                            child: Container(
-                              height: 72.0,
-                              color: isCurrent
-                                  ? themeColor.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: GestureDetector(
-                                  onSecondaryTapDown: (details) {
-                                    DesktopContextMenu.show(
+                          ),
+                          onDismissed: (_) {
+                            HapticFeedback.mediumImpact();
+                            _musicService.removeLikedSong(songId);
+                          },
+                          child: Container(
+                            height: 72.0,
+                            color: isCurrent
+                                ? themeColor.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: GestureDetector(
+                                onSecondaryTapDown: (details) {
+                                  DesktopContextMenu.show(
+                                    context: context,
+                                    globalPosition: details.globalPosition,
+                                    items: DesktopContextMenu.songItems(
                                       context: context,
-                                      globalPosition: details.globalPosition,
-                                      items: DesktopContextMenu.songItems(
-                                        context: context,
-                                        song: songMapToVideo(song),
-                                      ),
-                                    );
-                                  },
-                                  child: ListTile(
-                                    dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 4,
+                                      song: songMapToVideo(song),
                                     ),
-                                    leading: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 28,
-                                          child:
-                                              isCurrent &&
-                                                  _musicService.isPlaying
-                                              ? Center(
-                                                  child: AnimatedEqualizer(
-                                                    isPlaying: true,
-                                                    color: themeColor,
-                                                    size: 16,
-                                                  ),
-                                                )
-                                              : Text(
-                                                  '${index + 1}',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color: isCurrent
-                                                        ? themeColor
-                                                        : Colors.white
-                                                              .withValues(
-                                                                alpha: 0.4,
-                                                              ),
-                                                    fontWeight: isCurrent
-                                                        ? FontWeight.bold
-                                                        : FontWeight.w500,
-                                                    fontSize: 13,
-                                                    fontFeatures: const [
-                                                      FontFeature.tabularFigures(),
-                                                    ],
-                                                  ),
+                                  );
+                                },
+                                child: ListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                  leading: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 28,
+                                        child:
+                                            isCurrent && _musicService.isPlaying
+                                            ? Center(
+                                                child: AnimatedEqualizer(
+                                                  isPlaying: true,
+                                                  color: themeColor,
+                                                  size: 16,
                                                 ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Container(
-                                            width: 48,
-                                            height: 48,
-                                            color: const Color(0xFF181818),
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                thumb.isNotEmpty
-                                                    ? Image.network(
-                                                        thumb,
-                                                        width: 48,
-                                                        height: 48,
-                                                        cacheWidth: 120,
-                                                        cacheHeight: 120,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (
-                                                              context,
-                                                              error,
-                                                              stackTrace,
-                                                            ) => const Icon(
-                                                              Icons
-                                                                  .music_note_rounded,
-                                                              color: Colors
-                                                                  .white30,
-                                                            ),
-                                                      )
-                                                    : const Icon(
-                                                        Icons
-                                                            .music_note_rounded,
-                                                        color: Colors.white30,
-                                                      ),
-                                                if (isCurrent)
-                                                  Container(
-                                                    color: Colors.black45,
-                                                    child: Center(
-                                                      child: AnimatedEqualizer(
-                                                        isPlaying: _musicService
-                                                            .isPlaying,
-                                                        size: 18,
-                                                        color: Colors.white,
-                                                      ),
+                                              )
+                                            : Text(
+                                                '${index + 1}',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: isCurrent
+                                                      ? themeColor
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.4,
+                                                        ),
+                                                  fontWeight: isCurrent
+                                                      ? FontWeight.bold
+                                                      : FontWeight.w500,
+                                                  fontSize: 13,
+                                                  fontFeatures: const [
+                                                    FontFeature.tabularFigures(),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          width: 48,
+                                          height: 48,
+                                          color: const Color(0xFF181818),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              thumb.isNotEmpty
+                                                  ? Image.network(
+                                                      thumb,
+                                                      width: 48,
+                                                      height: 48,
+                                                      cacheWidth: 120,
+                                                      cacheHeight: 120,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) => const Icon(
+                                                            Icons
+                                                                .music_note_rounded,
+                                                            color:
+                                                                Colors.white30,
+                                                          ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.music_note_rounded,
+                                                      color: Colors.white30,
+                                                    ),
+                                              if (isCurrent)
+                                                Container(
+                                                  color: Colors.black45,
+                                                  child: Center(
+                                                    child: AnimatedEqualizer(
+                                                      isPlaying: _musicService
+                                                          .isPlaying,
+                                                      size: 18,
+                                                      color: Colors.white,
                                                     ),
                                                   ),
-                                              ],
-                                            ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                    title: Text(
-                                      (song['title'] as String?) ??
-                                          'Unknown Title',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: isCurrent
-                                            ? themeColor
-                                            : Colors.white,
-                                        fontWeight: isCurrent
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        fontSize: 14.5,
                                       ),
-                                    ),
-                                    subtitle: Text(
-                                      (song['author'] as String?) ??
-                                          'Unknown Artist',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                    trailing: Builder(
-                                      builder: (btnCtx) => IconButton(
-                                        key: ValueKey(
-                                          'liked_song_more_$songId',
-                                        ),
-                                        icon: const Icon(
-                                          Icons.more_vert_rounded,
-                                          color: Colors.white38,
-                                          size: 20,
-                                        ),
-                                        tooltip: 'Song options',
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 36,
-                                          minHeight: 40,
-                                        ),
-                                        onPressed: () {
-                                          HapticFeedback.lightImpact();
-                                          final likedIdx = _musicService
-                                              .likedSongs
-                                              .indexWhere(
-                                                (s) => s['id'] == songId,
-                                              );
-                                          showPlaylistSongOptionsBottomSheet(
-                                            context,
-                                            songMap: song,
-                                            playlistId: widget.playlistId,
-                                            onPlayNow: () {
-                                              if (likedIdx >= 0) {
-                                                _musicService.playLikedSong(
-                                                  _musicService
-                                                      .likedSongs[likedIdx],
-                                                );
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      final likedIdx = _musicService.likedSongs
-                                          .indexWhere((s) => s['id'] == songId);
-                                      if (likedIdx >= 0) {
-                                        _musicService.playLikedSong(
-                                          _musicService.likedSongs[likedIdx],
-                                        );
-                                      }
-                                    },
+                                    ],
                                   ),
+                                  title: Text(
+                                    (song['title'] as String?) ??
+                                        'Unknown Title',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isCurrent
+                                          ? themeColor
+                                          : Colors.white,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    (song['author'] as String?) ??
+                                        'Unknown Artist',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                  trailing: Builder(
+                                    builder: (btnCtx) => IconButton(
+                                      key: ValueKey('liked_song_more_$songId'),
+                                      icon: const Icon(
+                                        Icons.more_vert_rounded,
+                                        color: Colors.white38,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Song options',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 40,
+                                      ),
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        final likedIdx = _musicService
+                                            .likedSongs
+                                            .indexWhere(
+                                              (s) => s['id'] == songId,
+                                            );
+                                        showPlaylistSongOptionsBottomSheet(
+                                          context,
+                                          songMap: song,
+                                          playlistId: widget.playlistId,
+                                          onPlayNow: () {
+                                            if (likedIdx >= 0) {
+                                              _musicService.playLikedSong(
+                                                _musicService
+                                                    .likedSongs[likedIdx],
+                                              );
+                                            }
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    final likedIdx = _musicService.likedSongs
+                                        .indexWhere((s) => s['id'] == songId);
+                                    if (likedIdx >= 0) {
+                                      _musicService.playLikedSong(
+                                        _musicService.likedSongs[likedIdx],
+                                      );
+                                    }
+                                  },
                                 ),
                               ),
                             ),
-                          );
-                        },
-                        childCount: displayedSongs.length,
-                      ),
+                          ),
+                        );
+                      }, childCount: displayedSongs.length),
                     )
                   else if (_currentSort == PlaylistSortOption.customOrder &&
                       _searchQuery.trim().isEmpty)
@@ -1190,229 +1142,218 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                     )
                   else
                     SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final song = displayedSongs[index];
-                          final songId = (song['id'] as String?) ?? '';
-                          final isCurrent =
-                              _musicService.currentSong?.id.value == songId;
-                          final thumb = song['thumbnail'] as String? ?? '';
-                          final pIdx =
-                              songs.indexWhere((s) => s['id'] == songId);
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final song = displayedSongs[index];
+                        final songId = (song['id'] as String?) ?? '';
+                        final isCurrent =
+                            _musicService.currentSong?.id.value == songId;
+                        final thumb = song['thumbnail'] as String? ?? '';
+                        final pIdx = songs.indexWhere((s) => s['id'] == songId);
 
-                          return Dismissible(
-                            key: ValueKey('dismiss_${songId}_$index'),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                              ),
-                              color: Colors.redAccent.withValues(alpha: 0.8),
-                              child: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Colors.white,
-                                size: 26,
-                              ),
+                        return Dismissible(
+                          key: ValueKey('dismiss_${songId}_$index'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            color: Colors.redAccent.withValues(alpha: 0.8),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.white,
+                              size: 26,
                             ),
-                            onDismissed: (_) {
-                              HapticFeedback.mediumImpact();
-                              _musicService.removeSongFromPlaylist(
-                                widget.playlistId,
-                                songId,
-                              );
-                            },
-                            child: Container(
-                              height: 72.0,
-                              color: isCurrent
-                                  ? themeColor.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: GestureDetector(
-                                  onSecondaryTapDown: (details) {
-                                    DesktopContextMenu.show(
+                          ),
+                          onDismissed: (_) {
+                            HapticFeedback.mediumImpact();
+                            _musicService.removeSongFromPlaylist(
+                              widget.playlistId,
+                              songId,
+                            );
+                          },
+                          child: Container(
+                            height: 72.0,
+                            color: isCurrent
+                                ? themeColor.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: GestureDetector(
+                                onSecondaryTapDown: (details) {
+                                  DesktopContextMenu.show(
+                                    context: context,
+                                    globalPosition: details.globalPosition,
+                                    items: DesktopContextMenu.songItems(
                                       context: context,
-                                      globalPosition: details.globalPosition,
-                                      items: DesktopContextMenu.songItems(
-                                        context: context,
-                                        song: songMapToVideo(song),
-                                        currentPlaylistId: widget.playlistId,
-                                        onRemovedFromPlaylist: () =>
-                                            setState(() {}),
-                                      ),
-                                    );
-                                  },
-                                  child: ListTile(
-                                    dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 4,
+                                      song: songMapToVideo(song),
+                                      currentPlaylistId: widget.playlistId,
+                                      onRemovedFromPlaylist: () =>
+                                          setState(() {}),
                                     ),
-                                    leading: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 28,
-                                          child:
-                                              isCurrent &&
-                                                  _musicService.isPlaying
-                                              ? Center(
-                                                  child: AnimatedEqualizer(
-                                                    isPlaying: true,
-                                                    color: themeColor,
-                                                    size: 16,
-                                                  ),
-                                                )
-                                              : Text(
-                                                  '${index + 1}',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color: isCurrent
-                                                        ? themeColor
-                                                        : Colors.white
-                                                              .withValues(
-                                                                alpha: 0.4,
-                                                              ),
-                                                    fontWeight: isCurrent
-                                                        ? FontWeight.bold
-                                                        : FontWeight.w500,
-                                                    fontSize: 13,
-                                                    fontFeatures: const [
-                                                      FontFeature.tabularFigures(),
-                                                    ],
-                                                  ),
+                                  );
+                                },
+                                child: ListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                  leading: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 28,
+                                        child:
+                                            isCurrent && _musicService.isPlaying
+                                            ? Center(
+                                                child: AnimatedEqualizer(
+                                                  isPlaying: true,
+                                                  color: themeColor,
+                                                  size: 16,
                                                 ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Container(
-                                            width: 48,
-                                            height: 48,
-                                            color: const Color(0xFF181818),
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                thumb.isNotEmpty
-                                                    ? Image.network(
-                                                        thumb,
-                                                        width: 48,
-                                                        height: 48,
-                                                        cacheWidth: 120,
-                                                        cacheHeight: 120,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (
-                                                              context,
-                                                              error,
-                                                              stackTrace,
-                                                            ) => const Icon(
-                                                              Icons
-                                                                  .music_note_rounded,
-                                                              color: Colors
-                                                                  .white30,
-                                                            ),
-                                                      )
-                                                    : const Icon(
-                                                        Icons
-                                                            .music_note_rounded,
-                                                        color: Colors.white30,
-                                                      ),
-                                                if (isCurrent)
-                                                  Container(
-                                                    color: Colors.black45,
-                                                    child: Center(
-                                                      child: AnimatedEqualizer(
-                                                        isPlaying: _musicService
-                                                            .isPlaying,
-                                                        size: 18,
-                                                        color: Colors.white,
-                                                      ),
+                                              )
+                                            : Text(
+                                                '${index + 1}',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: isCurrent
+                                                      ? themeColor
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.4,
+                                                        ),
+                                                  fontWeight: isCurrent
+                                                      ? FontWeight.bold
+                                                      : FontWeight.w500,
+                                                  fontSize: 13,
+                                                  fontFeatures: const [
+                                                    FontFeature.tabularFigures(),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          width: 48,
+                                          height: 48,
+                                          color: const Color(0xFF181818),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              thumb.isNotEmpty
+                                                  ? Image.network(
+                                                      thumb,
+                                                      width: 48,
+                                                      height: 48,
+                                                      cacheWidth: 120,
+                                                      cacheHeight: 120,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) => const Icon(
+                                                            Icons
+                                                                .music_note_rounded,
+                                                            color:
+                                                                Colors.white30,
+                                                          ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.music_note_rounded,
+                                                      color: Colors.white30,
+                                                    ),
+                                              if (isCurrent)
+                                                Container(
+                                                  color: Colors.black45,
+                                                  child: Center(
+                                                    child: AnimatedEqualizer(
+                                                      isPlaying: _musicService
+                                                          .isPlaying,
+                                                      size: 18,
+                                                      color: Colors.white,
                                                     ),
                                                   ),
-                                              ],
-                                            ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                    title: Text(
-                                      (song['title'] as String?) ??
-                                          'Unknown Title',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: isCurrent
-                                            ? themeColor
-                                            : Colors.white,
-                                        fontWeight: isCurrent
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        fontSize: 14.5,
                                       ),
-                                    ),
-                                    subtitle: Text(
-                                      (song['author'] as String?) ??
-                                          'Unknown Artist',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                    trailing: Builder(
-                                      builder: (btnCtx) => IconButton(
-                                        key: ValueKey(
-                                          'playlist_song_more_$songId',
-                                        ),
-                                        icon: const Icon(
-                                          Icons.more_vert_rounded,
-                                          color: Colors.white38,
-                                          size: 20,
-                                        ),
-                                        tooltip: 'Song options',
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 36,
-                                          minHeight: 40,
-                                        ),
-                                        onPressed: () {
-                                          HapticFeedback.lightImpact();
-                                          showPlaylistSongOptionsBottomSheet(
-                                            context,
-                                            songMap: song,
-                                            playlistId: widget.playlistId,
-                                            onPlayNow: () {
-                                              _musicService.playCustomPlaylist(
-                                                widget.playlistId,
-                                                pIdx >= 0 ? pIdx : index,
-                                              );
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      _musicService.playCustomPlaylist(
-                                        widget.playlistId,
-                                        pIdx >= 0 ? pIdx : index,
-                                      );
-                                    },
+                                    ],
                                   ),
+                                  title: Text(
+                                    (song['title'] as String?) ??
+                                        'Unknown Title',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isCurrent
+                                          ? themeColor
+                                          : Colors.white,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    (song['author'] as String?) ??
+                                        'Unknown Artist',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                  trailing: Builder(
+                                    builder: (btnCtx) => IconButton(
+                                      key: ValueKey(
+                                        'playlist_song_more_$songId',
+                                      ),
+                                      icon: const Icon(
+                                        Icons.more_vert_rounded,
+                                        color: Colors.white38,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Song options',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 40,
+                                      ),
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        showPlaylistSongOptionsBottomSheet(
+                                          context,
+                                          songMap: song,
+                                          playlistId: widget.playlistId,
+                                          onPlayNow: () {
+                                            _musicService.playCustomPlaylist(
+                                              widget.playlistId,
+                                              pIdx >= 0 ? pIdx : index,
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    _musicService.playCustomPlaylist(
+                                      widget.playlistId,
+                                      pIdx >= 0 ? pIdx : index,
+                                    );
+                                  },
                                 ),
                               ),
                             ),
-                          );
-                        },
-                        childCount: displayedSongs.length,
-                      ),
+                          ),
+                        );
+                      }, childCount: displayedSongs.length),
                     ),
                   if (!isLikedSongs)
                     SliverToBoxAdapter(
@@ -1601,10 +1542,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
               const SizedBox(height: 4),
               const Text(
                 'Check for spelling errors or try a different term',
-                style: TextStyle(
-                  color: Colors.white38,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: Colors.white38, fontSize: 13),
               ),
             ],
           ),
@@ -1651,7 +1589,6 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
       ),
     );
   }
-
 }
 
 class _DesktopTrackRowWidget extends StatefulWidget {
@@ -1698,8 +1635,10 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
     }
     if (duration is Duration) {
       final minutes = duration.inMinutes;
-      final seconds =
-          duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+      final seconds = duration.inSeconds
+          .remainder(60)
+          .toString()
+          .padLeft(2, '0');
       return '$minutes:$seconds';
     }
     if (duration is int && duration > 0) {
@@ -1754,8 +1693,10 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
     final artist = (widget.song['author'] as String?) ?? 'Unknown Artist';
     final album = (widget.song['album'] as String?) ?? '';
     final thumb = (widget.song['thumbnail'] as String?) ?? '';
-    final durationStr =
-        _formatDuration(widget.song['duration'], widget.song['durationMs']);
+    final durationStr = _formatDuration(
+      widget.song['duration'],
+      widget.song['durationMs'],
+    );
     final dateAddedStr = _formatDateAdded(
       widget.song['addedAt'] ?? widget.song['dateAdded'],
     );
@@ -1781,8 +1722,8 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
               color: widget.isCurrent
                   ? widget.themeColor.withValues(alpha: 0.14)
                   : (_isHovered
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.transparent),
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.transparent),
               borderRadius: BorderRadius.circular(4.0),
             ),
             child: Row(
@@ -1802,26 +1743,26 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
                             ),
                           )
                         : (widget.isPlaying
-                            ? AnimatedEqualizer(
-                                isPlaying: true,
-                                color: widget.themeColor,
-                                size: 14,
-                              )
-                            : Text(
-                                '${widget.index}',
-                                style: TextStyle(
-                                  color: widget.isCurrent
-                                      ? widget.themeColor
-                                      : Colors.white.withValues(alpha: 0.54),
-                                  fontSize: 13.0,
-                                  fontWeight: widget.isCurrent
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
-                              )),
+                              ? AnimatedEqualizer(
+                                  isPlaying: true,
+                                  color: widget.themeColor,
+                                  size: 14,
+                                )
+                              : Text(
+                                  '${widget.index}',
+                                  style: TextStyle(
+                                    color: widget.isCurrent
+                                        ? widget.themeColor
+                                        : Colors.white.withValues(alpha: 0.54),
+                                    fontSize: 13.0,
+                                    fontWeight: widget.isCurrent
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                )),
                   ),
                 ),
 

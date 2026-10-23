@@ -47,10 +47,7 @@ extension PlaylistSortOptionExt on PlaylistSortOption {
   }
 }
 
-enum PlaylistViewMode {
-  list,
-  compact,
-}
+enum PlaylistViewMode { list, compact }
 
 extension PlaylistViewModeExt on PlaylistViewMode {
   String get label {

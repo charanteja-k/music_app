@@ -131,16 +131,14 @@ class _DesktopPlaylistToolbarState extends State<DesktopPlaylistToolbar> {
                         vertical: 6.0,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            _isAddHovered
-                                ? const Color(0xFF282828)
-                                : const Color(0xFF1E1E1E),
+                        color: _isAddHovered
+                            ? const Color(0xFF282828)
+                            : const Color(0xFF1E1E1E),
                         borderRadius: BorderRadius.circular(20.0),
                         border: Border.all(
-                          color:
-                              _isAddHovered
-                                  ? Colors.white.withValues(alpha: 0.25)
-                                  : Colors.white.withValues(alpha: 0.12),
+                          color: _isAddHovered
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : Colors.white.withValues(alpha: 0.12),
                           width: 1.0,
                         ),
                       ),
@@ -180,16 +178,14 @@ class _DesktopPlaylistToolbarState extends State<DesktopPlaylistToolbar> {
                         vertical: 6.0,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            _isEditHovered
-                                ? const Color(0xFF282828)
-                                : const Color(0xFF1E1E1E),
+                        color: _isEditHovered
+                            ? const Color(0xFF282828)
+                            : const Color(0xFF1E1E1E),
                         borderRadius: BorderRadius.circular(20.0),
                         border: Border.all(
-                          color:
-                              _isEditHovered
-                                  ? Colors.white.withValues(alpha: 0.25)
-                                  : Colors.white.withValues(alpha: 0.12),
+                          color: _isEditHovered
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : Colors.white.withValues(alpha: 0.12),
                           width: 1.0,
                         ),
                       ),
@@ -230,90 +226,84 @@ class _DesktopPlaylistToolbarState extends State<DesktopPlaylistToolbar> {
                 width: _isSearchExpanded ? 200.0 : 34.0,
                 height: 32.0,
                 decoration: BoxDecoration(
-                  color:
-                      _isSearchExpanded
-                          ? const Color(0xFF222222)
-                          : (_isSearchHovered
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.transparent),
+                  color: _isSearchExpanded
+                      ? const Color(0xFF222222)
+                      : (_isSearchHovered
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.transparent),
                   borderRadius: BorderRadius.circular(16.0),
-                  border:
-                      _isSearchExpanded
-                          ? Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            width: 1.0,
-                          )
-                          : null,
-                ),
-                child:
-                    _isSearchExpanded
-                        ? Row(
-                          children: [
-                            const SizedBox(width: 8.0),
-                            const Icon(
-                              Icons.search_rounded,
-                              size: 16.0,
-                              color: Color(0xFFB3B3B3),
-                            ),
-                            const SizedBox(width: 6.0),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchCtrl,
-                                focusNode: _focusNode,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13.0,
-                                ),
-                                cursorColor: Colors.white,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  border: InputBorder.none,
-                                  hintText: 'Search in playlist',
-                                  hintStyle: TextStyle(
-                                    color: Color(0xFF757575),
-                                    fontSize: 12.5,
-                                  ),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onChanged: widget.onSearchChanged,
-                              ),
-                            ),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(12.0),
-                              onTap: _toggleSearch,
-                              child: const Padding(
-                                padding: EdgeInsets.all(4.0),
-                                child: Icon(
-                                  Icons.close_rounded,
-                                  size: 15.0,
-                                  color: Color(0xFFB3B3B3),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4.0),
-                          ],
+                  border: _isSearchExpanded
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          width: 1.0,
                         )
-                        : MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          onEnter:
-                              (_) => setState(() => _isSearchHovered = true),
-                          onExit:
-                              (_) => setState(() => _isSearchHovered = false),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                            icon: Icon(
-                              Icons.search_rounded,
-                              size: 20.0,
-                              color:
-                                  _isSearchHovered
-                                      ? Colors.white
-                                      : const Color(0xFFB3B3B3),
-                            ),
-                            tooltip: 'Search in playlist',
-                            onPressed: _toggleSearch,
+                      : null,
+                ),
+                child: _isSearchExpanded
+                    ? Row(
+                        children: [
+                          const SizedBox(width: 8.0),
+                          const Icon(
+                            Icons.search_rounded,
+                            size: 16.0,
+                            color: Color(0xFFB3B3B3),
                           ),
+                          const SizedBox(width: 6.0),
+                          Expanded(
+                            child: TextField(
+                              controller: _searchCtrl,
+                              focusNode: _focusNode,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.0,
+                              ),
+                              cursorColor: Colors.white,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                border: InputBorder.none,
+                                hintText: 'Search in playlist',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFF757575),
+                                  fontSize: 12.5,
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onChanged: widget.onSearchChanged,
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12.0),
+                            onTap: _toggleSearch,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 15.0,
+                                color: Color(0xFFB3B3B3),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4.0),
+                        ],
+                      )
+                    : MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        onEnter: (_) => setState(() => _isSearchHovered = true),
+                        onExit: (_) => setState(() => _isSearchHovered = false),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            Icons.search_rounded,
+                            size: 20.0,
+                            color: _isSearchHovered
+                                ? Colors.white
+                                : const Color(0xFFB3B3B3),
+                          ),
+                          tooltip: 'Search in playlist',
+                          onPressed: _toggleSearch,
                         ),
+                      ),
               ),
 
               const SizedBox(width: 16.0),
@@ -338,10 +328,9 @@ class _DesktopPlaylistToolbarState extends State<DesktopPlaylistToolbar> {
                         Text(
                           widget.currentSort.label,
                           style: TextStyle(
-                            color:
-                                _isSortHovered
-                                    ? Colors.white
-                                    : const Color(0xFFB3B3B3),
+                            color: _isSortHovered
+                                ? Colors.white
+                                : const Color(0xFFB3B3B3),
                             fontSize: 13.0,
                             fontWeight: FontWeight.w500,
                           ),
@@ -350,10 +339,9 @@ class _DesktopPlaylistToolbarState extends State<DesktopPlaylistToolbar> {
                         Icon(
                           Icons.arrow_drop_down_rounded,
                           size: 18.0,
-                          color:
-                              _isSortHovered
-                                  ? Colors.white
-                                  : const Color(0xFFB3B3B3),
+                          color: _isSortHovered
+                              ? Colors.white
+                              : const Color(0xFFB3B3B3),
                         ),
                       ],
                     ),

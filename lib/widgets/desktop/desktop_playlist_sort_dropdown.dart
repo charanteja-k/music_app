@@ -171,10 +171,9 @@ class _DropdownItemEntryState extends State<_DropdownItemEntry> {
 
   @override
   Widget build(BuildContext context) {
-    final itemColor =
-        widget.isSelected
-            ? widget.activeColor
-            : Colors.white.withValues(alpha: 0.88);
+    final itemColor = widget.isSelected
+        ? widget.activeColor
+        : Colors.white.withValues(alpha: 0.88);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -185,20 +184,18 @@ class _DropdownItemEntryState extends State<_DropdownItemEntry> {
         child: Container(
           height: 34.0,
           padding: const EdgeInsets.symmetric(horizontal: 14.0),
-          color:
-              _isHovered
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.transparent,
+          color: _isHovered
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.transparent,
           child: Row(
             children: [
               if (widget.leadingIcon != null) ...[
                 Icon(
                   widget.leadingIcon,
                   size: 16.0,
-                  color:
-                      widget.isSelected
-                          ? widget.activeColor
-                          : Colors.white.withValues(alpha: 0.70),
+                  color: widget.isSelected
+                      ? widget.activeColor
+                      : Colors.white.withValues(alpha: 0.70),
                 ),
                 const SizedBox(width: 10.0),
               ],
@@ -208,8 +205,9 @@ class _DropdownItemEntryState extends State<_DropdownItemEntry> {
                   style: TextStyle(
                     color: itemColor,
                     fontSize: 13.0,
-                    fontWeight:
-                        widget.isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w600
+                        : FontWeight.w400,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
