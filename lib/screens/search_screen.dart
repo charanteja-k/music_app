@@ -9,6 +9,7 @@ import '../services/preferences_service.dart';
 import '../services/dynamic_artist_service.dart';
 import '../services/canonical_song_dedup.dart';
 import '../services/studio_search_service.dart';
+import '../services/trending_catalog_service.dart';
 import '../models/jio_album.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../widgets/song_options_bottom_sheet.dart';
@@ -1860,14 +1861,10 @@ class SearchScreenState extends State<SearchScreen>
     if (!mounted) return;
     setState(() => _isLoadingBrowseAlbums = true);
     try {
-      var albums = await _musicService.searchAlbums(
-        '$lang Soundtracks',
+      final albums = await TrendingCatalogService().fetchTopAlbums(
+        language: lang,
         limit: 24,
       );
-      if (albums.length < 4) {
-        final fallback = await _musicService.searchAlbums(lang, limit: 24);
-        if (fallback.isNotEmpty) albums = fallback;
-      }
       if (mounted) {
         setState(() {
           _browseAlbums = albums;
@@ -2172,29 +2169,15 @@ class SearchScreenState extends State<SearchScreen>
                       ),
                     ),
                     const SizedBox(height: 2),
-                    if (album.artist.isNotEmpty)
-                      Text(
-                        album.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.60),
-                          fontSize: 11,
-                        ),
+                    Text(
+                      TrendingCatalogService.formatAlbumSubtitle(album),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.60),
+                        fontSize: 11,
                       ),
-                    if (album.year.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          album.year,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
               ),

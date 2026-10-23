@@ -20,6 +20,7 @@ import 'custom_playlist_screen.dart';
 import '../models/jio_album.dart';
 import '../constants/app_theme_tokens.dart';
 import '../services/studio_search_service.dart';
+import '../services/trending_catalog_service.dart';
 import '../services/auth_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/update_service.dart';
@@ -50,6 +51,15 @@ class _HomeScreenState extends State<HomeScreen>
   List<Video> _dailyMix1 = [];
   List<Video> _dailyMix2 = [];
   List<JioAlbum> _trendingAlbums = [];
+  int _selectedAlbumLangIndex = 0;
+  static const List<String> _albumLanguages = [
+    'Hindi',
+    'Telugu',
+    'Tamil',
+    'Punjabi',
+    'Malayalam',
+    'Kannada',
+  ];
   CircadianContext? _circadianContext;
   List<DailyMixConfig> _dailyMixConfigs = [];
   final ScrollController _circadianScrollController = ScrollController();
@@ -529,21 +539,22 @@ class _HomeScreenState extends State<HomeScreen>
         if (mounted) setState(() => _isLoadingCharts = false);
       }
 
-      // Priority 5: Trending Now
+      // Priority 5: Trending Now (authentic velocity-based trending)
       await pauseIfSearchActive();
       if (!mounted) return;
       try {
-        final trending = CanonicalSongDedup.deduplicateList(
-          _musicService.hasPreloadedHome &&
-                  _musicService.preloadedTrending.isNotEmpty
-              ? _musicService.preloadedTrending
-              : await _musicService
-                    .searchSongs('$primaryLang Trending')
-                    .timeout(
-                      const Duration(seconds: 8),
-                      onTimeout: () => <Video>[],
-                    ),
-        );
+        final trending =
+            _musicService.hasPreloadedHome &&
+                _musicService.preloadedTrending.isNotEmpty
+            ? CanonicalSongDedup.deduplicateList(
+                _musicService.preloadedTrending,
+              )
+            : await TrendingCatalogService()
+                  .fetchTrendingSongs(language: primaryLang, limit: 30)
+                  .timeout(
+                    const Duration(seconds: 8),
+                    onTimeout: () => <Video>[],
+                  );
         if (mounted) {
           setState(() {
             if (trending.isNotEmpty) _trendingNow = trending;
@@ -558,28 +569,26 @@ class _HomeScreenState extends State<HomeScreen>
         if (mounted) setState(() => _isLoadingTrending = false);
       }
 
-      // Priority 6: Soundtracks & Albums
+      // Priority 6: Soundtracks & Albums (authentic top albums)
       await pauseIfSearchActive();
       if (!mounted) return;
+
+      // Sync language chip index with user's primary language
+      final primaryIdx = _albumLanguages.indexWhere(
+        (l) => l.toLowerCase() == primaryLang.toLowerCase(),
+      );
+      if (primaryIdx != -1 && _selectedAlbumLangIndex != primaryIdx) {
+        _selectedAlbumLangIndex = primaryIdx;
+      }
+
       if (_trendingAlbums.isEmpty) {
         try {
-          var albums = await _musicService
-              .searchAlbums('$primaryLang Soundtracks', limit: 12)
+          final albums = await TrendingCatalogService()
+              .fetchTopAlbums(language: primaryLang, limit: 12)
               .timeout(
                 const Duration(seconds: 8),
                 onTimeout: () => <JioAlbum>[],
               );
-          if (albums.length < 3) {
-            final fallbackAlbums = await _musicService
-                .searchAlbums(primaryLang, limit: 12)
-                .timeout(
-                  const Duration(seconds: 8),
-                  onTimeout: () => <JioAlbum>[],
-                );
-            if (fallbackAlbums.isNotEmpty) {
-              albums = fallbackAlbums;
-            }
-          }
           if (mounted) {
             setState(() {
               if (albums.isNotEmpty) _trendingAlbums = albums;
@@ -794,6 +803,33 @@ class _HomeScreenState extends State<HomeScreen>
           _isLoadingMood = false;
         });
       }
+    }
+  }
+
+  Future<void> _onAlbumLanguageSelected(int index) async {
+    if (_selectedAlbumLangIndex == index && _trendingAlbums.isNotEmpty) return;
+    final lang = _albumLanguages[index];
+    setState(() => _selectedAlbumLangIndex = index);
+
+    final cached = TrendingCatalogService().getCachedAlbums(lang);
+    if (cached != null && cached.isNotEmpty) {
+      setState(() => _trendingAlbums = cached);
+      return;
+    }
+
+    setState(() => _isLoadingAlbums = true);
+    try {
+      final albums = await TrendingCatalogService()
+          .fetchTopAlbums(language: lang, limit: 12)
+          .timeout(const Duration(seconds: 8), onTimeout: () => <JioAlbum>[]);
+      if (mounted) {
+        setState(() {
+          if (albums.isNotEmpty) _trendingAlbums = albums;
+          _isLoadingAlbums = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAlbums = false);
     }
   }
 
@@ -1818,7 +1854,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildAlbumsSection({ScrollController? controller}) {
-    if (_trendingAlbums.isEmpty) return const SizedBox.shrink();
+    if (_trendingAlbums.isEmpty && !_isLoadingAlbums) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1828,6 +1866,53 @@ class _HomeScreenState extends State<HomeScreen>
           'Full Movie & Studio Albums',
           scrollController: controller,
         ),
+        // Language Filter Chips for Soundtracks & Albums
+        SizedBox(
+          height: 38,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: _albumLanguages.length,
+            itemBuilder: (context, idx) {
+              final isSelected = _selectedAlbumLangIndex == idx;
+              return GestureDetector(
+                onTap: () => _onAlbumLanguageSelected(idx),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(right: 8, bottom: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? _prefs.themeColor.withValues(alpha: 0.22)
+                        : const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isSelected
+                          ? _prefs.themeColor.withValues(alpha: 0.70)
+                          : Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    _albumLanguages[idx],
+                    style: TextStyle(
+                      color: isSelected ? _prefs.themeColor : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
         SizedBox(
           height: 220,
           child: ListView.builder(
@@ -1989,11 +2074,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        album.artist.isNotEmpty
-                            ? album.artist
-                            : (album.year.isNotEmpty
-                                  ? album.year
-                                  : 'Soundtrack'),
+                        TrendingCatalogService.formatAlbumSubtitle(album),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

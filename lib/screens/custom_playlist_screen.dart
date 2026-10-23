@@ -1,13 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart'
-    show Video, VideoId, ChannelId, ThumbnailSet, Engagement;
 import '../services/music_service.dart';
 import '../services/preferences_service.dart';
 import '../services/auth_service.dart';
-import '../services/album_color_deriver.dart';
-import '../services/canonical_song_dedup.dart';
 import '../utils/image_utils.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/mini_player.dart';
@@ -269,6 +265,16 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     final isDesktop = MediaQuery.of(context).size.width >= 1024;
     final displayedSongs = _getDisplayedSongs(songs);
     final themeColor = Theme.of(context).primaryColor;
+    final description = (playlist['description'] as String?) ?? '';
+    final customCoverUrl =
+        (playlist['customCoverUrl'] ??
+                playlist['coverUrl'] ??
+                playlist['imageUrl'])
+            as String?;
+    final isSpotifyImport = PreferencesService().isSpotifyImportedPlaylist(
+      widget.playlistId,
+    );
+    final dominantColor = _getDominantColor(name);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -279,219 +285,254 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
             child: CustomScrollView(
               controller: _scrollController,
               slivers: [
-                SliverAppBar(
-                  backgroundColor: const Color(0xFF181818),
-                  expandedHeight: 260,
-                  pinned: true,
-                  stretch: true,
-                  leading: IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        DesktopLayoutState.closeDetailView();
-                      }
-                    },
-                  ),
-                  flexibleSpace: FlexibleSpaceBar(
-                    centerTitle: false,
-                    titlePadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    title: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        fontSize: 20,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    background: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onSecondaryTapDown: (details) {
-                        showUnifiedPlaylistMenu(
-                          context: context,
-                          globalPosition: details.globalPosition,
-                          playlist: isLikedSongs
-                              ? 'liked_songs'
-                              : {
-                                  'id': widget.playlistId,
-                                  'name': name,
-                                  'isSpotify': PreferencesService()
-                                      .isSpotifyImportedPlaylist(
-                                        widget.playlistId,
-                                      ),
-                                  'songs': songs,
-                                },
-                        );
-                      },
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (isLikedSongs)
-                            _buildLikedSongsArtwork()
-                          else if (firstThumbnail != null &&
-                              firstThumbnail.isNotEmpty)
-                            Image.network(
-                              firstThumbnail,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildDefaultArtwork(),
-                            )
-                          else
-                            _buildDefaultArtwork(),
-                          // Gradient overlay
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.3),
-                                  const Color(
-                                    0xFF121212,
-                                  ).withValues(alpha: 0.95),
-                                  const Color(0xFF121212),
-                                ],
-                                stops: const [0.0, 0.7, 1.0],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Action Buttons & Playlist Stats Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            isLikedSongs
-                                ? '${songs.length} ${songs.length == 1 ? "song" : "songs"}'
-                                : '${songs.length} ${songs.length == 1 ? "track" : "tracks"} • Drag handle to reorder',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                if (!isDesktop) ...[
+                  SliverAppBar(
+                    backgroundColor: const Color(0xFF181818),
+                    expandedHeight: 260,
+                    pinned: true,
+                    stretch: true,
+                    leading: IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Colors.black38,
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 8),
-                        if (songs.isNotEmpty) ...[
-                          ElevatedButton.icon(
-                            icon: const Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.black,
-                              size: 22,
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          DesktopLayoutState.closeDetailView();
+                        }
+                      },
+                    ),
+                    flexibleSpace: FlexibleSpaceBar(
+                      centerTitle: false,
+                      titlePadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      title: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontSize: 20,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      background: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onSecondaryTapDown: (details) {
+                          showUnifiedPlaylistMenu(
+                            context: context,
+                            globalPosition: details.globalPosition,
+                            playlist: isLikedSongs
+                                ? 'liked_songs'
+                                : {
+                                    'id': widget.playlistId,
+                                    'name': name,
+                                    'isSpotify': isSpotifyImport,
+                                    'songs': songs,
+                                  },
+                          );
+                        },
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (isLikedSongs)
+                              _buildLikedSongsArtwork()
+                            else if (firstThumbnail != null &&
+                                firstThumbnail.isNotEmpty)
+                              Image.network(
+                                ImageUtils.toHighResUrl(firstThumbnail),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildDefaultArtwork(),
+                              )
+                            else
+                              _buildDefaultArtwork(),
+                            // Gradient overlay
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.3),
+                                    const Color(
+                                      0xFF121212,
+                                    ).withValues(alpha: 0.95),
+                                    const Color(0xFF121212),
+                                  ],
+                                  stops: const [0.0, 0.7, 1.0],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
                             ),
-                            label: const Text(
-                              'Play',
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Mobile Action Buttons & Playlist Stats Header
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isLikedSongs
+                                  ? '${songs.length} ${songs.length == 1 ? "song" : "songs"}'
+                                  : '${songs.length} ${songs.length == 1 ? "track" : "tracks"} • Drag handle to reorder',
                               style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 9,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              elevation: 4,
-                            ),
-                            onPressed: () {
-                              HapticFeedback.mediumImpact();
-                              if (isLikedSongs) {
-                                _musicService.playLikedSong(
-                                  _musicService.likedSongs.first,
-                                );
-                              } else {
-                                _musicService.playCustomPlaylist(
-                                  widget.playlistId,
-                                  0,
-                                );
-                              }
-                            },
                           ),
                           const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            icon: const Icon(
-                              Icons.shuffle_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Shuffle',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                          if (songs.isNotEmpty) ...[
+                            ElevatedButton.icon(
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.black,
+                                size: 22,
                               ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.12,
+                              label: const Text(
+                                'Play',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                               ),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 9,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 9,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 4,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              elevation: 0,
-                            ),
-                            onPressed: () {
-                              HapticFeedback.mediumImpact();
-                              if (isLikedSongs) {
-                                if (_musicService.likedSongs.isNotEmpty) {
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                if (isLikedSongs) {
                                   _musicService.playLikedSong(
                                     _musicService.likedSongs.first,
-                                    enableShuffle: true,
+                                  );
+                                } else {
+                                  _musicService.playCustomPlaylist(
+                                    widget.playlistId,
+                                    0,
                                   );
                                 }
-                              } else {
-                                _musicService.playCustomPlaylistWithShuffle(
-                                  widget.playlistId,
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (isLikedSongs)
-                          Builder(
-                            builder: (btnCtx) => IconButton(
-                              tooltip: 'Playlist options',
-                              icon: Container(
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              icon: const Icon(
+                                Icons.shuffle_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                'Shuffle',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.12,
+                                ),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 9,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                if (isLikedSongs) {
+                                  if (_musicService.likedSongs.isNotEmpty) {
+                                    _musicService.playLikedSong(
+                                      _musicService.likedSongs.first,
+                                      enableShuffle: true,
+                                    );
+                                  }
+                                } else {
+                                  _musicService.playCustomPlaylistWithShuffle(
+                                    widget.playlistId,
+                                  );
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (isLikedSongs)
+                            Builder(
+                              builder: (btnCtx) => IconButton(
+                                tooltip: 'Playlist options',
+                                icon: Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.10),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.more_vert_rounded,
+                                    color: Colors.white70,
+                                    size: 20,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  final renderBox =
+                                      btnCtx.findRenderObject() as RenderBox?;
+                                  final offset =
+                                      renderBox?.localToGlobal(Offset.zero) ??
+                                      Offset.zero;
+                                  final size = renderBox?.size ?? Size.zero;
+                                  showUnifiedPlaylistMenu(
+                                    context: context,
+                                    globalPosition: Offset(
+                                      offset.dx,
+                                      offset.dy + size.height,
+                                    ),
+                                    playlist: 'liked_songs',
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            PlaylistActionMenu(
+                              playlistId: widget.playlistId,
+                              playlistName: name,
+                              isSpotifyImport: isSpotifyImport,
+                              customTrigger: Container(
                                 width: 38,
                                 height: 38,
                                 alignment: Alignment.center,
@@ -505,53 +546,76 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                   size: 20,
                                 ),
                               ),
-                              onPressed: () {
-                                final renderBox =
-                                    btnCtx.findRenderObject() as RenderBox?;
-                                final offset =
-                                    renderBox?.localToGlobal(Offset.zero) ??
-                                    Offset.zero;
-                                final size = renderBox?.size ?? Size.zero;
-                                showUnifiedPlaylistMenu(
-                                  context: context,
-                                  globalPosition: Offset(
-                                    offset.dx,
-                                    offset.dy + size.height,
-                                  ),
-                                  playlist: 'liked_songs',
-                                );
+                              closeScreenOnDelete: true,
+                              onRenamed: (_) {
+                                if (mounted) setState(() {});
                               },
                             ),
-                          )
-                        else
-                          PlaylistActionMenu(
-                            playlistId: widget.playlistId,
-                            playlistName: name,
-                            isSpotifyImport: PreferencesService()
-                                .isSpotifyImportedPlaylist(widget.playlistId),
-                            customTrigger: Container(
-                              width: 38,
-                              height: 38,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.10),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.more_vert_rounded,
-                                color: Colors.white70,
-                                size: 20,
-                              ),
-                            ),
-                            closeScreenOnDelete: true,
-                            onRenamed: (_) {
-                              if (mounted) setState(() {});
-                            },
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  // Desktop Back Button Row
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: 20,
+                        top: 16,
+                        bottom: 4,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.black38,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } else {
+                              DesktopLayoutState.closeDetailView();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Desktop Horizontal Hero Banner
+                  SliverToBoxAdapter(
+                    child: _buildDesktopHeroBanner(
+                      context: context,
+                      name: name,
+                      description: description,
+                      isLikedSongs: isLikedSongs,
+                      isSpotifyImport: isSpotifyImport,
+                      songs: songs,
+                      customCoverUrl: customCoverUrl,
+                      dominantColor: dominantColor,
+                    ),
+                  ),
+
+                  // Desktop Spotify Action Row
+                  SliverToBoxAdapter(
+                    child: _buildDesktopActionRow(
+                      context: context,
+                      name: name,
+                      isLikedSongs: isLikedSongs,
+                      isSpotifyImport: isSpotifyImport,
+                      songs: songs,
+                    ),
+                  ),
+                ],
 
                 // Spotify Desktop Playlist Toolbar & Sticky Table Header
                 if (isDesktop) ...[
@@ -1406,11 +1470,506 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     );
   }
 
-  Widget _buildLikedSongsArtwork() {
+  Color _getDominantColor(String playlistName) {
+    if (widget.playlistId == 'liked_songs') {
+      return const Color(0xFF5038A0);
+    }
+    final hash = playlistName.hashCode.abs();
+    final double hue = (hash % 360).toDouble();
+    return HSLColor.fromAHSL(1.0, hue, 0.65, 0.22).toColor();
+  }
+
+  String _formatTotalDuration(List<Map<String, dynamic>> songs) {
+    if (songs.isEmpty) return '';
+    int totalSeconds = 0;
+    for (final s in songs) {
+      final durMs = s['durationMs'];
+      if (durMs is num && durMs > 0) {
+        totalSeconds += (durMs / 1000).round();
+        continue;
+      }
+      final dur = s['duration'];
+      if (dur is Duration) {
+        totalSeconds += dur.inSeconds;
+      } else if (dur is int && dur > 0) {
+        totalSeconds += dur > 10000 ? (dur / 1000).round() : dur;
+      } else if (dur is String && dur.isNotEmpty) {
+        if (dur.contains(':')) {
+          final parts = dur.split(':');
+          if (parts.length == 2) {
+            totalSeconds +=
+                (int.tryParse(parts[0]) ?? 0) * 60 +
+                (int.tryParse(parts[1]) ?? 0);
+          } else if (parts.length == 3) {
+            totalSeconds +=
+                (int.tryParse(parts[0]) ?? 0) * 3600 +
+                (int.tryParse(parts[1]) ?? 0) * 60 +
+                (int.tryParse(parts[2]) ?? 0);
+          }
+        } else {
+          final parsed = int.tryParse(dur);
+          if (parsed != null && parsed > 0) {
+            totalSeconds += parsed > 10000 ? (parsed / 1000).round() : parsed;
+          }
+        }
+      }
+    }
+
+    if (totalSeconds == 0 && songs.isNotEmpty) {
+      totalSeconds = songs.length * 210;
+    }
+
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return ', about $hours hr $minutes min';
+    } else if (minutes > 0) {
+      return ', $minutes min $seconds sec';
+    } else {
+      return ', $seconds sec';
+    }
+  }
+
+  Widget _buildSingleCover({
+    required BuildContext context,
+    required String url,
+    required double size,
+  }) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final targetCache = (size * dpr).round().clamp(232, 2048);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6.0),
+      child: Image.network(
+        ImageUtils.toHighResUrl(url),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: targetCache,
+        cacheHeight: targetCache,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) =>
+            _buildDefaultArtwork(width: size, height: size),
+      ),
+    );
+  }
+
+  Widget _buildMosaicCover({
+    required BuildContext context,
+    required List<Map<String, dynamic>> songs,
+    required double size,
+  }) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final quadSize = size / 2;
+    final quadCache = (quadSize * dpr).round().clamp(64, 1024);
+
+    final thumbs = <String>[];
+    for (final s in songs) {
+      final t =
+          (s['thumbnail'] ??
+                  s['thumbnailUrl'] ??
+                  s['artworkUrl'] ??
+                  s['imageUrl'] ??
+                  '')
+              .toString();
+      if (t.isNotEmpty && !thumbs.contains(t)) {
+        thumbs.add(ImageUtils.toHighResUrl(t));
+        if (thumbs.length == 4) break;
+      }
+    }
+    while (thumbs.length < 4 && thumbs.isNotEmpty) {
+      thumbs.add(thumbs.first);
+    }
+    if (thumbs.isEmpty) {
+      return _buildDefaultArtwork(width: size, height: size);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6.0),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Column(
+          children: [
+            Row(
+              children: [
+                _buildQuadrantTile(thumbs[0], quadSize, quadCache),
+                _buildQuadrantTile(thumbs[1], quadSize, quadCache),
+              ],
+            ),
+            Row(
+              children: [
+                _buildQuadrantTile(thumbs[2], quadSize, quadCache),
+                _buildQuadrantTile(thumbs[3], quadSize, quadCache),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuadrantTile(String url, double size, int cacheSize) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: const Color(0xFF282828),
+          child: const Center(
+            child: Icon(
+              Icons.music_note_rounded,
+              size: 24,
+              color: Colors.white24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroArtwork({
+    required BuildContext context,
+    required bool isLikedSongs,
+    required List<Map<String, dynamic>> songs,
+    required String? customCoverUrl,
+    required double size,
+  }) {
+    if (isLikedSongs) {
+      return _buildLikedSongsArtwork(width: size, height: size);
+    }
+    if (customCoverUrl != null && customCoverUrl.isNotEmpty) {
+      return _buildSingleCover(
+        context: context,
+        url: customCoverUrl,
+        size: size,
+      );
+    }
+    if (songs.length >= 4) {
+      return _buildMosaicCover(context: context, songs: songs, size: size);
+    }
+    if (songs.isNotEmpty) {
+      final firstThumb =
+          (songs.first['thumbnail'] ??
+                  songs.first['thumbnailUrl'] ??
+                  songs.first['artworkUrl'] ??
+                  '')
+              .toString();
+      if (firstThumb.isNotEmpty) {
+        return _buildSingleCover(context: context, url: firstThumb, size: size);
+      }
+    }
+    return _buildDefaultArtwork(width: size, height: size);
+  }
+
+  Widget _buildDesktopHeroBanner({
+    required BuildContext context,
+    required String name,
+    required String description,
+    required bool isLikedSongs,
+    required bool isSpotifyImport,
+    required List<Map<String, dynamic>> songs,
+    required String? customCoverUrl,
+    required Color dominantColor,
+  }) {
+    final titleLen = name.length;
+    final double titleFontSize;
+    final FontWeight titleFontWeight;
+    final double? letterSpacing;
+    if (titleLen < 15) {
+      titleFontSize = 56;
+      titleFontWeight = FontWeight.w900;
+      letterSpacing = -1.2;
+    } else if (titleLen <= 30) {
+      titleFontSize = 42;
+      titleFontWeight = FontWeight.w800;
+      letterSpacing = -0.8;
+    } else {
+      titleFontSize = 32;
+      titleFontWeight = FontWeight.w700;
+      letterSpacing = null;
+    }
+
+    final auth = AuthService();
+    final authorName = auth.userDisplayName ?? 'DilSe User';
+    final authorPhoto = auth.userPhotoUrl;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: details.globalPosition,
+          playlist: isLikedSongs
+              ? 'liked_songs'
+              : {
+                  'id': widget.playlistId,
+                  'name': name,
+                  'isSpotify': isSpotifyImport,
+                  'songs': songs,
+                },
+        );
+      },
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 260),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              dominantColor.withValues(alpha: 0.55),
+              const Color(0xFF121212).withValues(alpha: 0.85),
+              const Color(0xFF121212),
+            ],
+            stops: const [0.0, 0.7, 1.0],
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _DesktopHeroCoverBox(
+              canEdit: !isLikedSongs,
+              onEdit: () => _showEditDetailsModal(context, name),
+              size: 232.0,
+              child: _buildHeroArtwork(
+                context: context,
+                isLikedSongs: isLikedSongs,
+                songs: songs,
+                customCoverUrl: customCoverUrl,
+                size: 232.0,
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    isLikedSongs
+                        ? 'PLAYLIST'
+                        : (isSpotifyImport
+                              ? 'SPOTIFY IMPORT'
+                              : 'PUBLIC PLAYLIST'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: titleFontSize,
+                      fontWeight: titleFontWeight,
+                      letterSpacing: letterSpacing,
+                      height: 1.05,
+                    ),
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.70),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: const Color(0xFF282828),
+                        backgroundImage:
+                            (authorPhoto != null && authorPhoto.isNotEmpty)
+                            ? NetworkImage(authorPhoto)
+                            : null,
+                        child: (authorPhoto == null || authorPhoto.isEmpty)
+                            ? const Icon(
+                                Icons.person_rounded,
+                                size: 14,
+                                color: Colors.white70,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        authorName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        ' • ',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.60),
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '${songs.length} ${songs.length == 1 ? "song" : "songs"}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        _formatTotalDuration(songs),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.60),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopActionRow({
+    required BuildContext context,
+    required String name,
+    required bool isLikedSongs,
+    required bool isSpotifyImport,
+    required List<Map<String, dynamic>> songs,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+      child: Row(
+        children: [
+          _DesktopHeroPlayButton(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              if (isLikedSongs) {
+                if (_musicService.likedSongs.isNotEmpty) {
+                  _musicService.playLikedSong(_musicService.likedSongs.first);
+                }
+              } else if (songs.isNotEmpty) {
+                _musicService.playCustomPlaylist(widget.playlistId, 0);
+              }
+            },
+          ),
+          const SizedBox(width: 20),
+          _DesktopHeroShuffleButton(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              if (isLikedSongs) {
+                if (_musicService.likedSongs.isNotEmpty) {
+                  _musicService.playLikedSong(
+                    _musicService.likedSongs.first,
+                    enableShuffle: true,
+                  );
+                }
+              } else if (songs.isNotEmpty) {
+                _musicService.playCustomPlaylistWithShuffle(widget.playlistId);
+              }
+            },
+          ),
+          const SizedBox(width: 16),
+          _DesktopHeroPinButton(
+            isPinned: PreferencesService().isPlaylistPinned(widget.playlistId),
+            onTap: () {
+              setState(() {
+                PreferencesService().togglePinPlaylist(widget.playlistId);
+              });
+            },
+          ),
+          const SizedBox(width: 16),
+          if (isLikedSongs)
+            Builder(
+              builder: (btnCtx) => IconButton(
+                tooltip: 'More options',
+                icon: Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: Colors.white70,
+                    size: 26,
+                  ),
+                ),
+                onPressed: () {
+                  final renderBox = btnCtx.findRenderObject() as RenderBox?;
+                  final offset =
+                      renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+                  final size = renderBox?.size ?? Size.zero;
+                  showUnifiedPlaylistMenu(
+                    context: context,
+                    globalPosition: Offset(offset.dx, offset.dy + size.height),
+                    playlist: 'liked_songs',
+                  );
+                },
+              ),
+            )
+          else
+            PlaylistActionMenu(
+              playlistId: widget.playlistId,
+              playlistName: name,
+              isSpotifyImport: isSpotifyImport,
+              customTrigger: Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.more_horiz_rounded,
+                  color: Colors.white70,
+                  size: 26,
+                ),
+              ),
+              closeScreenOnDelete: true,
+              onRenamed: (_) {
+                if (mounted) setState(() {});
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLikedSongsArtwork({double? width, double? height}) {
     return Container(
+      width: width,
+      height: height,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2E2E2E), Color(0xFF181818)],
+          colors: [Color(0xFF450AF5), Color(0xFF8E8EE5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1421,9 +1980,11 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     );
   }
 
-  Widget _buildDefaultArtwork() {
+  Widget _buildDefaultArtwork({double? width, double? height}) {
     final themeColor = PreferencesService().themeColor;
     return Container(
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: themeColor.withValues(alpha: 0.16),
         border: Border.all(
@@ -1500,7 +2061,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
             ),
           ),
           SizedBox(
-            width: 60.0,
+            width: 110.0,
             child: Align(
               alignment: Alignment.centerRight,
               child: Padding(
@@ -1831,7 +2392,7 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
                                 color: const Color(0xFF1E1E1E),
                                 child: thumb.isNotEmpty
                                     ? Image.network(
-                                        thumb,
+                                        ImageUtils.toHighResUrl(thumb),
                                         width: 40.0,
                                         height: 40.0,
                                         cacheWidth: 100,
@@ -1921,9 +2482,9 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
                   ),
                 ),
 
-                // Duration + More Options Button (width: 60)
+                // Duration + More Options Button (width: 110)
                 SizedBox(
-                  width: 60.0,
+                  width: 110.0,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -1950,6 +2511,7 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
                                 ? Colors.white70
                                 : Colors.transparent,
                           ),
+                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
                             minWidth: 28.0,
@@ -1975,6 +2537,240 @@ class _DesktopTrackRowWidgetState extends State<_DesktopTrackRowWidget> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHeroCoverBox extends StatefulWidget {
+  final Widget child;
+  final bool canEdit;
+  final VoidCallback onEdit;
+  final double size;
+
+  const _DesktopHeroCoverBox({
+    required this.child,
+    required this.canEdit,
+    required this.onEdit,
+    this.size = 232.0,
+  });
+
+  @override
+  State<_DesktopHeroCoverBox> createState() => _DesktopHeroCoverBoxState();
+}
+
+class _DesktopHeroCoverBoxState extends State<_DesktopHeroCoverBox> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.canEdit
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.canEdit ? widget.onEdit : null,
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.55),
+                blurRadius: 36,
+                spreadRadius: 2,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6.0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                widget.child,
+                if (widget.canEdit && _isHovered)
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.edit_rounded, size: 48, color: Colors.white),
+                        SizedBox(height: 8),
+                        Text(
+                          'Choose photo',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHeroPlayButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _DesktopHeroPlayButton({required this.onPressed});
+
+  @override
+  State<_DesktopHeroPlayButton> createState() => _DesktopHeroPlayButtonState();
+}
+
+class _DesktopHeroPlayButtonState extends State<_DesktopHeroPlayButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.05 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(
+                  0xFF1DB954,
+                ).withValues(alpha: _isHovered ? 0.55 : 0.30),
+                blurRadius: _isHovered ? 16 : 10,
+                spreadRadius: _isHovered ? 2 : 0,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: widget.onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1DB954),
+              foregroundColor: Colors.black,
+              shape: const CircleBorder(),
+              padding: EdgeInsets.zero,
+              elevation: 0,
+            ),
+            child: const Stack(
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  opacity: 0.0,
+                  child: Text('Play', style: TextStyle(fontSize: 1)),
+                ),
+                Icon(Icons.play_arrow_rounded, size: 32, color: Colors.black),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHeroShuffleButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _DesktopHeroShuffleButton({required this.onPressed});
+
+  @override
+  State<_DesktopHeroShuffleButton> createState() =>
+      _DesktopHeroShuffleButtonState();
+}
+
+class _DesktopHeroShuffleButtonState extends State<_DesktopHeroShuffleButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: widget.onPressed,
+        child: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.shuffle_rounded,
+            size: 24,
+            color: _isHovered ? Colors.white : Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopHeroPinButton extends StatefulWidget {
+  final bool isPinned;
+  final VoidCallback onTap;
+  const _DesktopHeroPinButton({required this.isPinned, required this.onTap});
+
+  @override
+  State<_DesktopHeroPinButton> createState() => _DesktopHeroPinButtonState();
+}
+
+class _DesktopHeroPinButtonState extends State<_DesktopHeroPinButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Tooltip(
+        message: widget.isPinned
+            ? 'Remove from Your Library'
+            : 'Save to Your Library',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: widget.onTap,
+          child: Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              widget.isPinned
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              size: 24,
+              color: widget.isPinned
+                  ? const Color(0xFF1DB954)
+                  : (_isHovered ? Colors.white : Colors.white70),
             ),
           ),
         ),

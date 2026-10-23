@@ -10,6 +10,7 @@ import '../services/music_service.dart';
 import '../services/canonical_song_dedup.dart';
 import '../services/preferences_service.dart';
 import '../services/studio_search_service.dart';
+import '../services/trending_catalog_service.dart';
 import '../services/youtube_library_service.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/animated_equalizer.dart';
@@ -314,6 +315,45 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
           setState(() {
             _isLoading = false;
             _errorMessage = 'Failed to load tracks: $e';
+          });
+        }
+      }
+      return;
+    }
+
+    final isTrending =
+        widget.title.toLowerCase().contains('trending') ||
+        qLower.contains('trending');
+
+    if (isTrending) {
+      try {
+        final preferredLang =
+            PreferencesService().preferredLanguages.firstOrNull ?? 'Hindi';
+        final songsFuture = TrendingCatalogService()
+            .fetchTrendingSongs(language: preferredLang, limit: 40)
+            .timeout(const Duration(seconds: 10), onTimeout: () => <Video>[]);
+        final albumsFuture = TrendingCatalogService()
+            .fetchTopAlbums(language: preferredLang, limit: 10)
+            .timeout(const Duration(seconds: 8), onTimeout: () => <JioAlbum>[]);
+
+        final songs = await songsFuture;
+        final albums = await albumsFuture;
+
+        if (mounted) {
+          setState(() {
+            _tracks = CanonicalSongDedup.deduplicateList(songs);
+            _relatedAlbums = albums;
+            _isLoading = false;
+            if (_tracks.isEmpty && _relatedAlbums.isEmpty) {
+              _errorMessage = 'No trending tracks found.';
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Failed to load trending tracks: $e';
           });
         }
       }
@@ -1345,9 +1385,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              album.artist.isNotEmpty
-                  ? album.artist
-                  : (album.year.isNotEmpty ? album.year : 'Album'),
+              TrendingCatalogService.formatAlbumSubtitle(album),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
