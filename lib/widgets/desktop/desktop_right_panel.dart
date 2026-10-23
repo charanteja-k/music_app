@@ -202,7 +202,7 @@ class _DesktopNowPlayingTab extends StatelessWidget {
                   width: 72.0,
                   height: 72.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161622),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(16.0),
                   ),
                   child: const Icon(
@@ -282,7 +282,7 @@ class _DesktopNowPlayingTab extends StatelessWidget {
                           height: 248.0,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Container(
-                            color: const Color(0xFF1F1F2B),
+                            color: const Color(0xFF181818),
                             child: const Center(
                               child: Icon(
                                 Icons.music_note_rounded,
@@ -396,7 +396,7 @@ class _DesktopNowPlayingTab extends StatelessWidget {
                           'Song link copied to clipboard!',
                           style: TextStyle(color: Colors.white),
                         ),
-                        backgroundColor: const Color(0xFF1E1E28),
+                        backgroundColor: const Color(0xFF181818),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(
@@ -662,7 +662,7 @@ class _DesktopAboutArtistCard extends StatelessWidget {
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
-                          const Color(0xFF161622).withValues(alpha: 0.95),
+                          const Color(0xFF181818).withValues(alpha: 0.95),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -850,7 +850,7 @@ class _DesktopNextInQueueCard extends StatelessWidget {
                                 errorBuilder: (_, _, _) => Container(
                                   width: 44.0,
                                   height: 44.0,
-                                  color: const Color(0xFF282836),
+                                  color: const Color(0xFF282828),
                                   child: const Icon(
                                     Icons.music_note_rounded,
                                     color: Colors.white30,
@@ -861,7 +861,7 @@ class _DesktopNextInQueueCard extends StatelessWidget {
                             : Container(
                                 width: 44.0,
                                 height: 44.0,
-                                color: const Color(0xFF282836),
+                                color: const Color(0xFF282828),
                                 child: const Icon(
                                   Icons.music_note_rounded,
                                   color: Colors.white30,
@@ -1152,7 +1152,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161622),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(12.0),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.08),
@@ -1171,7 +1171,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                           errorBuilder: (_, _, _) => Container(
                             width: 48.0,
                             height: 48.0,
-                            color: const Color(0xFF282836),
+                            color: const Color(0xFF282828),
                             child: const Icon(
                               Icons.music_note_rounded,
                               color: Colors.white24,
@@ -1352,7 +1352,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                                         errorBuilder: (_, _, _) => Container(
                                           width: 40.0,
                                           height: 40.0,
-                                          color: const Color(0xFF282836),
+                                          color: const Color(0xFF282828),
                                           child: const Icon(
                                             Icons.music_note_rounded,
                                             color: Colors.white24,

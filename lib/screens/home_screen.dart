@@ -878,7 +878,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 ],
                               ),
                               child: CircleAvatar(
-                                backgroundColor: const Color(0xFF1E1E28),
+                                backgroundColor: const Color(0xFF181818),
                                 radius: 20,
                                 backgroundImage: getProfileImageProvider(
                                   _prefs.profileImagePath,
@@ -933,7 +933,7 @@ class _HomeScreenState extends State<HomeScreen>
                         decoration: BoxDecoration(
                           color: isSelected
                               ? Colors.white.withValues(alpha: 0.16)
-                              : const Color(0xFF161622),
+                              : const Color(0xFF181818),
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(
                             color: isSelected
@@ -1626,7 +1626,7 @@ class _HomeScreenState extends State<HomeScreen>
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF161622),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.12),
@@ -1904,9 +1904,9 @@ class _HomeScreenState extends State<HomeScreen>
                                     border: Border.all(
                                       color: isSingle
                                           ? Colors.white24
-                                          : const Color(
-                                              0xFF7C3AED,
-                                            ).withValues(alpha: 0.6),
+                                          : _prefs.themeColor.withValues(
+                                              alpha: 0.6,
+                                            ),
                                       width: 1,
                                     ),
                                   ),
@@ -1917,7 +1917,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     style: TextStyle(
                                       color: isSingle
                                           ? Colors.white70
-                                          : const Color(0xFFA78BFA),
+                                          : _prefs.themeColor,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.2,
@@ -1994,7 +1994,7 @@ class _HomeScreenState extends State<HomeScreen>
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1F1B2C), Color(0xFF120E1E)],
+          colors: [Color(0xFF181818), Color(0xFF121212)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -2003,7 +2003,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.album_rounded, color: Color(0xFFA78BFA), size: 40),
+            Icon(Icons.album_rounded, color: _prefs.themeColor, size: 40),
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),

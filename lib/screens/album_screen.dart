@@ -41,6 +41,7 @@ class AlbumScreen extends StatefulWidget {
 class _AlbumScreenState extends State<AlbumScreen>
     with SingleTickerProviderStateMixin {
   final MusicService _music = MusicService();
+  final PreferencesService _prefs = PreferencesService();
   final ScrollController _scrollController = ScrollController();
   JioAlbum? _album;
   bool _loading = true;
@@ -263,10 +264,10 @@ class _AlbumScreenState extends State<AlbumScreen>
 
                 // Loading / Error
                 if (_loading)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     child: Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF7C3AED),
+                        color: _prefs.themeColor,
                       ),
                     ),
                   )
@@ -299,9 +300,9 @@ class _AlbumScreenState extends State<AlbumScreen>
                               });
                               _loadAlbum();
                             },
-                            child: const Text(
+                            child: Text(
                               'Retry',
-                              style: TextStyle(color: Color(0xFF7C3AED)),
+                              style: TextStyle(color: _prefs.themeColor),
                             ),
                           ),
                         ],
@@ -344,7 +345,7 @@ class _AlbumScreenState extends State<AlbumScreen>
                             const SizedBox(height: 24),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF7C3AED),
+                                backgroundColor: _prefs.themeColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -554,13 +555,11 @@ class _AlbumScreenState extends State<AlbumScreen>
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-                  ),
+                  color: _prefs.themeColor,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                      color: _prefs.themeColor.withValues(alpha: 0.35),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -752,7 +751,7 @@ class _AlbumScreenState extends State<AlbumScreen>
             title: Text(
               title,
               style: TextStyle(
-                color: isPlaying ? const Color(0xFF7C3AED) : Colors.white,
+                color: isPlaying ? _prefs.themeColor : Colors.white,
                 fontSize: 14,
                 fontWeight: isPlaying ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -877,7 +876,7 @@ class _AlbumScreenState extends State<AlbumScreen>
               shape: BoxShape.circle,
               color: Colors.black.withValues(alpha: 0.65),
               border: Border.all(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                color: _prefs.themeColor.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
@@ -885,7 +884,7 @@ class _AlbumScreenState extends State<AlbumScreen>
               child: Text(
                 title.isNotEmpty ? title[0].toUpperCase() : '♪',
                 style: TextStyle(
-                  color: const Color(0xFFA78BFA),
+                  color: _prefs.themeColor,
                   fontSize: size * 0.16,
                   fontWeight: FontWeight.w900,
                 ),

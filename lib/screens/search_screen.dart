@@ -176,7 +176,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Party & Dance',
       'subtitle': 'Club Nights & EDM',
       'query': 'Party Dance Club Hits',
-      'colors': [const Color(0xFF7358FF), const Color(0xFF3B2D82)],
+      'colors': [const Color(0xFFBD6B52), const Color(0xFF5A3327)],
       'icon': Icons.celebration_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&q=80',
@@ -1200,11 +1200,11 @@ class SearchScreenState extends State<SearchScreen>
               switch (item.type) {
                 case 'artist':
                   typeIcon = Icons.person_rounded;
-                  iconColor = const Color(0xFFA78BFA);
+                  iconColor = _prefs.legibleThemeColor;
                   break;
                 case 'album':
                   typeIcon = Icons.album_rounded;
-                  iconColor = const Color(0xFF60A5FA);
+                  iconColor = _prefs.legibleThemeColor;
                   break;
                 default:
                   typeIcon = Icons.history_rounded;
@@ -1792,7 +1792,7 @@ class SearchScreenState extends State<SearchScreen>
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
                 color: active
-                    ? const Color(0xFF7C3AED)
+                    ? _prefs.themeColor
                     : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
@@ -1803,7 +1803,7 @@ class SearchScreenState extends State<SearchScreen>
                 boxShadow: active
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                          color: _prefs.themeColor.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
@@ -1867,17 +1867,17 @@ class SearchScreenState extends State<SearchScreen>
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.16),
+                    color: _prefs.themeColor.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                      color: _prefs.themeColor.withValues(alpha: 0.35),
                       width: 1,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.album_rounded,
                     size: 16,
-                    color: Color(0xFFA78BFA),
+                    color: _prefs.themeColor,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1940,7 +1940,7 @@ class SearchScreenState extends State<SearchScreen>
                           }
                         },
                         selectedColor: Theme.of(context).primaryColor,
-                        backgroundColor: const Color(0xFF161622),
+                        backgroundColor: const Color(0xFF181818),
                         labelStyle: TextStyle(
                           color: _selectedAlbumBrowseLang == lang
                               ? Colors.black
@@ -2104,16 +2104,14 @@ class SearchScreenState extends State<SearchScreen>
                         border: Border.all(
                           color: isSingle
                               ? Colors.white24
-                              : const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                              : _prefs.themeColor.withValues(alpha: 0.5),
                           width: 1,
                         ),
                       ),
                       child: Text(
                         isSingle ? 'Single' : '${album.songCount} Songs',
                         style: TextStyle(
-                          color: isSingle
-                              ? Colors.white70
-                              : const Color(0xFFA78BFA),
+                          color: isSingle ? Colors.white70 : _prefs.themeColor,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
@@ -2220,15 +2218,15 @@ class SearchScreenState extends State<SearchScreen>
               shape: BoxShape.circle,
               color: Colors.black.withValues(alpha: 0.6),
               border: Border.all(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                color: _prefs.themeColor.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
             child: Center(
               child: Text(
                 album.title.isNotEmpty ? album.title[0].toUpperCase() : '♪',
-                style: const TextStyle(
-                  color: Color(0xFFA78BFA),
+                style: TextStyle(
+                  color: _prefs.themeColor,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),

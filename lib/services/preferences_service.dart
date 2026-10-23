@@ -16,6 +16,53 @@ enum ScrubberStyle { waveform, classic }
 
 enum ProgressLineStyle { wave, classic }
 
+enum PlaylistSortOption {
+  customOrder,
+  title,
+  artist,
+  album,
+  recentlyAdded,
+  releaseDate,
+  duration,
+}
+
+extension PlaylistSortOptionExt on PlaylistSortOption {
+  String get label {
+    switch (this) {
+      case PlaylistSortOption.customOrder:
+        return 'Custom order';
+      case PlaylistSortOption.title:
+        return 'Title';
+      case PlaylistSortOption.artist:
+        return 'Artist';
+      case PlaylistSortOption.album:
+        return 'Album';
+      case PlaylistSortOption.recentlyAdded:
+        return 'Recently added';
+      case PlaylistSortOption.releaseDate:
+        return 'Release date';
+      case PlaylistSortOption.duration:
+        return 'Duration';
+    }
+  }
+}
+
+enum PlaylistViewMode {
+  list,
+  compact,
+}
+
+extension PlaylistViewModeExt on PlaylistViewMode {
+  String get label {
+    switch (this) {
+      case PlaylistViewMode.compact:
+        return 'Compact';
+      case PlaylistViewMode.list:
+        return 'List';
+    }
+  }
+}
+
 enum AudioQualityPreset {
   studioMaster, // 320 kbps (Direct JioSaavn 320k CDN / max bitrate)
   high, // 160 kbps (High Fidelity Opus / 160k AAC)
@@ -352,6 +399,28 @@ class PreferencesService extends ChangeNotifier {
       : ProgressLineStyle.classic;
   AudioQualityPreset get audioQuality => _audioQuality;
   AudioFormatPreference get audioFormat => _audioFormat;
+  PlaylistSortOption _playlistSortOption = PlaylistSortOption.customOrder;
+  PlaylistViewMode _playlistViewMode = PlaylistViewMode.list;
+
+  PlaylistSortOption get playlistSortOption => _playlistSortOption;
+  PlaylistViewMode get playlistViewMode => _playlistViewMode;
+
+  Future<void> setPlaylistSortOption(PlaylistSortOption option) async {
+    _playlistSortOption = option;
+    notifyListeners();
+    try {
+      await _prefs.setString('playlistSortOption', option.name);
+    } catch (_) {}
+  }
+
+  Future<void> setPlaylistViewMode(PlaylistViewMode mode) async {
+    _playlistViewMode = mode;
+    notifyListeners();
+    try {
+      await _prefs.setString('playlistViewMode', mode.name);
+    } catch (_) {}
+  }
+
   bool get pureDjFlowEnabled => _pureDjFlowEnabled;
   String get lyricsDisplayMode => _lyricsDisplayMode;
   String get userName => _userName.isEmpty ? 'Friend' : _userName;
@@ -528,6 +597,16 @@ class PreferencesService extends ChangeNotifier {
       orElse: () => AudioFormatPreference.auto,
     );
     _lyricsDisplayMode = _prefs.getString('lyricsDisplayMode') ?? 'original';
+    final sortStr = _prefs.getString('playlistSortOption') ?? 'customOrder';
+    _playlistSortOption = PlaylistSortOption.values.firstWhere(
+      (e) => e.name == sortStr,
+      orElse: () => PlaylistSortOption.customOrder,
+    );
+    final viewStr = _prefs.getString('playlistViewMode') ?? 'list';
+    _playlistViewMode = PlaylistViewMode.values.firstWhere(
+      (e) => e.name == viewStr,
+      orElse: () => PlaylistViewMode.list,
+    );
 
     final historyJson = _prefs.getString('listeningHistoryJson');
     if (historyJson != null && historyJson.isNotEmpty) {

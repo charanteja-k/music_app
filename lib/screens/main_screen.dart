@@ -259,7 +259,7 @@ class _BackgroundImportBanner extends StatelessWidget {
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF161622).withValues(alpha: 0.95),
+              color: const Color(0xFF181818).withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: const Color(0xFF1DB954).withValues(alpha: 0.4),

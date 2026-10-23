@@ -14,6 +14,8 @@ import '../widgets/dilse_scrollbar.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/desktop/desktop_context_menu.dart';
 import '../widgets/desktop/desktop_playlist_enrichment.dart';
+import '../widgets/desktop/desktop_playlist_toolbar.dart';
+import '../widgets/desktop/desktop_playlist_sort_dropdown.dart';
 import '../layouts/desktop_layout_state.dart';
 
 class CustomPlaylistScreen extends StatefulWidget {
@@ -26,27 +28,24 @@ class CustomPlaylistScreen extends StatefulWidget {
 
 class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
   final MusicService _musicService = MusicService();
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
 
-  Timer? _debounceTimer;
+  late PlaylistSortOption _currentSort;
+  late PlaylistViewMode _currentViewMode;
   String _searchQuery = '';
-  bool _isSearchingGlobal = false;
-  bool _showExpandedRecommendations = false;
-  List<Video> _globalRecommendations = [];
 
   @override
   void initState() {
     super.initState();
+    _currentSort = PreferencesService().playlistSortOption;
+    _currentViewMode = PreferencesService().playlistViewMode;
     _musicService.addListener(_onServiceChanged);
   }
 
   @override
   void dispose() {
     _musicService.removeListener(_onServiceChanged);
-    _debounceTimer?.cancel();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -54,70 +53,179 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _fetchGlobalRecommendations(String query) async {
-    final trimmed = query.trim();
-    if (trimmed.length < 2) return;
-    setState(() => _isSearchingGlobal = true);
-    try {
-      final results = await _musicService.searchSongs(trimmed);
-      if (mounted && _searchController.text.trim() == trimmed) {
-        setState(() {
-          _globalRecommendations = results;
-          _isSearchingGlobal = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isSearchingGlobal = false);
-    }
+  Future<void> _showEditDetailsModal(
+    BuildContext context,
+    String currentName,
+  ) async {
+    final nameCtrl = TextEditingController(text: currentName);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF181818),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1.0,
+          ),
+        ),
+        title: const Text(
+          'Edit details',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Playlist Name',
+                style: TextStyle(
+                  color: Color(0xFFA3A3A3),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                cursorColor: Colors.white,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFF222222),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            onPressed: () {
+              final newName = nameCtrl.text.trim();
+              if (newName.isNotEmpty && newName != currentName) {
+                _musicService.renamePlaylist(widget.playlistId, newName);
+                if (mounted) setState(() {});
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
   }
 
-  void _onSearchQueryChanged(String query) {
-    final trimmed = query.trim();
-    final isLikedSongs = widget.playlistId == 'liked_songs';
-    final playlist = isLikedSongs
-        ? <String, dynamic>{
-            'id': 'liked_songs',
-            'name': 'Liked Songs',
-            'isLiked': true,
-            'isPermanent': true,
-            'songs': _musicService.likedSongs
-                .map((s) => Map<String, dynamic>.from(s))
-                .toList(),
-          }
-        : _musicService.customPlaylists.firstWhere(
-            (p) => p['id'] == widget.playlistId,
-            orElse: () => <String, dynamic>{},
-          );
-    final songs = List<Map<String, dynamic>>.from(playlist['songs'] ?? []);
-    final searchResult = PlaylistArtistFilter.searchPlaylist(
-      songs: songs,
-      query: trimmed,
-    );
-
-    setState(() {
-      _searchQuery = trimmed;
-      _showExpandedRecommendations = false;
-      if (trimmed.length < 2) {
-        _globalRecommendations = [];
-        _isSearchingGlobal = false;
-      }
-    });
-
-    _debounceTimer?.cancel();
-
-    // If query is absent from this playlist, automatically debounce-fetch catalog recommendations to add!
-    // But if songs of that artist or title ARE in this playlist, do not flood the screen with YouTube recommendations.
-    if (trimmed.length >= 2 && searchResult.matchedIndices.isEmpty) {
-      _debounceTimer = Timer(const Duration(milliseconds: 350), () {
-        if (!mounted || _searchController.text.trim() != trimmed) return;
-        _fetchGlobalRecommendations(trimmed);
-      });
-    } else {
-      setState(() {
-        _globalRecommendations = [];
-        _isSearchingGlobal = false;
-      });
+  List<Map<String, dynamic>> _getDisplayedSongs(
+    List<Map<String, dynamic>> originalSongs,
+  ) {
+    final list = List<Map<String, dynamic>>.from(originalSongs);
+    switch (_currentSort) {
+      case PlaylistSortOption.customOrder:
+        break;
+      case PlaylistSortOption.title:
+        list.sort(
+          (a, b) => (a['title']?.toString().toLowerCase() ?? '').compareTo(
+            b['title']?.toString().toLowerCase() ?? '',
+          ),
+        );
+        break;
+      case PlaylistSortOption.artist:
+        list.sort(
+          (a, b) => (a['author']?.toString().toLowerCase() ?? '').compareTo(
+            b['author']?.toString().toLowerCase() ?? '',
+          ),
+        );
+        break;
+      case PlaylistSortOption.album:
+        list.sort(
+          (a, b) => (a['album']?.toString().toLowerCase() ?? '').compareTo(
+            b['album']?.toString().toLowerCase() ?? '',
+          ),
+        );
+        break;
+      case PlaylistSortOption.recentlyAdded:
+        return list.reversed.toList();
+      case PlaylistSortOption.releaseDate:
+        list.sort(
+          (a, b) => (b['album']?.toString().toLowerCase() ?? '').compareTo(
+            a['album']?.toString().toLowerCase() ?? '',
+          ),
+        );
+        break;
+      case PlaylistSortOption.duration:
+        list.sort((a, b) {
+          final durA = (a['durationMs'] as num?)?.toInt() ?? 0;
+          final durB = (b['durationMs'] as num?)?.toInt() ?? 0;
+          return durA.compareTo(durB);
+        });
+        break;
     }
+
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      return list.where((s) {
+        final t = (s['title']?.toString() ?? '').toLowerCase();
+        final a = (s['author']?.toString() ?? '').toLowerCase();
+        final al = (s['album']?.toString() ?? '').toLowerCase();
+        return t.contains(q) || a.contains(q) || al.contains(q);
+      }).toList();
+    }
+
+    return list;
+  }
+
+  String _formatDurationMs(num? durationMs) {
+    if (durationMs == null || durationMs <= 0) return '';
+    final dur = Duration(milliseconds: durationMs.toInt());
+    final minutes = dur.inMinutes;
+    final seconds = dur.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  String _formatDateAdded(dynamic addedAt) {
+    if (addedAt == null) return 'Recently';
+    if (addedAt is DateTime) {
+      return '${addedAt.year}-${addedAt.month.toString().padLeft(2, '0')}-${addedAt.day.toString().padLeft(2, '0')}';
+    }
+    final s = addedAt.toString();
+    if (s.length >= 10) return s.substring(0, 10);
+    return s.isNotEmpty ? s : 'Recently';
   }
 
   String _formatDuration(Duration? d) {
@@ -495,7 +603,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E28).withValues(alpha: 0.90),
+                        color: const Color(0xFF181818).withValues(alpha: 0.90),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSearching
@@ -600,7 +708,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                 selected: isSelected,
                                 selectedColor: themeColor,
                                 backgroundColor: const Color(
-                                  0xFF1E1E28,
+                                  0xFF181818,
                                 ).withValues(alpha: 0.85),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
@@ -761,7 +869,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                       child: Container(
                                         width: 48,
                                         height: 48,
-                                        color: const Color(0xFF1E1E28),
+                                        color: const Color(0xFF181818),
                                         child: Stack(
                                           fit: StackFit.expand,
                                           children: [
@@ -966,7 +1074,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: const Color(
-                              0xFF1E1E28,
+                              0xFF181818,
                             ).withValues(alpha: 0.70),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
@@ -1123,7 +1231,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                   child: Container(
                                     width: 48,
                                     height: 48,
-                                    color: const Color(0xFF1E1E28),
+                                    color: const Color(0xFF181818),
                                     child: Image.network(
                                       MusicService.getHdThumbnail(songId),
                                       width: 48,
@@ -1252,7 +1360,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                                     : 'Added "${song.title}" to $name',
                                               ),
                                               backgroundColor: const Color(
-                                                0xFF1E1E28,
+                                                0xFF181818,
                                               ),
                                               behavior:
                                                   SnackBarBehavior.floating,
@@ -1410,7 +1518,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                         child: Container(
                                           width: 48,
                                           height: 48,
-                                          color: const Color(0xFF1E1E28),
+                                          color: const Color(0xFF181818),
                                           child: Stack(
                                             fit: StackFit.expand,
                                             children: [
@@ -1664,7 +1772,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                                           child: Container(
                                             width: 48,
                                             height: 48,
-                                            color: const Color(0xFF1E1E28),
+                                            color: const Color(0xFF181818),
                                             child: Stack(
                                               fit: StackFit.expand,
                                               children: [

@@ -166,7 +166,7 @@ class _EqualizerBottomSheetState extends State<EqualizerBottomSheet> {
                       selected: isSelected,
                       selectedColor: themeColor,
                       backgroundColor: const Color(0xFF1E1E2C),
-                      disabledColor: const Color(0xFF161622),
+                      disabledColor: const Color(0xFF181818),
                       labelStyle: TextStyle(
                         color: isSelected ? Colors.white : Colors.white70,
                         fontSize: 12,

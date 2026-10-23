@@ -252,7 +252,7 @@ class _DesktopPlaylistEnrichmentState extends State<DesktopPlaylistEnrichment> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added "${song.title}" to playlist'),
-        backgroundColor: const Color(0xFF1E1E24),
+        backgroundColor: const Color(0xFF181818),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2),

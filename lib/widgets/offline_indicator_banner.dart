@@ -60,7 +60,7 @@ class _OfflineIndicatorBannerState extends State<OfflineIndicatorBanner> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF161622).withValues(alpha: 0.95),
+            color: const Color(0xFF181818).withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: const Color(0xFFFFB74D).withValues(alpha: 0.35),

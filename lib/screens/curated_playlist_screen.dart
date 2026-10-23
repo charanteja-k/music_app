@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/music_service.dart';
 import '../services/canonical_song_dedup.dart';
+import '../services/preferences_service.dart';
 import '../services/studio_search_service.dart';
 import '../services/youtube_library_service.dart';
 import '../widgets/mini_player.dart';
@@ -48,6 +49,7 @@ class CuratedPlaylistScreen extends StatefulWidget {
 
 class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
   final MusicService _musicService = MusicService();
+  final PreferencesService _prefs = PreferencesService();
   final ScrollController _scrollController = ScrollController();
 
   List<Video> _tracks = [];
@@ -317,11 +319,11 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     if (widget.gradientColors != null && widget.gradientColors!.isNotEmpty) {
       if (widget.gradientColors!.length == 1) {
         final c = widget.gradientColors!.first;
-        return [c, const Color(0xFF121217)];
+        return [c, const Color(0xFF121212)];
       }
       return widget.gradientColors!;
     }
-    return [const Color(0xFF4D727A), const Color(0xFF121217)];
+    return [const Color(0xFF4D727A), const Color(0xFF121212)];
   }
 
   String _formatDuration(Duration? duration) {
@@ -862,7 +864,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                                         width: 46,
                                                         height: 46,
                                                         color: const Color(
-                                                          0xFF161622,
+                                                          0xFF181818,
                                                         ),
                                                         child: const Icon(
                                                           Icons
@@ -876,7 +878,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                                   width: 46,
                                                   height: 46,
                                                   color: const Color(
-                                                    0xFF161622,
+                                                    0xFF181818,
                                                   ),
                                                   child: const Icon(
                                                     Icons.music_note_rounded,
@@ -1174,9 +1176,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             border: Border.all(
                               color: isSingle
                                   ? Colors.white24
-                                  : const Color(
-                                      0xFF7C3AED,
-                                    ).withValues(alpha: 0.5),
+                                  : _prefs.themeColor.withValues(alpha: 0.5),
                               width: 0.8,
                             ),
                           ),
@@ -1185,7 +1185,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                             style: TextStyle(
                               color: isSingle
                                   ? Colors.white70
-                                  : const Color(0xFFA78BFA),
+                                  : _prefs.themeColor,
                               fontSize: 9.5,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1229,7 +1229,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1A1A24), Color(0xFF121217)],
+          colors: [Color(0xFF181818), Color(0xFF121212)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1266,7 +1266,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return Container(
-          color: const Color(0xFF16161E),
+          color: const Color(0xFF181818),
           child: const Center(
             child: SizedBox(
               width: 24,

@@ -131,7 +131,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
             decoration: BoxDecoration(
               color: _isHovered
                   ? Colors.white.withValues(alpha: 0.16)
-                  : const Color(0xFF1E1E28),
+                  : const Color(0xFF181818),
               shape: BoxShape.circle,
               border: Border.all(
                 color: _isHovered
@@ -201,7 +201,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
           decoration: BoxDecoration(
             color: _isHovered
                 ? Colors.white.withValues(alpha: 0.16)
-                : const Color(0xFF1E1E28),
+                : const Color(0xFF181818),
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
               color: _isHovered
@@ -261,7 +261,7 @@ class _GoogleProfileHeaderButtonState extends State<GoogleProfileHeaderButton> {
           decoration: BoxDecoration(
             color: _isHovered
                 ? Colors.white.withValues(alpha: 0.15)
-                : const Color(0xFF1E1E28),
+                : const Color(0xFF181818),
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
               color: _isHovered

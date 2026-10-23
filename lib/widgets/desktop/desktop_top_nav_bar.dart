@@ -5,8 +5,6 @@ import '../../layouts/desktop_layout_state.dart';
 import '../../services/preferences_service.dart';
 import '../../services/auth_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
-import '../auth/google_profile_header_button.dart';
-import '../top_bar_cloud_actions.dart';
 import 'desktop_search_dropdown.dart';
 import '../profile_avatar_helper.dart';
 
@@ -296,7 +294,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                   decoration: BoxDecoration(
                                     color: isHomeActive
                                         ? Colors.white.withValues(alpha: 0.16)
-                                        : const Color(0xFF1F1F24),
+                                        : const Color(0xFF181818),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: isHomeActive
@@ -337,7 +335,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                 horizontal: 12.0,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1F1F24),
+                                color: const Color(0xFF1A1A1A),
                                 borderRadius: BorderRadius.circular(23.0),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.08),
@@ -534,7 +532,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                             icon: Container(
                               padding: const EdgeInsets.all(5.0),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF24242E),
+                                color: const Color(0xFF222222),
                                 borderRadius: BorderRadius.circular(7.0),
                               ),
                               child: const Icon(
@@ -588,14 +586,6 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                 DesktopLayoutState.toggleRightPanel(),
                           ),
                         ),
-
-                        const SizedBox(width: 8.0),
-
-                        const AppUpdateTopBarButton(),
-                        const CloudBackupTopBarButton(),
-
-                        // Google Sign-In & YouTube Account Profile Button
-                        const GoogleProfileHeaderButton(compact: true),
 
                         const SizedBox(width: 8.0),
 

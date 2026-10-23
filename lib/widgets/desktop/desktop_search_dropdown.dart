@@ -51,7 +51,7 @@ class DesktopSearchDropdown extends StatelessWidget {
                 child: Container(
                   width: dropdownWidth,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF18181F),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(8.0),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.08),

@@ -87,7 +87,7 @@ class _DesktopTrackInfoSection extends StatelessWidget {
                             child: Container(
                               width: 56.0,
                               height: 56.0,
-                              color: const Color(0xFF161622),
+                              color: const Color(0xFF181818),
                               child: Stack(
                                 children: [
                                   Positioned.fill(
@@ -210,7 +210,7 @@ class _DesktopTrackInfoSection extends StatelessWidget {
                 width: 56.0,
                 height: 56.0,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF161622),
+                  color: const Color(0xFF181818),
                   borderRadius: BorderRadius.circular(6.0),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.06),
@@ -262,7 +262,7 @@ class _DesktopTrackInfoSection extends StatelessWidget {
                         child: Container(
                           width: 56.0,
                           height: 56.0,
-                          color: const Color(0xFF161622),
+                          color: const Color(0xFF181818),
                           child: artworkUrl.isNotEmpty
                               ? Image.network(
                                   artworkUrl,

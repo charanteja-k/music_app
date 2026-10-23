@@ -49,7 +49,7 @@ class PlaylistActionMenu extends StatelessWidget {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Rename Playlist',
@@ -114,7 +114,7 @@ class PlaylistActionMenu extends StatelessWidget {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Delete Playlist',
@@ -355,7 +355,7 @@ class PlaylistActionMenu extends StatelessWidget {
       data: Theme.of(context).copyWith(
         dividerColor: Colors.white.withValues(alpha: 0.08),
         popupMenuTheme: PopupMenuThemeData(
-          color: const Color(0xFF1E1E28),
+          color: const Color(0xFF181818),
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

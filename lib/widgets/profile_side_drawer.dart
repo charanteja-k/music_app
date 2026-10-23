@@ -235,7 +235,7 @@ class ProfileSideDrawer extends StatelessWidget {
               ),
               child: CircleAvatar(
                 radius: 24,
-                backgroundColor: const Color(0xFF1E1E28),
+                backgroundColor: const Color(0xFF181818),
                 backgroundImage: getProfileImageProvider(customImagePath),
                 child: !hasCustom
                     ? const Icon(

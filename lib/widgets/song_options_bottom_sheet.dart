@@ -155,7 +155,7 @@ void showSongOptionsBottomSheet(
                         errorBuilder: (_, _, _) => Container(
                           width: 52,
                           height: 52,
-                          color: const Color(0xFF1E1E28),
+                          color: const Color(0xFF181818),
                           child: const Icon(
                             Icons.music_note,
                             color: Colors.white54,
@@ -237,7 +237,7 @@ void showSongOptionsBottomSheet(
               // Action 0b: Start Song Radio
               _buildActionTile(
                 icon: Icons.auto_awesome_rounded,
-                iconColor: const Color(0xFF6C5CE7),
+                iconColor: PreferencesService().legibleThemeColor,
                 title: 'Start Song Radio',
                 subtitle: '50 smart tracks based on this song',
                 onTap: () {
@@ -250,7 +250,7 @@ void showSongOptionsBottomSheet(
               // Action 0c: Go to Album
               _buildActionTile(
                 icon: Icons.album_rounded,
-                iconColor: const Color(0xFF8E2DE2),
+                iconColor: PreferencesService().legibleThemeColor,
                 title: 'Go to Album',
                 subtitle:
                     MusicService.getCachedAlbumTitle(song.id.value) ??
@@ -561,7 +561,7 @@ void showAddToPlaylistSheet(BuildContext context, Video song) {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -604,7 +604,7 @@ void _showNewPlaylistPrompt(BuildContext context, Video song) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1E1E28),
+      backgroundColor: const Color(0xFF181818),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text(
         'Create New Playlist',

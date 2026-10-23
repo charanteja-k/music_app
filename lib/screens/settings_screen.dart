@@ -78,7 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF14141E).withValues(alpha: 0.96),
+            color: const Color(0xFF181818).withValues(alpha: 0.96),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
@@ -229,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF14141E).withValues(alpha: 0.98),
+                color: const Color(0xFF181818).withValues(alpha: 0.98),
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(24),
                 ),
@@ -316,7 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       'Audio Quality set to ${preset.label}',
                                     ),
                                     duration: const Duration(seconds: 2),
-                                    backgroundColor: const Color(0xFF1E1E28),
+                                    backgroundColor: const Color(0xFF181818),
                                   ),
                                 );
                               }
@@ -438,7 +438,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF14141E).withValues(alpha: 0.98),
+                color: const Color(0xFF181818).withValues(alpha: 0.98),
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(24),
                 ),
@@ -461,9 +461,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF00E5FF),
-                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                          decoration: BoxDecoration(
+                            color: _prefs.themeColor,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(10),
+                            ),
                           ),
                           child: const Icon(
                             Icons.album_rounded,
@@ -525,7 +527,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       'Audio Format set to ${format.label}',
                                     ),
                                     duration: const Duration(seconds: 2),
-                                    backgroundColor: const Color(0xFF1E1E28),
+                                    backgroundColor: const Color(0xFF181818),
                                   ),
                                 );
                               }
@@ -534,16 +536,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? const Color(
-                                        0xFF00E5FF,
-                                      ).withValues(alpha: 0.14)
+                                    ? _prefs.themeColor.withValues(alpha: 0.14)
                                     : Colors.white.withValues(alpha: 0.04),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isSelected
-                                      ? const Color(
-                                          0xFF00E5FF,
-                                        ).withValues(alpha: 0.6)
+                                      ? _prefs.themeColor.withValues(alpha: 0.6)
                                       : Colors.white.withValues(alpha: 0.06),
                                   width: isSelected ? 1.5 : 1.0,
                                 ),
@@ -555,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         ? Icons.radio_button_checked_rounded
                                         : Icons.radio_button_off_rounded,
                                     color: isSelected
-                                        ? const Color(0xFF00E5FF)
+                                        ? _prefs.themeColor
                                         : Colors.white38,
                                     size: 22,
                                   ),
@@ -586,9 +584,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                   ),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? const Color(
-                                                        0xFF00E5FF,
-                                                      ).withValues(alpha: 0.3)
+                                                    ? _prefs.themeColor
+                                                          .withValues(
+                                                            alpha: 0.3,
+                                                          )
                                                     : Colors.white10,
                                                 borderRadius:
                                                     BorderRadius.circular(4),
@@ -1633,7 +1632,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E24),
+        backgroundColor: const Color(0xFF181818),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
@@ -1778,7 +1777,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Material(
-        color: const Color(0xFF1E1E24),
+        color: const Color(0xFF181818),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -1795,7 +1794,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF16161E),
+        color: const Color(0xFF181818),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.08),

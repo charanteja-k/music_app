@@ -90,7 +90,7 @@ class _DesktopPopupItemEntryState extends State<_DesktopPopupItemEntry> {
           margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
           padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
           decoration: BoxDecoration(
-            color: _isHovered ? const Color(0xFF282836) : Colors.transparent,
+            color: _isHovered ? const Color(0xFF282828) : Colors.transparent,
             borderRadius: BorderRadius.circular(6.0),
           ),
           child: Row(
@@ -148,7 +148,7 @@ class _DesktopPopupDividerEntryState extends State<_DesktopPopupDividerEntry> {
 
 /// Spotify-grade Desktop Context Menu Engine.
 ///
-/// Spawns an elevated dark-mode menu (#16161E) clamped precisely at cursor coordinates.
+/// Spawns an elevated dark-mode menu (#181818) clamped precisely at cursor coordinates.
 /// Reuses existing public service abstractions with zero extra dependencies.
 class DesktopContextMenu {
   DesktopContextMenu._();
@@ -189,7 +189,7 @@ class DesktopContextMenu {
       items: entries,
       elevation: 16.0,
       shadowColor: Colors.black.withValues(alpha: 0.6),
-      color: const Color(0xFF16161E),
+      color: const Color(0xFF181818),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8.0),
         side: BorderSide(

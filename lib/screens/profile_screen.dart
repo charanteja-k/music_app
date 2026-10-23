@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/preferences_service.dart';
 import '../services/music_service.dart';
 import '../services/auth_service.dart';
+import '../services/cloud_sync_service.dart';
 import '../widgets/auth/google_logo.dart';
 import '../widgets/auth/google_profile_header_button.dart';
 import '../widgets/animated_equalizer.dart';
@@ -46,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFF181824).withValues(alpha: 0.98),
+            color: const Color(0xFF181818).withValues(alpha: 0.98),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             border: Border.all(color: Colors.white12),
           ),
@@ -236,7 +237,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF181824).withValues(alpha: 0.96),
+              color: const Color(0xFF181818).withValues(alpha: 0.96),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
@@ -782,9 +783,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Clean Obsidian Google Account Binding Card.
   Widget _buildGoogleAccountCard(BuildContext context) {
     final auth = AuthService();
+    final cloudSync = CloudSyncService();
 
     return AnimatedBuilder(
-      animation: auth,
+      animation: Listenable.merge([auth, cloudSync.syncStatus]),
       builder: (context, _) {
         final isConnected = auth.isAuthenticated;
         final displayName =
@@ -804,7 +806,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 44.0,
               height: 44.0,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E28),
+                color: const Color(0xFF181818),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isConnected
@@ -838,7 +840,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: const Color(0xFF1DB954),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF16161E),
+                      color: const Color(0xFF121212),
                       width: 2.0,
                     ),
                   ),
@@ -908,60 +910,148 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         );
 
-        final actionButton = isConnected
-            ? OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    width: 1.0,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14.0,
-                    vertical: 10.0,
-                  ),
-                ),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: const Color(0xFF181824),
-                      title: const Text(
-                        'Sign Out of Google?',
-                        style: TextStyle(color: Colors.white),
+        final isSyncing = cloudSync.syncStatus.value == CloudSyncStatus.syncing;
+
+        final actionButtons = isConnected
+            ? Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white.withValues(alpha: 0.05),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 1.0,
                       ),
-                      content: const Text(
-                        'Are you sure you want to sign out? Your local playlists and downloads remain intact.',
-                        style: TextStyle(color: Colors.white70),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFA2D48),
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Sign Out'),
-                        ),
-                      ],
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14.0,
+                        vertical: 10.0,
+                      ),
                     ),
-                  );
-                  if (confirm == true) {
-                    await auth.signOut();
-                  }
-                },
-                icon: const Icon(Icons.logout_rounded, size: 16.0),
-                label: const Text(
-                  'Sign Out',
-                  style: TextStyle(fontSize: 13.0, fontWeight: FontWeight.w600),
-                ),
+                    onPressed: isSyncing
+                        ? null
+                        : () async {
+                            HapticFeedback.lightImpact();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Backing up library to cloud...'),
+                                  ],
+                                ),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            final result = await cloudSync.sync();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(
+                                context,
+                              ).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result.success
+                                        ? 'Cloud backup complete: ${result.mergedPlaylistsCount} playlists, ${result.mergedLikesCount} likes.'
+                                        : 'Backup note: ${result.message}',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: const Color(0xFF181818),
+                                ),
+                              );
+                            }
+                          },
+                    icon: isSyncing
+                        ? const SizedBox(
+                            width: 14.0,
+                            height: 14.0,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_upload_rounded, size: 16.0),
+                    label: Text(
+                      isSyncing ? 'Backing up...' : 'Backup Library',
+                      style: const TextStyle(
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 1.0,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14.0,
+                        vertical: 10.0,
+                      ),
+                    ),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: const Color(0xFF181818),
+                          title: const Text(
+                            'Sign Out of Google?',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to sign out? Your local playlists and downloads remain intact.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFA2D48),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Sign Out'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await auth.signOut();
+                      }
+                    },
+                    icon: const Icon(Icons.logout_rounded, size: 16.0),
+                    label: const Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               )
             : ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
@@ -990,7 +1080,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           margin: const EdgeInsets.only(bottom: 20.0),
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: const Color(0xFF16161E),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(16.0),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.08),
@@ -1019,7 +1109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 14.0),
-                    actionButton,
+                    actionButtons,
                   ],
                 );
               }
@@ -1030,7 +1120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 16.0),
                   Expanded(child: identityColumn),
                   const SizedBox(width: 16.0),
-                  actionButton,
+                  actionButtons,
                 ],
               );
             },
@@ -1053,7 +1143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14141E),
+          color: const Color(0xFF121212),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.10),
@@ -1218,7 +1308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _buildCompactMetricCard(
         context,
         icon: Icons.person_search_rounded,
-        iconColor: const Color(0xFF2196F3),
+        iconColor: prefs.themeColor,
         title: 'Top Artist',
         value: topArtist,
         subtitle: topArtistPlays,
@@ -1285,7 +1375,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF14141E),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
@@ -1458,7 +1548,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 128,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14141E),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.06),
@@ -1475,7 +1565,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             height: 72,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: const Color(0xFF222230),
+                              color: const Color(0xFF222222),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.35),
@@ -1505,10 +1595,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             decoration: BoxDecoration(
                               color: isFirst
                                   ? const Color(0xFF1DB954)
-                                  : const Color(0xFF282838),
+                                  : const Color(0xFF282828),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: const Color(0xFF14141E),
+                                color: const Color(0xFF181818),
                                 width: 1.5,
                               ),
                             ),
@@ -1696,7 +1786,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Spotify-grade Tracklist
         Material(
-          color: const Color(0xFF14141E),
+          color: const Color(0xFF181818),
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -1757,7 +1847,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               cacheWidth: 120,
                               cacheHeight: 120,
                               errorBuilder: (_, _, _) => Container(
-                                color: const Color(0xFF1E1E28),
+                                color: const Color(0xFF181818),
                                 child: const Icon(
                                   Icons.music_note,
                                   color: Colors.white54,
@@ -1911,7 +2001,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 140,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14141E),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.06),
@@ -1925,7 +2015,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           width: 116,
                           height: 100,
-                          color: const Color(0xFF222232),
+                          color: const Color(0xFF181818),
                           child: thumbnail.isNotEmpty
                               ? Image.network(
                                   thumbnail,

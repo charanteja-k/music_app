@@ -220,7 +220,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
             Text('Capsule summary copied to clipboard!'),
           ],
         ),
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

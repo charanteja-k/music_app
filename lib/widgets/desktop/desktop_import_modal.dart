@@ -350,9 +350,9 @@ class _DesktopImportModalState extends State<DesktopImportModal>
             width: 540.0,
             constraints: const BoxConstraints(maxHeight: 620.0),
             decoration: BoxDecoration(
-              color: const Color(0xFF18181F),
+              color: const Color(0xFF181818),
               borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(color: const Color(0xFF282836), width: 1.0),
+              border: Border.all(color: const Color(0xFF282828), width: 1.0),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.7),
@@ -379,7 +379,7 @@ class _DesktopImportModalState extends State<DesktopImportModal>
                     decoration: const BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: Color(0xFF282836),
+                          color: Color(0xFF282828),
                           width: 1.0,
                         ),
                       ),
@@ -514,7 +514,7 @@ class _DesktopImportModalState extends State<DesktopImportModal>
             child: Container(
               height: 140.0,
               decoration: BoxDecoration(
-                color: const Color(0xFF121217),
+                color: const Color(0xFF121212),
                 borderRadius: BorderRadius.circular(10.0),
                 border: Border.all(
                   color: _pickedFileName != null
@@ -790,7 +790,7 @@ class _DesktopImportModalState extends State<DesktopImportModal>
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8.0,
-              backgroundColor: const Color(0xFF282836),
+              backgroundColor: const Color(0xFF282828),
               valueColor: const AlwaysStoppedAnimation<Color>(
                 Color(0xFF1DB954),
               ),

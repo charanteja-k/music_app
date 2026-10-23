@@ -89,7 +89,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Create New Playlist',
@@ -921,7 +921,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF282836)
+                ? const Color(0xFF282828)
                 : Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(16.0),
             border: Border.all(
@@ -1010,11 +1010,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     final targetPosition = renderBox.localToGlobal(const Offset(64, 120));
     final selected = await showMenu<String>(
       context: context,
-      color: const Color(0xFF18181F),
+      color: const Color(0xFF181818),
       elevation: 10,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF282836)),
+        side: const BorderSide(color: Color(0xFF282828)),
       ),
       position: RelativeRect.fromRect(
         targetPosition & const Size(40, 40),
@@ -1169,7 +1169,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF5038A0),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
+                    ),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: const Icon(
@@ -1236,7 +1240,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
 
   Widget _buildPlaylistFallback(bool isSpotify, String name) {
     return Container(
-      color: const Color(0xFF282836),
+      color: const Color(0xFF282828),
       alignment: Alignment.center,
       child: isSpotify
           ? const Icon(
@@ -1310,7 +1314,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF282836),
+                    color: const Color(0xFF282828),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: ClipRRect(
@@ -1326,7 +1330,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(
-                                color: const Color(0xFF282836),
+                                color: const Color(0xFF282828),
                                 child: const Center(
                                   child: Icon(
                                     Icons.music_note_rounded,
@@ -1444,7 +1448,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                 height: 48.0,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF282836),
+                  color: const Color(0xFF282828),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.12),
                     width: 1.0,
@@ -1583,7 +1587,11 @@ class _CompactLikedSongsTileState extends State<_CompactLikedSongsTile> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF5038A0),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
+                    ),
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
                       color: widget.isSelected
@@ -1661,7 +1669,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E24),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
                       color: widget.isSelected
@@ -1685,7 +1693,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(
-                                color: const Color(0xFF1E1E24),
+                                color: const Color(0xFF181818),
                                 child: const Center(
                                   child: Icon(
                                     Icons.music_note_rounded,
@@ -1724,7 +1732,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
     final isSpotify = widget.playlist['isSpotify'] == true;
     final name = widget.playlist['name']?.toString() ?? 'P';
     return Container(
-      color: const Color(0xFF1E1E24),
+      color: const Color(0xFF181818),
       alignment: Alignment.center,
       child: isSpotify
           ? const Icon(

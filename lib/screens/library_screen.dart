@@ -1095,7 +1095,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.08),
                           width: 1,
@@ -1192,7 +1192,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161622),
+              color: const Color(0xFF181818),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.08),
@@ -1206,14 +1206,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                   height: 52,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                        color: const Color(0xFFBA385C).withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -1522,7 +1522,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E28),
+                      color: const Color(0xFF181818),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.08),
@@ -1740,7 +1740,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheWidth: 120,
                       cacheHeight: 120,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -1862,7 +1862,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheHeight: 120,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -1949,7 +1949,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: const Color(0xFF1E1E28),
+                        backgroundColor: const Color(0xFF181818),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -2266,7 +2266,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   child: Container(
                     width: 52,
                     height: 52,
-                    color: const Color(0xFF1E1E28),
+                    color: const Color(0xFF181818),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -2420,7 +2420,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         cacheWidth: 120,
                         cacheHeight: 120,
                         errorBuilder: (_, _, _) => Container(
-                          color: const Color(0xFF1E1E28),
+                          color: const Color(0xFF181818),
                           child: const Icon(
                             Icons.album_rounded,
                             color: Colors.white54,
@@ -2428,7 +2428,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.album_rounded,
                           color: Colors.white54,
@@ -2496,7 +2496,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF161622),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.06),
@@ -2761,7 +2761,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161622),
+              color: const Color(0xFF181818),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: const Color(0xFF1DB954).withValues(alpha: 0.5),
@@ -2944,7 +2944,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                             width: 52,
                             height: 52,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF161622),
+                              color: const Color(0xFF181818),
                               border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.08),
                                 width: 1,
@@ -3151,7 +3151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheWidth: 120,
                       cacheHeight: 120,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -3429,7 +3429,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget _buildArtistAvatarFallback(String name) {
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'A';
     return Container(
-      color: const Color(0xFF1E1E28),
+      color: const Color(0xFF181818),
       alignment: Alignment.center,
       child: Text(
         initial,
@@ -3457,7 +3457,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: const Color(0xFF161622),
+                color: const Color(0xFF181818),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white12, width: 1),
               ),

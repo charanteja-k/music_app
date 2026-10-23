@@ -946,7 +946,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 errorBuilder: (_, _, _) => Container(
                                   width: 52,
                                   height: 52,
-                                  color: const Color(0xFF1E1E28),
+                                  color: const Color(0xFF181818),
                                   child: const Icon(
                                     Icons.music_note,
                                     color: Colors.white54,
@@ -1057,7 +1057,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       // 2c. Go to Album
                       _buildSongActionTile(
                         icon: Icons.album_rounded,
-                        iconColor: const Color(0xFF8E2DE2),
+                        iconColor: PreferencesService().legibleThemeColor,
                         title: 'Go to Album',
                         subtitle:
                             MusicService.getCachedAlbumTitle(song.id.value) ??
@@ -3639,7 +3639,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 MusicService.getCachedAlbumTitle(song.id.value) ??
                 MusicService.extractMovieOrAlbumTitle(song.title) ??
                 'View full album',
-            iconColor: const Color(0xFF8E2DE2),
+            iconColor: PreferencesService().legibleThemeColor,
             onTap: () => _navigateToAlbum(song),
           ),
           _buildLandscapeMoreCard(
