@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'constants/app_theme_tokens.dart';
 import 'services/audio_handler.dart';
 import 'screens/intro_splash_screen.dart';
+import 'screens/main_screen.dart';
 import 'services/preferences_service.dart';
 import 'services/bug_report_service.dart';
 import 'services/auth_service.dart';
@@ -32,7 +33,7 @@ class MusicApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: PreferencesService(),
+      animation: PreferencesService().themeColorNotifier,
       builder: (context, child) {
         final prefs = PreferencesService();
         return DynamicColorBuilder(
@@ -101,7 +102,9 @@ class MusicApp extends StatelessWidget {
                   child: wrapped,
                 );
               },
-              home: const IntroSplashScreen(),
+              home: IntroSplashScreen.hasCompletedSplash
+                  ? const MainScreen()
+                  : const IntroSplashScreen(),
             );
           },
         );

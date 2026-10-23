@@ -3,11 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/music_service.dart';
+import '../services/bug_report_service.dart';
 import '../constants/app_theme_tokens.dart';
 import 'main_screen.dart';
 
 class IntroSplashScreen extends StatefulWidget {
   const IntroSplashScreen({super.key});
+
+  /// Tracks whether the splash animation has completed once during this app session.
+  /// Prevents MaterialApp rebuilds from re-triggering the splash screen.
+  static bool hasCompletedSplash = false;
 
   @override
   State<IntroSplashScreen> createState() => _IntroSplashScreenState();
@@ -17,7 +22,9 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   Timer? _fallbackTimer;
+  Timer? _hardFallbackTimer;
   bool _navigated = false;
+  bool _showMainFallback = false;
   int _lastCharCount = 0;
 
   static const String _fullTitle = 'DilSe';
@@ -33,7 +40,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     // 2. Setup 60-120 FPS animation controller
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: kIsWeb ? 1300 : 2500),
+      duration: Duration(milliseconds: kIsWeb ? 900 : 2500),
     );
 
     _controller.addListener(() {
@@ -55,9 +62,21 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     });
 
     // Safety fallback timer so user can NEVER be stuck on the splash screen
-    _fallbackTimer = Timer(Duration(milliseconds: kIsWeb ? 1600 : 2900), () {
+    _fallbackTimer = Timer(Duration(milliseconds: kIsWeb ? 1100 : 2900), () {
       if (mounted) _navigateToMain();
     });
+
+    // Ultimate hard failsafe: if still mounted after 2.5s on web (or 3.5s on mobile), switch internal state to render MainScreen directly
+    _hardFallbackTimer = Timer(
+      Duration(milliseconds: kIsWeb ? 2500 : 3500),
+      () {
+        if (mounted && !_showMainFallback) {
+          setState(() {
+            _showMainFallback = true;
+          });
+        }
+      },
+    );
 
     _controller.forward();
   }
@@ -76,33 +95,51 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     _fallbackTimer?.cancel();
     if (!mounted || _navigated) return;
     _navigated = true;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const MainScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOutCubic,
-            ),
-            child: child,
-          );
-        },
-      ),
-    );
+    IntroSplashScreen.hasCompletedSplash = true;
+    try {
+      final nav =
+          BugReportService.instance.rootNavKey.currentState ??
+          Navigator.of(context);
+      nav.pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const MainScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOutCubic,
+              ),
+              child: child,
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('[IntroSplashScreen] Navigation error: $e');
+      try {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainScreen()),
+          (route) => false,
+        );
+      } catch (_) {}
+    }
   }
 
   @override
   void dispose() {
     _fallbackTimer?.cancel();
+    _hardFallbackTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_showMainFallback) {
+      return const MainScreen();
+    }
     return Scaffold(
       backgroundColor: AppThemeTokens.oledBackground,
       body: Stack(
@@ -280,14 +317,27 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
             child: AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
-                if (_controller.value < 0.35) return const SizedBox.shrink();
+                if (!kIsWeb && _controller.value < 0.25) {
+                  return const SizedBox.shrink();
+                }
                 return TextButton(
-                  onPressed: _navigateToMain,
+                  onPressed: () {
+                    _navigated = false;
+                    _navigateToMain();
+                    Future.delayed(const Duration(milliseconds: 350), () {
+                      if (mounted && !_showMainFallback) {
+                        setState(() {
+                          _showMainFallback = true;
+                        });
+                      }
+                    });
+                  },
                   child: Text(
                     'Skip',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 );

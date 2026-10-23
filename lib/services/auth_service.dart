@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'cloud_sync_service.dart';
+import 'preferences_service.dart';
 
 /// Authentication Service managing Google Sign-In with standard email profile access.
 ///
@@ -83,22 +84,51 @@ class AuthService extends ChangeNotifier {
   String? get accessToken => _accessToken;
 
   /// Display name of the signed-in user.
-  String? get userDisplayName =>
-      _currentUser?.displayName ??
-      (_isDemoMode ? _demoUserName : _cachedUserName);
+  String? get userDisplayName {
+    final raw = _currentUser?.displayName;
+    if (raw != null && raw.trim().isNotEmpty) return raw.trim();
+    if (_isDemoMode) return _demoUserName;
+    if (_cachedUserName != null && _cachedUserName!.trim().isNotEmpty) {
+      return _cachedUserName!.trim();
+    }
+    final email = userEmail;
+    if (email != null && email.contains('@')) {
+      return email.split('@').first;
+    }
+    return null;
+  }
 
   /// Email address of the signed-in user.
-  String? get userEmail =>
-      _currentUser?.email ?? (_isDemoMode ? _demoUserEmail : _cachedUserEmail);
+  String? get userEmail {
+    final raw = _currentUser?.email;
+    if (raw != null && raw.trim().isNotEmpty) return raw.trim();
+    if (_isDemoMode) return _demoUserEmail;
+    if (_cachedUserEmail != null && _cachedUserEmail!.trim().isNotEmpty) {
+      return _cachedUserEmail!.trim();
+    }
+    return null;
+  }
 
   /// Profile photo URL of the signed-in user.
-  String? get userPhotoUrl =>
-      _currentUser?.photoUrl ??
-      (_isDemoMode ? _demoUserPhotoUrl : _cachedUserPhoto);
+  String? get userPhotoUrl {
+    final raw = _currentUser?.photoUrl;
+    if (raw != null && raw.trim().isNotEmpty) return raw.trim();
+    if (_isDemoMode) return _demoUserPhotoUrl;
+    return _cachedUserPhoto;
+  }
 
   /// Unique Google account identifier.
-  String? get userId =>
-      _currentUser?.id ?? (_isDemoMode ? _demoUserId : _cachedUserId);
+  String? get userId {
+    final raw = _currentUser?.id;
+    if (raw != null && raw.trim().isNotEmpty) return raw.trim();
+    if (_isDemoMode) return _demoUserId;
+    if (_cachedUserId != null && _cachedUserId!.trim().isNotEmpty) {
+      return _cachedUserId!.trim();
+    }
+    final email = userEmail;
+    if (email != null && email.trim().isNotEmpty) return email.trim();
+    return null;
+  }
 
   /// Stream of user sign-in state changes.
   Stream<GoogleSignInAccount?> get onCurrentUserChanged =>
@@ -115,28 +145,50 @@ class AuthService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefSessionType, type);
-      if (id != null) {
-        await prefs.setString(_prefUserId, id);
+
+      final effectiveId = (id != null && id.trim().isNotEmpty)
+          ? id.trim()
+          : (email != null && email.trim().isNotEmpty ? email.trim() : null);
+
+      if (effectiveId != null) {
+        await prefs.setString(_prefUserId, effectiveId);
+        try {
+          await PreferencesService().markAccountSignedIn(effectiveId);
+        } catch (_) {}
       } else {
         await prefs.remove(_prefUserId);
       }
-      if (name != null) {
-        await prefs.setString(_prefUserName, name);
+
+      final effectiveName = (name != null && name.trim().isNotEmpty)
+          ? name.trim()
+          : (email != null && email.contains('@')
+                ? email.split('@').first
+                : null);
+
+      if (effectiveName != null) {
+        await prefs.setString(_prefUserName, effectiveName);
+        try {
+          await PreferencesService().setUserName(effectiveName);
+        } catch (_) {}
       } else {
         await prefs.remove(_prefUserName);
       }
-      if (email != null) {
-        await prefs.setString(_prefUserEmail, email);
+
+      if (email != null && email.trim().isNotEmpty) {
+        await prefs.setString(_prefUserEmail, email.trim());
       } else {
         await prefs.remove(_prefUserEmail);
       }
-      if (photo != null) {
-        await prefs.setString(_prefUserPhoto, photo);
+
+      if (photo != null && photo.trim().isNotEmpty) {
+        await prefs.setString(_prefUserPhoto, photo.trim());
       } else {
         await prefs.remove(_prefUserPhoto);
       }
-      if (token != null) {
-        await prefs.setString(_prefAccessToken, token);
+
+      final effectiveToken = token ?? _accessToken;
+      if (effectiveToken != null && effectiveToken.trim().isNotEmpty) {
+        await prefs.setString(_prefAccessToken, effectiveToken.trim());
       } else {
         await prefs.remove(_prefAccessToken);
       }
@@ -203,6 +255,22 @@ class AuthService extends ChangeNotifier {
         _cachedUserEmail = prefs.getString(_prefUserEmail);
         _cachedUserPhoto = prefs.getString(_prefUserPhoto);
         _accessToken = prefs.getString(_prefAccessToken);
+
+        final displayName = userDisplayName;
+        if (displayName != null && displayName.trim().isNotEmpty) {
+          try {
+            await PreferencesService().setUserName(displayName.trim());
+          } catch (_) {}
+        }
+        final effectiveUserId = userId;
+        if (effectiveUserId != null && effectiveUserId.trim().isNotEmpty) {
+          try {
+            await PreferencesService().markAccountSignedIn(
+              effectiveUserId.trim(),
+            );
+          } catch (_) {}
+        }
+
         notifyListeners();
       } else if (savedType == 'guest') {
         _isExplicitGuestMode = true;
@@ -213,17 +281,17 @@ class AuthService extends ChangeNotifier {
       _googleSignIn.onCurrentUserChanged.listen((
         GoogleSignInAccount? account,
       ) async {
-        _currentUser = account;
         if (account != null) {
+          _currentUser = account;
           _isDemoMode = false;
           _isExplicitGuestMode = false;
           _hasCachedGoogleUser = true;
-          _cachedUserId = account.id;
+          _cachedUserId = account.id.isNotEmpty ? account.id : account.email;
           _cachedUserName = account.displayName;
           _cachedUserEmail = account.email;
           _cachedUserPhoto = account.photoUrl;
-          final auth = await account.authentication;
-          _accessToken = auth.accessToken;
+
+          // 1. Persist IMMEDIATELY so session is held in storage even before token resolution
           await _persistSession(
             type: 'google',
             id: account.id,
@@ -232,10 +300,26 @@ class AuthService extends ChangeNotifier {
             photo: account.photoUrl,
             token: _accessToken,
           );
+
           debugPrint(
             '[AuthService] User signed in: ${account.email} (${account.displayName})',
           );
-          // Auto-sync library non-destructively in the background
+
+          // 2. Safely attempt to fetch token in non-blocking try-catch with timeout
+          try {
+            final auth = await account.authentication.timeout(
+              const Duration(seconds: 4),
+            );
+            _accessToken = auth.accessToken;
+            if (_accessToken != null && _accessToken!.isNotEmpty) {
+              final p = await SharedPreferences.getInstance();
+              await p.setString(_prefAccessToken, _accessToken!);
+            }
+          } catch (e) {
+            debugPrint('[AuthService] Token acquisition non-fatal: $e');
+          }
+
+          // 3. Auto-sync library non-destructively in the background
           CloudSyncService().sync().catchError((e) {
             debugPrint('[AuthService] Auto-sync error: $e');
             return const CloudSyncResult(
@@ -245,18 +329,24 @@ class AuthService extends ChangeNotifier {
             );
           });
         } else if (!_isDemoMode && !_hasCachedGoogleUser) {
+          _currentUser = null;
           _accessToken = null;
           debugPrint('[AuthService] User signed out');
         }
         notifyListeners();
       });
 
-      // 3. Attempt silent sign-in if Google was previously active or if not in demo mode
-      if (savedType == 'google' || savedType == null) {
-        await _googleSignIn.signInSilently().catchError((e) {
-          debugPrint('[AuthService] Silent sign-in skipped: $e');
-          return null;
-        });
+      // 3. Attempt silent sign-in in the background without blocking app startup (non-web only; on web, cached session is already hydrated and silent sign-in triggers Google One Tap FedCM modal which throttles vsync/tickers)
+      if (!kIsWeb && (savedType == 'google' || savedType == null)) {
+        unawaited(
+          _googleSignIn
+              .signInSilently()
+              .timeout(const Duration(seconds: 4), onTimeout: () => null)
+              .catchError((e) {
+                debugPrint('[AuthService] Silent sign-in skipped: $e');
+                return null;
+              }),
+        );
       }
     } catch (e) {
       debugPrint('[AuthService] Init error: $e');
@@ -282,12 +372,12 @@ class AuthService extends ChangeNotifier {
       _isDemoMode = false;
       _isExplicitGuestMode = false;
       _hasCachedGoogleUser = true;
-      _cachedUserId = account.id;
+      _cachedUserId = account.id.isNotEmpty ? account.id : account.email;
       _cachedUserName = account.displayName;
       _cachedUserEmail = account.email;
       _cachedUserPhoto = account.photoUrl;
-      final auth = await account.authentication;
-      _accessToken = auth.accessToken;
+
+      // 1. Immediately persist session so web tab refresh/close never loses session
       await _persistSession(
         type: 'google',
         id: account.id,
@@ -296,7 +386,22 @@ class AuthService extends ChangeNotifier {
         photo: account.photoUrl,
         token: _accessToken,
       );
-      // Auto-sync library non-destructively in the background
+
+      // 2. Safely obtain access token with timeout without aborting sign-in success
+      try {
+        final auth = await account.authentication.timeout(
+          const Duration(seconds: 4),
+        );
+        _accessToken = auth.accessToken;
+        if (_accessToken != null && _accessToken!.isNotEmpty) {
+          final p = await SharedPreferences.getInstance();
+          await p.setString(_prefAccessToken, _accessToken!);
+        }
+      } catch (tokenErr) {
+        debugPrint('[AuthService] Token retrieval non-fatal error: $tokenErr');
+      }
+
+      // 3. Auto-sync library non-destructively in the background
       CloudSyncService().sync().catchError((e) {
         debugPrint('[AuthService] Auto-sync error: $e');
         return const CloudSyncResult(
@@ -305,6 +410,7 @@ class AuthService extends ChangeNotifier {
           message: 'Auto-sync failed',
         );
       });
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -405,6 +511,9 @@ class AuthService extends ChangeNotifier {
       _demoUserEmail = null;
       _demoUserPhotoUrl = null;
       await _clearPersistedSession();
+      try {
+        await PreferencesService().setUserName('');
+      } catch (_) {}
       notifyListeners();
       debugPrint('[AuthService] Successfully signed out');
     } catch (e) {

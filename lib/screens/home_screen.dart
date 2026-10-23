@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,12 @@ import 'custom_playlist_screen.dart';
 import '../models/jio_album.dart';
 import '../constants/app_theme_tokens.dart';
 import '../services/studio_search_service.dart';
+import '../services/auth_service.dart';
+import '../services/cloud_sync_service.dart';
+import '../services/update_service.dart';
 import '../widgets/auth/google_profile_header_button.dart';
+import '../widgets/auth/google_cloud_backup_prompt_dialog.dart';
+import '../widgets/top_bar_cloud_actions.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -126,8 +132,64 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoadingTrending = false;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadHomeFeeds();
+      if (mounted) {
+        _loadHomeFeeds();
+        _checkAppUpdateQuietly();
+      }
     });
+  }
+
+  /// Stage 2: After loading all home feed doors in given priority, take up playlists & library info
+  Future<void> _loadPlaylistsAndLibraryStage() async {
+    if (!mounted) return;
+    try {
+      if (_musicService.customPlaylists.isEmpty) {
+        await _musicService.loadCustomPlaylists();
+      }
+      // Progressive yield: allow Flutter engine to take up and render playlists smoothly
+      await Future.delayed(const Duration(milliseconds: 300));
+    } catch (e) {
+      debugPrint('[HomeScreen] Stage 2 playlist loading error: $e');
+    }
+  }
+
+  /// Stage 3: After loading playlists and library, check for differences in cloud and update if needed
+  Future<void> _checkCloudDifferencesAndUpdate() async {
+    if (!mounted) return;
+    final auth = AuthService();
+    final prefs = PreferencesService();
+    if (!auth.isAuthenticated) return;
+
+    try {
+      final analysis = await CloudSyncService().inspectSyncState();
+      if (!mounted) return;
+
+      if (!analysis.hasNewLocalItems) {
+        // If cloud has updates/songs that this device lacks, pull them silently so browser is updated
+        if (analysis.hasNewCloudItems) {
+          await CloudSyncService().sync();
+        }
+        await prefs.setHasPromptedGoogleCloudBackup(true);
+        return;
+      }
+
+      // If local storage has unsaved items that don't exist in the cloud (L \ C != ∅)
+      if (!prefs.hasPromptedGoogleCloudBackup) {
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (ctx) => GoogleCloudBackupPromptDialog(analysis: analysis),
+        );
+      }
+    } catch (e) {
+      debugPrint('[HomeScreen] Stage 3 cloud checkup error: $e');
+    }
+  }
+
+  Future<void> _checkAppUpdateQuietly() async {
+    try {
+      await UpdateService().checkForUpdate();
+    } catch (_) {}
   }
 
   void _setHomeFeedComplete(bool complete) {
@@ -180,41 +242,27 @@ class _HomeScreenState extends State<HomeScreen>
     _circadianContext = _prefs.getCircadianContext();
     _dailyMixConfigs = _prefs.getDailyMixConfigs();
 
-    // 1. Silent Instant Cache Hydration (< 6 hours) with strict deduplication & noise filtering
-    final cachedCircadian = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('circadian'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    // 1. Silent Instant Cache Hydration (< 6 hours)
+    final cachedCircadian = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('circadian'),
     );
-    final cachedMix1 = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('daily_mix_1'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedMix1 = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('daily_mix_1'),
     );
-    final cachedMix2 = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('daily_mix_2'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedMix2 = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('daily_mix_2'),
     );
-    final cachedCharts = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('charts'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedCharts = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('charts'),
     );
-    final cachedTrending = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('trending'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedTrending = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('trending'),
     );
-    final cachedNewReleases = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('new_releases'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedNewReleases = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('new_releases'),
     );
-    final cachedPersonalized = CanonicalSongDedup.deduplicateList(
-      _deserializeCachedVideos(
-        _prefs.getCachedHomeFeed('personalized'),
-      ).where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
+    final cachedPersonalized = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('personalized'),
     );
     final cachedAlbumsJson = _prefs.getCachedHomeFeed('albums');
     List<JioAlbum> cachedAlbums = [];
@@ -268,9 +316,6 @@ class _HomeScreenState extends State<HomeScreen>
           }
         });
       }
-      _setHomeFeedComplete(true);
-    } else {
-      _setHomeFeedComplete(false);
     }
 
     // 2. Background Refresh / Initial Load
@@ -291,8 +336,13 @@ class _HomeScreenState extends State<HomeScreen>
           _isLoadingPersonalized = false;
         });
       }
+      _setHomeFeedComplete(true);
+      await _loadPlaylistsAndLibraryStage();
+      await _checkCloudDifferencesAndUpdate();
       return;
     }
+
+    _setHomeFeedComplete(false);
 
     Future<void> pauseIfSearchActive() async {
       while (mounted) {
@@ -641,6 +691,12 @@ class _HomeScreenState extends State<HomeScreen>
       }
       _setHomeFeedComplete(true);
     }
+
+    // Stage 2: After loading all the home feed in given priority, start taking up playlists and other info
+    await _loadPlaylistsAndLibraryStage();
+
+    // Stage 3: After loading playlists and library, check for differences in cloud and update if needed
+    await _checkCloudDifferencesAndUpdate();
   }
 
   String _serializeVideos(List<Video> videos) {
@@ -797,6 +853,8 @@ class _HomeScreenState extends State<HomeScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          const AppUpdateTopBarButton(),
+                          const CloudBackupTopBarButton(),
                           const GoogleProfileHeaderButton(compact: true),
                           const SizedBox(width: 8),
                           GestureDetector(

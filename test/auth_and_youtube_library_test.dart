@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:music_app/services/auth_service.dart';
+import 'package:music_app/services/preferences_service.dart';
 import 'package:music_app/services/youtube_library_service.dart';
 
 void main() {
@@ -179,6 +180,32 @@ void main() {
         expect(auth.accessToken, equals('persisted_oauth_token_xyz'));
 
         // Sign out cleans SharedPreferences
+        await auth.signOut();
+        expect(auth.isAuthenticated, isFalse);
+        expect(auth.userDisplayName, isNull);
+      },
+    );
+
+    test(
+      'AuthService restores session without explicit displayName falling back to email prefix and updates PreferencesService',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'dilse_auth_session_type': 'google',
+          'dilse_auth_user_id': '',
+          'dilse_auth_user_name': '',
+          'dilse_auth_user_email': 'dilseuser@gmail.com',
+          'dilse_auth_user_photo': '',
+        });
+
+        await PreferencesService().init();
+        final auth = AuthService();
+        await auth.initialize();
+
+        expect(auth.isAuthenticated, isTrue);
+        expect(auth.userDisplayName, equals('dilseuser'));
+        expect(auth.userId, equals('dilseuser@gmail.com'));
+        expect(PreferencesService().userName, equals('dilseuser'));
+
         await auth.signOut();
         expect(auth.isAuthenticated, isFalse);
         expect(auth.userDisplayName, isNull);

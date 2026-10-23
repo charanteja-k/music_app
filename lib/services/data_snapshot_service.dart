@@ -203,9 +203,7 @@ class DataSnapshotService {
         'preferences': preferencesMap,
       };
 
-      final serializedJson = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(snapshotPayload);
+      final serializedJson = json.encode(snapshotPayload);
 
       String? primaryPath;
 
@@ -233,12 +231,26 @@ class DataSnapshotService {
           }
         }
       } else {
-        final prefsInstance = await SharedPreferences.getInstance();
-        await prefsInstance.setString(
-          'dilse_safety_snapshot_web',
-          serializedJson,
-        );
-        primaryPath = 'web_storage:dilse_safety_snapshot_web';
+        primaryPath = 'web_storage:primary_keys';
+        try {
+          final prefsInstance = await SharedPreferences.getInstance();
+          // On Web, library data is already stored in primary keys ('custom_playlists_web', 'liked_songs_web').
+          // If storing the duplicate snapshot exceeds browser 5MB quota, catch safely and clear stale snapshots
+          // to protect browser localStorage headroom.
+          await prefsInstance.setString(
+            'dilse_safety_snapshot_web',
+            serializedJson,
+          );
+          primaryPath = 'web_storage:dilse_safety_snapshot_web';
+        } catch (storageErr) {
+          debugPrint(
+            '[DataSnapshotService] Web localStorage quota constrained ($storageErr). Primary keys remain intact.',
+          );
+          try {
+            final prefsInstance = await SharedPreferences.getInstance();
+            await prefsInstance.remove('dilse_safety_snapshot_web');
+          } catch (_) {}
+        }
       }
 
       debugPrint(
@@ -305,6 +317,19 @@ class DataSnapshotService {
       if (kIsWeb) {
         final prefs = await SharedPreferences.getInstance();
         jsonContent = prefs.getString('dilse_safety_snapshot_web');
+        if (jsonContent == null || jsonContent.isEmpty) {
+          final pRaw = prefs.getString('custom_playlists_web');
+          final lRaw = prefs.getString('liked_songs_web');
+          if ((pRaw != null && pRaw.isNotEmpty) ||
+              (lRaw != null && lRaw.isNotEmpty)) {
+            jsonContent = json.encode({
+              'playlists': pRaw != null ? json.decode(pRaw) : [],
+              'liked_songs': lRaw != null ? json.decode(lRaw) : [],
+              'downloads': [],
+              'preferences': {},
+            });
+          }
+        }
       } else {
         final file = await findLatestSnapshotFile();
         if (file != null && await file.exists()) {

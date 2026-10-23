@@ -362,10 +362,17 @@
 
     el.addEventListener('ended', () => {
       if (activeEngine === ENGINE_AUDIO && el === getActiveDeck()) {
-        console.log(`[DilSe Web Player] JioSaavn audio track ended (${id})`);
-        broadcastState('ended');
-        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-        window.dispatchEvent(new CustomEvent('dilse_ended'));
+        const pos = el.currentTime || 0;
+        const dur = el.duration || 0;
+        // Verify genuine track completion: ensure duration is valid and playback is within 2.5s of end
+        if (dur > 1 && pos >= (dur - 2.5)) {
+          console.log(`[DilSe Web Player] JioSaavn audio track ended (${id})`);
+          broadcastState('ended');
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+          window.dispatchEvent(new CustomEvent('dilse_ended'));
+        } else {
+          console.log(`[DilSe Web Player] Ignored premature/reset ended event on ${id} (pos: ${pos}, dur: ${dur})`);
+        }
       }
     });
 
@@ -430,6 +437,17 @@
     const errName = err ? (err.name || '') : '';
     const errMsg = err ? (err.message || String(err)) : '';
     console.warn('[DilSe Web Player] audioEl.play() rejected:', errName, errMsg);
+
+    // If play was aborted due to another play/pause action or rapid track change, this is expected DOM behavior.
+    // DO NOT trigger fallback or auto-skip!
+    if (
+      errName === 'AbortError' ||
+      errMsg.includes('interrupted') ||
+      errMsg.includes('pause()')
+    ) {
+      console.log('[DilSe Web Player] Playback request interrupted by subsequent action (benign AbortError). Ignoring.');
+      return;
+    }
 
     // If browser Autoplay policy blocked sound before user gesture, DO NOT trigger fallback or skip track!
     if (

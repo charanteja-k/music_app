@@ -77,6 +77,9 @@ class UpdateService {
   static const String _githubRepoOwner = 'charanteja-k';
   static const String _githubRepoName = 'music_app';
 
+  final ValueNotifier<AppUpdateInfo?> latestUpdateInfoNotifier =
+      ValueNotifier<AppUpdateInfo?>(null);
+
   /// Queries GitHub Releases for the latest release and checks if it is newer
   /// than the currently installed app version.
   Future<AppUpdateInfo?> checkForUpdate() async {
@@ -143,7 +146,7 @@ class UpdateService {
         currentBuild: currentBuildNumber,
       );
 
-      return AppUpdateInfo(
+      final info = AppUpdateInfo(
         tagName: tagName,
         releaseName: releaseName,
         changelog: changelog,
@@ -154,6 +157,8 @@ class UpdateService {
         hasUpdate: hasUpdate,
         releasePageUrl: releasePage,
       );
+      latestUpdateInfoNotifier.value = info;
+      return info;
     } catch (e) {
       debugPrint('[UpdateService] Error checking for updates: $e');
       return null;

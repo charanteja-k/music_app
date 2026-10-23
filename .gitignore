@@ -51,6 +51,8 @@ backend/__pycache__/
 # Node / Cloudflare
 node_modules/
 **/node_modules/
+.wrangler/
+**/.wrangler/
 
 # Nested clone
 /music_app/

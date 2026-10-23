@@ -1,4 +1,5 @@
 name = "dilse-edge-stream"
+account_id = "5c3d6e26e7d1f5f86945d0ecff5c35a7"
 main = "worker.js"
 compatibility_date = "2024-09-01"
 

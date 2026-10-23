@@ -6839,6 +6839,7 @@ var worker_source_default = {
       const rawArtist = url.searchParams.get("artist") || "";
       const rawLang = url.searchParams.get("lang") || "";
       const rawDuration = parseInt(url.searchParams.get("duration") || "0", 10);
+      const rawVideoId = url.searchParams.get("videoId") || url.searchParams.get("v") || "";
       if (!rawTitle || rawTitle.trim().length < 1) {
         return new Response(
           JSON.stringify({ status: "error", message: "Missing title (?title=...)" }),
@@ -6846,7 +6847,13 @@ var worker_source_default = {
         );
       }
       try {
-        const result = await fetchLyricsEdge(rawTitle.trim(), rawArtist.trim(), rawLang.trim(), rawDuration);
+        const result = await fetchLyricsEdge(
+          rawTitle.trim(),
+          rawArtist.trim(),
+          rawLang.trim(),
+          rawDuration,
+          rawVideoId.trim()
+        );
         if (result && (result.syncedLyrics || result.plainLyrics)) {
           return new Response(
             JSON.stringify({ status: "ok", match: true, data: result }),
@@ -7400,12 +7407,146 @@ function scoreLyricsCandidate(cand, targetTitle, targetArtist, targetLang, targe
   }
   return score;
 }
-async function fetchLyricsEdge(title, artist, lang, duration) {
+async function fetchLyricsEdge(title, artist, lang, duration, videoId) {
   const cleanTitle = title.replace(/[\(\[\{].*?[\)\]\}]/g, "").replace(/official video|music video|full song|lyric video|audio song|video song|lyrics/gi, "").trim();
   const cleanArtist = artist.replace(/[\(\[\{].*?[\)\]\}]/g, "").trim();
+  try {
+    const jioResult = await fetchJioLyrics(cleanTitle, cleanArtist);
+    if (jioResult && (jioResult.plainLyrics || jioResult.syncedLyrics)) {
+      return jioResult;
+    }
+  } catch (err) {
+    console.error("JioLyrics error:", err);
+  }
+  try {
+    let targetVid = videoId;
+    if (!targetVid) {
+      const ytmMatches = await searchYtmSongs(`${cleanTitle} ${cleanArtist}`.trim(), 2);
+      if (ytmMatches && ytmMatches.length > 0 && ytmMatches[0].id) {
+        targetVid = ytmMatches[0].id;
+      }
+    }
+    if (targetVid) {
+      const ytmResult = await fetchYtmLyrics(targetVid, cleanTitle, cleanArtist);
+      if (ytmResult && (ytmResult.plainLyrics || ytmResult.syncedLyrics)) {
+        return ytmResult;
+      }
+    }
+  } catch (err) {
+    console.error("YtmLyrics error:", err);
+  }
+  try {
+    const lrcResult = await fetchLrcLibLyrics(cleanTitle, cleanArtist, lang, duration);
+    if (lrcResult && (lrcResult.syncedLyrics || lrcResult.plainLyrics)) {
+      return lrcResult;
+    }
+  } catch (err) {
+    console.error("LrcLib error:", err);
+  }
+  return null;
+}
+async function fetchJioLyrics(cleanTitle, cleanArtist) {
+  const query = `${cleanTitle} ${cleanArtist}`.trim();
+  const searchUrl = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&cc=in&api_version=4&ctx=android&n=5&p=1&q=" + encodeURIComponent(query);
+  const res = await fetch(searchUrl, {
+    headers: {
+      "User-Agent": "SaavnAndroid/9.0.0",
+      "Accept": "application/json",
+      ...JIO_GEO_HEADERS
+    }
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const results = data.results || [];
+  for (const r of results) {
+    if (!r || !r.id) continue;
+    const lUrl = `https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&lyrics_id=${r.id}&ctx=web6dot0&api_version=4&_format=json`;
+    try {
+      const lRes = await fetch(lUrl, {
+        headers: {
+          "User-Agent": "SaavnAndroid/9.0.0",
+          "Accept": "application/json",
+          ...JIO_GEO_HEADERS
+        }
+      });
+      if (lRes.ok) {
+        const lData = await lRes.json();
+        const rawLyrics = lData.lyrics;
+        if (rawLyrics && typeof rawLyrics === "string" && rawLyrics.trim().length > 10) {
+          const clean = rawLyrics.replace(/<br\s*[\/]?>/gi, "\n").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").replace(/<[^>]+>/g, "").trim();
+          const songTitle = (r.title || r.song || cleanTitle).replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").trim();
+          const songArtist = (r.more_info?.artistMap?.primary_artists || []).map((a) => a.name).join(", ") || r.subtitle || cleanArtist;
+          return {
+            id: "jio_" + r.id,
+            trackName: songTitle,
+            artistName: songArtist,
+            albumName: r.more_info?.album || r.album || "",
+            plainLyrics: clean,
+            syncedLyrics: null,
+            source: "jiosaavn_official"
+          };
+        }
+      }
+    } catch (_) {
+    }
+  }
+  return null;
+}
+async function fetchYtmLyrics(videoId, cleanTitle, cleanArtist) {
+  if (!videoId) return null;
+  const nextUrl = "https://www.youtube.com/youtubei/v1/next";
+  const nextBody = {
+    videoId,
+    context: YTM_CONTEXT
+  };
+  const nextRes = await fetch(nextUrl, {
+    method: "POST",
+    headers: YTM_HEADERS,
+    body: JSON.stringify(nextBody)
+  });
+  if (!nextRes.ok) return null;
+  const nextData = await nextRes.json();
+  const tabs = nextData.contents?.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs || [];
+  let lyricsBrowseId = null;
+  for (const t of tabs) {
+    const tab = t.tabRenderer;
+    if (tab && (tab.title || "").toLowerCase().includes("lyric")) {
+      lyricsBrowseId = tab.endpoint?.browseEndpoint?.browseId;
+      break;
+    }
+  }
+  if (!lyricsBrowseId) return null;
+  const browseUrl = "https://www.youtube.com/youtubei/v1/browse";
+  const browseBody = {
+    browseId: lyricsBrowseId,
+    context: YTM_CONTEXT
+  };
+  const browseRes = await fetch(browseUrl, {
+    method: "POST",
+    headers: YTM_HEADERS,
+    body: JSON.stringify(browseBody)
+  });
+  if (!browseRes.ok) return null;
+  const browseData = await browseRes.json();
+  const section = browseData.contents?.sectionListRenderer?.contents?.[0]?.musicDescriptionShelfRenderer;
+  const runs = section?.description?.runs || [];
+  const text = runs.map((r) => r.text || "").join("").trim();
+  if (text && text.length > 10) {
+    return {
+      id: "ytm_" + videoId,
+      trackName: cleanTitle,
+      artistName: cleanArtist,
+      plainLyrics: text,
+      syncedLyrics: null,
+      source: "youtube_music_official"
+    };
+  }
+  return null;
+}
+async function fetchLrcLibLyrics(cleanTitle, cleanArtist, lang, duration) {
   let targetLang = (lang || "").toLowerCase().trim();
   if (!targetLang) {
-    targetLang = detectLyricsScript(title) || detectMetaLanguage(`${title} ${artist}`) || "";
+    targetLang = detectLyricsScript(cleanTitle) || detectMetaLanguage(`${cleanTitle} ${cleanArtist}`) || "";
   }
   const searchHeaders = {
     "User-Agent": "DilSeMusicApp/1.0 (https://dilse.app; contact@dilse.app)",

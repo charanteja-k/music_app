@@ -5,6 +5,8 @@ import '../../layouts/desktop_layout_state.dart';
 import '../../services/preferences_service.dart';
 import '../../services/auth_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
+import '../auth/google_profile_header_button.dart';
+import '../top_bar_cloud_actions.dart';
 import 'desktop_search_dropdown.dart';
 import '../profile_avatar_helper.dart';
 
@@ -586,6 +588,14 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                                 DesktopLayoutState.toggleRightPanel(),
                           ),
                         ),
+
+                        const SizedBox(width: 8.0),
+
+                        const AppUpdateTopBarButton(),
+                        const CloudBackupTopBarButton(),
+
+                        // Google Sign-In & YouTube Account Profile Button
+                        const GoogleProfileHeaderButton(compact: true),
 
                         const SizedBox(width: 8.0),
 

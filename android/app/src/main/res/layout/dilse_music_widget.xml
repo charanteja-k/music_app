@@ -85,7 +85,6 @@
                         android:layout_height="38dp"
                         android:layout_weight="1"
                         android:padding="8dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_widget_shuffle"
                         android:contentDescription="Shuffle" />
 
@@ -96,7 +95,6 @@
                         android:layout_height="38dp"
                         android:layout_weight="1"
                         android:padding="6dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/audio_service_skip_previous"
                         android:contentDescription="Previous" />
 
@@ -107,7 +105,6 @@
                         android:layout_height="44dp"
                         android:layout_weight="1.3"
                         android:padding="2dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/audio_service_play_arrow"
                         android:contentDescription="Play/Pause" />
 
@@ -118,7 +115,6 @@
                         android:layout_height="38dp"
                         android:layout_weight="1"
                         android:padding="6dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/audio_service_skip_next"
                         android:contentDescription="Next" />
 
@@ -129,7 +125,6 @@
                         android:layout_height="38dp"
                         android:layout_weight="1"
                         android:padding="8dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_widget_repeat"
                         android:contentDescription="Repeat" />
 
@@ -141,10 +136,10 @@
                     android:layout_height="22dp"
                     android:layout_marginTop="3dp">
 
-                    <!-- Visual Progress Bar -->
+                    <!-- Visual Progress Bar (Safe framework style for RemoteViews) -->
                     <ProgressBar
                         android:id="@+id/widget_progress_bar"
-                        style="?android:attr/progressBarStyleHorizontal"
+                        style="@android:style/Widget.ProgressBar.Horizontal"
                         android:layout_width="match_parent"
                         android:layout_height="4.5dp"
                         android:layout_gravity="center_vertical"
@@ -158,75 +153,65 @@
                         android:layout_height="match_parent"
                         android:orientation="horizontal">
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_0"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_1"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_2"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_3"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_4"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_5"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_6"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_7"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_8"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
-                        <View
+                        <FrameLayout
                             android:id="@+id/widget_seek_zone_9"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="?android:attr/selectableItemBackgroundBorderless" />
+                            android:layout_weight="1" />
 
                     </LinearLayout>
 
@@ -247,8 +232,7 @@
                         android:text="0:00"
                         android:textColor="#99FFFFFF"
                         android:textSize="9.5sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:background="?android:attr/selectableItemBackgroundBorderless" />
+                        android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:id="@+id/widget_time_total"
@@ -257,8 +241,7 @@
                         android:text="0:00"
                         android:textColor="#99FFFFFF"
                         android:textSize="9.5sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:background="?android:attr/selectableItemBackgroundBorderless" />
+                        android:fontFamily="sans-serif-medium" />
 
                 </LinearLayout>
 
@@ -282,8 +265,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:padding="2dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless">
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_0"
@@ -314,8 +296,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:padding="2dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless">
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_1"
@@ -346,8 +327,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:padding="2dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless">
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_2"
@@ -378,8 +358,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:padding="2dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless">
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_3"
@@ -410,8 +389,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:padding="2dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless">
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/widget_playlist_art_4"

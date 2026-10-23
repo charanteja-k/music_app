@@ -253,6 +253,9 @@ class PreferencesService extends ChangeNotifier {
   ];
 
   Color _themeColor = const Color(0xFF8FA382); // Default Sage Leaf (Organic)
+  final ValueNotifier<Color> themeColorNotifier = ValueNotifier<Color>(
+    const Color(0xFF8FA382),
+  );
   double _cacheSizeMB = 500.0;
   String _customServerUrl = '';
   String _cloudflareWorkerUrl = '';
@@ -265,6 +268,7 @@ class PreferencesService extends ChangeNotifier {
   String _lyricsDisplayMode = 'original'; // 'original', 'pronunciation', 'dual'
   String _userName = '';
   bool _hasPromptedName = false;
+  bool _hasPromptedGoogleCloudBackup = false;
   String? _profileImagePath;
 
   // Search History
@@ -353,6 +357,7 @@ class PreferencesService extends ChangeNotifier {
   String get userName => _userName.isEmpty ? 'Friend' : _userName;
   bool get hasCustomName => _userName.isNotEmpty;
   bool get hasPromptedName => _hasPromptedName;
+  bool get hasPromptedGoogleCloudBackup => _hasPromptedGoogleCloudBackup;
   bool? _isYouTubeConnectDismissed;
   bool get isYouTubeConnectDismissed => _isYouTubeConnectDismissed ?? false;
 
@@ -435,6 +440,7 @@ class PreferencesService extends ChangeNotifier {
 
     int colorValue = _prefs.getInt('themeColor') ?? 0xFF8FA382;
     _themeColor = Color(colorValue);
+    themeColorNotifier.value = _themeColor;
     _cacheSizeMB = _prefs.getDouble('cacheSizeMB') ?? 500.0;
     _customServerUrl = _prefs.getString('customServerUrl') ?? '';
     _cloudflareWorkerUrl = _prefs.getString('cloudflareWorkerUrl') ?? '';
@@ -498,6 +504,8 @@ class PreferencesService extends ChangeNotifier {
     _mostPlayedArtist = _prefs.getString('mostPlayedArtist') ?? '';
     _userName = _prefs.getString('userName') ?? '';
     _hasPromptedName = _prefs.getBool('hasPromptedName') ?? false;
+    _hasPromptedGoogleCloudBackup =
+        _prefs.getBool('hasPromptedGoogleCloudBackup') ?? false;
     _isYouTubeConnectDismissed =
         _prefs.getBool('yt_connect_card_dismissed') ?? false;
     _profileImagePath = _prefs.getString('profileImagePath');
@@ -1437,6 +1445,7 @@ class PreferencesService extends ChangeNotifier {
   Future<void> setThemeColor(Color color) async {
     if (!_isInitialized) return;
     _themeColor = color;
+    themeColorNotifier.value = color;
     await _prefs.setInt('themeColor', color.toARGB32());
     notifyListeners();
   }
@@ -1749,6 +1758,14 @@ class PreferencesService extends ChangeNotifier {
     _hasPromptedName = true;
     await _prefs.setString('userName', _userName);
     await _prefs.setBool('hasPromptedName', true);
+    notifyListeners();
+  }
+
+  Future<void> setHasPromptedGoogleCloudBackup(bool value) async {
+    _hasPromptedGoogleCloudBackup = value;
+    if (_isInitialized) {
+      await _prefs.setBool('hasPromptedGoogleCloudBackup', value);
+    }
     notifyListeners();
   }
 
