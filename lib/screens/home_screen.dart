@@ -1087,6 +1087,7 @@ class _HomeScreenState extends State<HomeScreen>
       required List<Color> gradientColors,
       required IconData icon,
       String? query,
+      String? imageUrl,
     }) {
       HapticFeedback.lightImpact();
       if (isDesktop) {
@@ -1098,6 +1099,7 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: initialSongs,
           gradientColors: gradientColors,
           icon: icon,
+          imageUrl: imageUrl,
         );
       } else {
         Navigator.push(
@@ -1110,6 +1112,7 @@ class _HomeScreenState extends State<HomeScreen>
               initialSongs: initialSongs,
               gradientColors: gradientColors,
               icon: icon,
+              imageUrl: imageUrl,
             ),
           ),
         );
@@ -1131,8 +1134,8 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    final items = <_HomeQuickAccessItem>[
-      _HomeQuickAccessItem(
+    final items = <HomeQuickAccessItem>[
+      HomeQuickAccessItem(
         title: dailyMix1?.title ?? 'Daily Mix 1',
         icon: Icons.shuffle_rounded,
         solidColor: const Color(0xFF2E3856),
@@ -1143,6 +1146,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ? MusicService.resolveArtworkUrl(_dailyMix1.first)
                   : null)
             : null,
+        songs: _dailyMix1,
         onTap: () => openCurated(
           playlistId: 'daily_mix_1',
           title: dailyMix1?.title ?? 'Daily Mix 1',
@@ -1153,7 +1157,27 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _dailyMix1,
           gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
           icon: Icons.shuffle_rounded,
+          imageUrl: _dailyMix1.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_dailyMix1.first)
+              : null,
         ),
+        onPlay: () {
+          if (_dailyMix1.isNotEmpty) {
+            _musicService.playPlaylist(_dailyMix1, 0);
+          } else {
+            openCurated(
+              playlistId: 'daily_mix_1',
+              title: dailyMix1?.title ?? 'Daily Mix 1',
+              subtitle: dailyMix1?.subtitle ?? 'Curated for you',
+              query:
+                  dailyMix1?.query ??
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Mix',
+              initialSongs: _dailyMix1,
+              gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
+              icon: Icons.shuffle_rounded,
+            );
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
@@ -1165,7 +1189,7 @@ class _HomeScreenState extends State<HomeScreen>
           },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Liked Songs',
         icon: Icons.favorite_rounded,
         solidColor: const Color(0xFF5038A0),
@@ -1174,13 +1198,20 @@ class _HomeScreenState extends State<HomeScreen>
             ? _musicService.likedSongs.first['thumbnail']
             : null,
         onTap: openLikedSongs,
+        onPlay: () {
+          if (_musicService.likedSongs.isNotEmpty) {
+            _musicService.playLikedSong(_musicService.likedSongs.first);
+          } else {
+            openLikedSongs();
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
           playlist: 'liked_songs',
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: dailyMix2?.title ?? 'Daily Mix 2',
         icon: Icons.graphic_eq_rounded,
         solidColor: const Color(0xFF223544),
@@ -1191,6 +1222,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ? MusicService.resolveArtworkUrl(_dailyMix2.first)
                   : null)
             : null,
+        songs: _dailyMix2,
         onTap: () => openCurated(
           playlistId: 'daily_mix_2',
           title: dailyMix2?.title ?? 'Daily Mix 2',
@@ -1201,7 +1233,27 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _dailyMix2,
           gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
           icon: Icons.graphic_eq_rounded,
+          imageUrl: _dailyMix2.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_dailyMix2.first)
+              : null,
         ),
+        onPlay: () {
+          if (_dailyMix2.isNotEmpty) {
+            _musicService.playPlaylist(_dailyMix2, 0);
+          } else {
+            openCurated(
+              playlistId: 'daily_mix_2',
+              title: dailyMix2?.title ?? 'Daily Mix 2',
+              subtitle: dailyMix2?.subtitle ?? 'Curated for you',
+              query:
+                  dailyMix2?.query ??
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Hits',
+              initialSongs: _dailyMix2,
+              gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
+              icon: Icons.graphic_eq_rounded,
+            );
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
@@ -1213,7 +1265,7 @@ class _HomeScreenState extends State<HomeScreen>
           },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Top Charts',
         icon: Icons.trending_up_rounded,
         solidColor: const Color(0xFF382B24),
@@ -1223,6 +1275,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
                   : null)
             : null,
+        songs: _topChartsIndia,
         onTap: () => openCurated(
           playlistId: 'top_charts_india',
           title: 'Top Charts India',
@@ -1232,7 +1285,26 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _topChartsIndia,
           gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
           icon: Icons.trending_up_rounded,
+          imageUrl: _topChartsIndia.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
+              : null,
         ),
+        onPlay: () {
+          if (_topChartsIndia.isNotEmpty) {
+            _musicService.playPlaylist(_topChartsIndia, 0);
+          } else {
+            openCurated(
+              playlistId: 'top_charts_india',
+              title: 'Top Charts India',
+              subtitle: 'Updated Daily',
+              query:
+                  'Top Charts India ${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'}',
+              initialSongs: _topChartsIndia,
+              gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
+              icon: Icons.trending_up_rounded,
+            );
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
@@ -1244,9 +1316,9 @@ class _HomeScreenState extends State<HomeScreen>
           },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'New Releases',
-        icon: Icons.fiber_new_rounded,
+        icon: Icons.album_rounded,
         solidColor: const Color(0xFF1E382A),
         iconGradient: const [Color(0xFF1E382A), Color(0xFF12241A)],
         imageUrl: _newReleases.isNotEmpty
@@ -1254,6 +1326,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ? MusicService.resolveArtworkUrl(_newReleases.first)
                   : null)
             : null,
+        songs: _newReleases,
         onTap: () => openCurated(
           playlistId: 'new_releases',
           title: 'New Releases',
@@ -1262,8 +1335,27 @@ class _HomeScreenState extends State<HomeScreen>
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
           initialSongs: _newReleases,
           gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
-          icon: Icons.fiber_new_rounded,
+          icon: Icons.album_rounded,
+          imageUrl: _newReleases.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_newReleases.first)
+              : null,
         ),
+        onPlay: () {
+          if (_newReleases.isNotEmpty) {
+            _musicService.playPlaylist(_newReleases, 0);
+          } else {
+            openCurated(
+              playlistId: 'new_releases',
+              title: 'New Releases',
+              subtitle: 'Fresh Music',
+              query:
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
+              initialSongs: _newReleases,
+              gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
+              icon: Icons.album_rounded,
+            );
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
@@ -1275,7 +1367,7 @@ class _HomeScreenState extends State<HomeScreen>
           },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Trending',
         icon: Icons.whatshot_rounded,
         solidColor: const Color(0xFF38222A),
@@ -1286,6 +1378,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ? MusicService.resolveArtworkUrl(_trendingNow.first)
                   : null)
             : null,
+        songs: _trendingNow,
         onTap: () => openCurated(
           playlistId: 'trending_now',
           title: 'Trending Now',
@@ -1295,7 +1388,26 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: _trendingNow,
           gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
           icon: Icons.whatshot_rounded,
+          imageUrl: _trendingNow.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_trendingNow.first)
+              : null,
         ),
+        onPlay: () {
+          if (_trendingNow.isNotEmpty) {
+            _musicService.playPlaylist(_trendingNow, 0);
+          } else {
+            openCurated(
+              playlistId: 'trending_now',
+              title: 'Trending Now',
+              subtitle: 'Global Pick',
+              query:
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Trending',
+              initialSongs: _trendingNow,
+              gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
+              icon: Icons.whatshot_rounded,
+            );
+          }
+        },
         onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
@@ -1320,97 +1432,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final item = items[index];
-          return Material(
-            color: Colors.transparent,
-            child: GestureDetector(
-              onSecondaryTapDown: item.onSecondaryTap != null
-                  ? (details) => item.onSecondaryTap!(details.globalPosition)
-                  : null,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppThemeTokens.radiusSmall),
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  item.onTap();
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppThemeTokens.surfaceCard,
-                    borderRadius: BorderRadius.circular(
-                      AppThemeTokens.radiusSmall,
-                    ),
-                    border: Border.all(
-                      color: AppThemeTokens.surfaceBorder,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(AppThemeTokens.radiusSmall),
-                          bottomLeft: Radius.circular(
-                            AppThemeTokens.radiusSmall,
-                          ),
-                        ),
-                        child: SizedBox(
-                          width: 52,
-                          height: 52,
-                          child: item.isLoading
-                              ? const ShimmerBox(
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: 0,
-                                )
-                              : item.imageUrl != null &&
-                                    item.imageUrl!.isNotEmpty
-                              ? Image.network(
-                                  item.imageUrl!,
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    decoration: BoxDecoration(
-                                      color: item.solidColor,
-                                    ),
-                                    child: Icon(
-                                      item.icon,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  decoration: BoxDecoration(
-                                    color: item.solidColor,
-                                  ),
-                                  child: Icon(
-                                    item.icon,
-                                    color: Colors.white,
-                                    size: 22,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppThemeTokens.textPrimary,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
+          return HomeShortcutCard(item: item);
         }, childCount: items.length),
       ),
     );
@@ -2395,26 +2417,259 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-class _HomeQuickAccessItem {
+class HomeQuickAccessItem {
   final String title;
   final IconData icon;
   final Color solidColor;
   final List<Color> iconGradient;
   final String? imageUrl;
+  final List<Video> songs;
   final bool isLoading;
   final VoidCallback onTap;
+  final VoidCallback? onPlay;
   final void Function(Offset globalPosition)? onSecondaryTap;
 
-  const _HomeQuickAccessItem({
+  const HomeQuickAccessItem({
     required this.title,
     required this.icon,
     this.solidColor = const Color(0xFF242434),
     this.iconGradient = const [Color(0xFF242434), Color(0xFF1E1E2C)],
     this.imageUrl,
+    this.songs = const [],
     this.isLoading = false,
     required this.onTap,
+    this.onPlay,
     this.onSecondaryTap,
   });
+
+  /// 4-tier artwork resolution pipeline:
+  /// Tier 1: Explicit Entity Thumbnail (if non-null and non-empty)
+  /// Tier 2: First Track Artwork (MusicService.resolveArtworkUrl(songs.first))
+  /// Tier 3: Curated High-Res Genre/Release Artwork (CuratedPlaylistScreen.getCuratedGenreFallback)
+  /// Tier 4: Null (triggers stylized minimalist gradient container with centered vinyl icon)
+  String? resolveArtwork() {
+    // Liked Songs special case: if no explicit thumbnail exists, return null so it falls
+    // back cleanly to the iconic purple gradient + heart icon (Tier 4).
+    if (title.toLowerCase().contains('liked')) {
+      if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+        return imageUrl!.trim();
+      }
+      return null;
+    }
+
+    // Tier 1 — Explicit Entity Thumbnail
+    if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+      return imageUrl!.trim();
+    }
+
+    // Tier 2 — First Track Artwork
+    if (songs.isNotEmpty) {
+      final trackArt = MusicService.resolveArtworkUrl(songs.first);
+      if (trackArt.trim().isNotEmpty) {
+        return trackArt.trim();
+      }
+    }
+
+    // Tier 3 — Curated High-Res Genre/Release Artwork
+    final curatedFallback = CuratedPlaylistScreen.getCuratedGenreFallback(
+      title,
+    );
+    if (curatedFallback.trim().isNotEmpty) {
+      return curatedFallback.trim();
+    }
+
+    return null;
+  }
+}
+
+class HomeShortcutCard extends StatefulWidget {
+  final HomeQuickAccessItem item;
+
+  const HomeShortcutCard({super.key, required this.item});
+
+  @override
+  State<HomeShortcutCard> createState() => _HomeShortcutCardState();
+}
+
+class _HomeShortcutCardState extends State<HomeShortcutCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final targetCache = (52 * dpr).round().clamp(52, 2048);
+    final isDesktopViewport = MediaQuery.of(context).size.width >= 1024;
+    final resolvedUrl = widget.item.resolveArtwork();
+
+    return Material(
+      color: Colors.transparent,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onSecondaryTapDown: widget.item.onSecondaryTap != null
+              ? (details) => widget.item.onSecondaryTap!(details.globalPosition)
+              : null,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6.0),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.item.onTap();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: _isHovered
+                    ? const Color(0xFF282834)
+                    : const Color(0xFF16161E),
+                borderRadius: BorderRadius.circular(6.0),
+                border: Border.all(
+                  color: Colors.white.withValues(
+                    alpha: _isHovered ? 0.12 : 0.06,
+                  ),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(6.0),
+                    ),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: widget.item.isLoading
+                          ? const ShimmerBox(
+                              width: 52,
+                              height: 52,
+                              borderRadius: 0,
+                            )
+                          : (resolvedUrl != null && resolvedUrl.isNotEmpty)
+                          ? Image.network(
+                              resolvedUrl,
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                              cacheWidth: targetCache,
+                              cacheHeight: targetCache,
+                              frameBuilder:
+                                  (
+                                    context,
+                                    child,
+                                    frame,
+                                    wasSynchronouslyLoaded,
+                                  ) {
+                                    if (wasSynchronouslyLoaded ||
+                                        frame != null) {
+                                      return child;
+                                    }
+                                    return const ShimmerBox(
+                                      width: 52,
+                                      height: 52,
+                                      borderRadius: 0,
+                                    );
+                                  },
+                              errorBuilder: (_, _, _) => _buildTier4Fallback(),
+                            )
+                          : _buildTier4Fallback(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFFFFFFF),
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (isDesktopViewport)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: AnimatedOpacity(
+                        opacity: _isHovered ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: IgnorePointer(
+                          ignoring: !_isHovered,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                if (widget.item.onPlay != null) {
+                                  widget.item.onPlay!();
+                                } else {
+                                  widget.item.onTap();
+                                }
+                              },
+                              customBorder: const CircleBorder(),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF1DB954),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black45,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.black,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTier4Fallback() {
+    final isLiked = widget.item.title.toLowerCase().contains('liked');
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: widget.item.iconGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          isLiked ? Icons.favorite_rounded : Icons.album_rounded,
+          color: Colors.white.withValues(alpha: isLiked ? 0.9 : 0.40),
+          size: 24,
+        ),
+      ),
+    );
+  }
 }
 
 class _ShelfChevronControls extends StatefulWidget {

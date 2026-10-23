@@ -135,7 +135,10 @@ class DesktopMainViewport extends StatelessWidget {
       index: _getTabIndex(tab),
       children: const [
         HomeScreen(key: PageStorageKey('desktop_home_viewport')),
-        SearchScreen(key: PageStorageKey('desktop_search_viewport')),
+        SearchScreen(
+          key: PageStorageKey('desktop_search_viewport'),
+          isDesktopView: true,
+        ),
         LibraryScreen(key: PageStorageKey('desktop_library_viewport')),
       ],
     );

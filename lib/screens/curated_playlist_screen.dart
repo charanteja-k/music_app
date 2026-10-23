@@ -44,6 +44,9 @@ class CuratedPlaylistScreen extends StatefulWidget {
     this.imageUrl,
   });
 
+  static String getCuratedGenreFallback(String title) =>
+      _CuratedPlaylistScreenState.getCuratedGenreFallback(title);
+
   @override
   State<CuratedPlaylistScreen> createState() => _CuratedPlaylistScreenState();
 }
@@ -1389,7 +1392,7 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
     final String? firstSongThumb = _tracks.isNotEmpty
         ? MusicService.getHdThumbnail(_tracks.first.id.value)
         : null;
-    final String genreFallback = _getCuratedGenreFallback(widget.title);
+    final String genreFallback = getCuratedGenreFallback(widget.title);
 
     return Image.network(
       primaryUrl,
@@ -1488,10 +1491,10 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       }
     }
     // d) A curated high-resolution genre fallback cover
-    return _getCuratedGenreFallback(widget.title);
+    return getCuratedGenreFallback(widget.title);
   }
 
-  static String _getCuratedGenreFallback(String title) {
+  static String getCuratedGenreFallback(String title) {
     final lower = title.toLowerCase();
     if (lower.contains('bollywood') || lower.contains('hindi')) {
       return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80';
@@ -1499,10 +1502,18 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
       return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
     } else if (lower.contains('discover')) {
       return 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80';
-    } else if (lower.contains('new release') || lower.contains('release mix')) {
+    } else if (lower.contains('new release') ||
+        lower.contains('release mix') ||
+        lower.contains('latest')) {
       return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80';
     } else if (lower.contains('forgotten')) {
       return 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80';
+    } else if (lower.contains('top chart') ||
+        lower.contains('chart') ||
+        lower.contains('top')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+    } else if (lower.contains('trending') || lower.contains('trend')) {
+      return 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80';
     } else if (lower.contains('daily mix') || lower.contains('mix')) {
       return 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80';
     } else if (lower.contains('telugu')) {

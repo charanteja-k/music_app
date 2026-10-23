@@ -58,6 +58,9 @@ class DesktopLayoutState {
     '',
   );
 
+  /// Alias for globalSearchQuery matching prompt specification.
+  static ValueNotifier<String> get searchQuery => globalSearchQuery;
+
   /// Explicitly submitted search query (triggered only on Enter, search button, or suggestion click).
   static final ValueNotifier<String> submittedSearchQuery =
       ValueNotifier<String>('');

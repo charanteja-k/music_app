@@ -24,9 +24,10 @@ import '../services/connectivity_service.dart';
 import '../widgets/offline_barrier.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.isActive = true});
+  const SearchScreen({super.key, this.isActive = true, this.isDesktopView});
 
   final bool isActive;
+  final bool? isDesktopView;
 
   @override
   State<SearchScreen> createState() => SearchScreenState();
@@ -87,7 +88,12 @@ class SearchScreenState extends State<SearchScreen>
   int _searchTabIndex = 0; // 0 = Songs, 1 = Albums
   List<SearchSuggestion> _suggestions = [];
   Timer? _debounceTimer;
+  Timer? _desktopSearchDebounce;
   bool _isSearching = false;
+
+  bool get _isDesktop =>
+      widget.isDesktopView ??
+      ((MediaQuery.maybeOf(context)?.size.width ?? 0) >= 1024);
   bool _isSubmittingSearch = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -277,17 +283,29 @@ class SearchScreenState extends State<SearchScreen>
       _performSearch(DesktopLayoutState.submittedSearchQuery.value);
     } else if (DesktopLayoutState.globalSearchQuery.value.isNotEmpty) {
       _searchController.text = DesktopLayoutState.globalSearchQuery.value;
+      if (_isDesktop) {
+        _performSearch(DesktopLayoutState.globalSearchQuery.value);
+      }
     }
   }
 
   void _onGlobalSearchQueryChanged() {
     final query = DesktopLayoutState.globalSearchQuery.value;
-    if (query.isNotEmpty && _searchController.text != query) {
-      _searchController.text = query;
-      // Do NOT trigger heavy _performSearch while typing!
-      // Setting _searchController.text triggers _onSearchChanged()
-      // which fetches lightweight autocomplete suggestions.
-    } else if (query.isEmpty && _searchController.text.isNotEmpty) {
+    if (query.isNotEmpty) {
+      if (_searchController.text != query) {
+        _searchController.text = query;
+      }
+      if (_isDesktop) {
+        _desktopSearchDebounce?.cancel();
+        _desktopSearchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          if (_currentQuery != query && query.isNotEmpty) {
+            _performSearch(query);
+          }
+        });
+      }
+    } else if (query.isEmpty) {
+      _desktopSearchDebounce?.cancel();
       _debounceTimer?.cancel();
       clearSearchAndDismiss();
     }
@@ -296,6 +314,7 @@ class SearchScreenState extends State<SearchScreen>
   void _onSubmittedSearchQueryChanged() {
     final query = DesktopLayoutState.submittedSearchQuery.value;
     if (query.isNotEmpty) {
+      _desktopSearchDebounce?.cancel();
       _searchController.text = query;
       _debounceTimer?.cancel();
       _isSubmittingSearch = true;
@@ -318,7 +337,7 @@ class SearchScreenState extends State<SearchScreen>
 
   void _onSearchChanged() {
     setState(() {});
-    if (_isSubmittingSearch || _isSearching) return;
+    if (_isDesktop || _isSubmittingSearch || _isSearching) return;
     _debounceTimer?.cancel();
     final query = _searchController.text.trim();
     if (query.isEmpty) {
@@ -389,6 +408,7 @@ class SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
+    _desktopSearchDebounce?.cancel();
     DesktopLayoutState.globalSearchQuery.removeListener(
       _onGlobalSearchQueryChanged,
     );
@@ -577,48 +597,54 @@ class SearchScreenState extends State<SearchScreen>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0B0B0F),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0B0B0F),
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          leading: isSearchActive
-              ? IconButton(
-                  key: const ValueKey('search_appbar_back_btn'),
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
+        appBar: _isDesktop
+            ? null
+            : AppBar(
+                backgroundColor: const Color(0xFF0B0B0F),
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                leading: isSearchActive
+                    ? IconButton(
+                        key: const ValueKey('search_appbar_back_btn'),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        tooltip: 'Back to Browse',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          clearSearchAndDismiss();
+                        },
+                      )
+                    : null,
+                title: const Text(
+                  'Search',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
-                    size: 24,
+                    letterSpacing: -0.8,
                   ),
-                  tooltip: 'Back to Browse',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    clearSearchAndDismiss();
-                  },
-                )
-              : null,
-          title: const Text(
-            'Search',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.8,
-            ),
-          ),
-        ),
+                ),
+              ),
         body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: _isDesktop
+              ? const EdgeInsets.all(24.0)
+              : const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Modern Frosted Search Field - permanently mounted so it never unmounts or drops keyboard focus
-              _buildSearchInputField(isSearchActive),
-              const SizedBox(height: 16),
+              // Viewport-aware search bar: suppressed on desktop, preserved on mobile (<1024px)
+              if (!_isDesktop) ...[
+                _buildMobileSearchBar(),
+                const SizedBox(height: 16),
+              ],
 
               // Content Area: Either Searching, Live Suggestions, Search Results, or Browse Categories
               Expanded(
@@ -629,7 +655,8 @@ class SearchScreenState extends State<SearchScreen>
                                 color: Theme.of(context).primaryColor,
                               ),
                             )
-                          : (_searchController.text.trim().isNotEmpty &&
+                          : (!_isDesktop &&
+                                _searchController.text.trim().isNotEmpty &&
                                 _suggestions.isNotEmpty &&
                                 !_isSubmittingSearch &&
                                 _searchController.text.trim() != _currentQuery)
@@ -1081,6 +1108,9 @@ class SearchScreenState extends State<SearchScreen>
       ),
     );
   }
+
+  /// Mobile search bar wrapper matching deduplication directive.
+  Widget _buildMobileSearchBar() => _buildSearchInputField(isSearchActive);
 
   /// Modern Frosted Search Input Field
   Widget _buildSearchInputField(bool isSearchActive) {
