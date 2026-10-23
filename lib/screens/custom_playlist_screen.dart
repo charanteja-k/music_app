@@ -1,8 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart'
+    show Video, VideoId, ChannelId, ThumbnailSet, Engagement;
 import '../services/music_service.dart';
 import '../services/preferences_service.dart';
+import '../services/auth_service.dart';
+import '../services/album_color_deriver.dart';
+import '../services/canonical_song_dedup.dart';
+import '../utils/image_utils.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/playlist_action_menu.dart';
