@@ -388,7 +388,7 @@ class _DesktopCenterPlaybackSection extends StatelessWidget {
                             Icons.shuffle_rounded,
                             color: isShuffle
                                 ? accentColor
-                                : Colors.white.withValues(alpha: 0.6),
+                                : Colors.white.withOpacity(0.35),
                             size: 19.0,
                           ),
                           onPressed: () => musicService.toggleShuffle(),

@@ -465,17 +465,16 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                             ),
                             onPressed: () {
                               HapticFeedback.mediumImpact();
-                              if (!_musicService.isShuffle) {
-                                _musicService.toggleShuffle();
-                              }
                               if (isLikedSongs) {
-                                _musicService.playLikedSong(
-                                  _musicService.likedSongs.first,
-                                );
+                                if (_musicService.likedSongs.isNotEmpty) {
+                                  _musicService.playLikedSong(
+                                    _musicService.likedSongs.first,
+                                    enableShuffle: true,
+                                  );
+                                }
                               } else {
-                                _musicService.playCustomPlaylist(
+                                _musicService.playCustomPlaylistWithShuffle(
                                   widget.playlistId,
-                                  0,
                                 );
                               }
                             },

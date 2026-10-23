@@ -590,10 +590,9 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
                                     ? null
                                     : () {
                                         HapticFeedback.lightImpact();
-                                        final shuffled = List<Video>.from(
+                                        _musicService.playShuffledPlaylist(
                                           _tracks,
-                                        )..shuffle();
-                                        _musicService.playPlaylist(shuffled, 0);
+                                        );
                                       },
                                 icon: const Icon(
                                   Icons.shuffle_rounded,

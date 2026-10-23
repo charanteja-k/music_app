@@ -1091,9 +1091,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
             : currentTrack.thumbnails.lowResUrl;
 
         final upcomingOffset = currentIndex >= 0 ? currentIndex + 1 : 0;
-        final upcoming = upcomingOffset < playlist.length
-            ? playlist.sublist(upcomingOffset)
-            : <Video>[];
+        final upcoming = _musicService.upcomingQueue;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1310,10 +1308,7 @@ class _DesktopQueueTabState extends State<_DesktopQueueTab> {
                             child: InkWell(
                               borderRadius: BorderRadius.circular(8),
                               onTap: () {
-                                _musicService.playPlaylist(
-                                  playlist,
-                                  absoluteIndex,
-                                );
+                                _musicService.skipToQueueIndex(absoluteIndex);
                               },
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
