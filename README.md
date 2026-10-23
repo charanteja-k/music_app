@@ -337,30 +337,17 @@ The backend and Cloudflare edge workers exclusively transfer lightweight search 
 
 <div align="center">
 
-```text
-+---------------------------------+   +---------------------------------+
-| DILSE // NOW PLAYING (SUNO DIL) |   | DILSE STUDIO // LIBRARY & QUEUE |
-+---------------------------------+   +---------------------------------+
-|                                 |   | [All] [Created by You] [Spotify]|
-|       +-----------------+       |   |                                 |
-|       |   .:::. .:::.   |       |   | > 01. Starboy                   |
-|       |  ::::::.::::::  |       |   |      The Weeknd - Starboy (320k)|
-|       |  ':::::::::::'  |       |   |                                 |
-|       |    ':::::::'    |       |   |   02. Blinding Lights           |
-|       |      ':::'      |       |   |      The Weeknd - After Hours   |
-|       |        '        |       |   |                                 |
-|       |  [DILSE HEART]  |       |   |   03. Die For You               |
-|       +-----------------+       |   |      The Weeknd - Starboy       |
-|                                 |   |                                 |
-|   Track: Starboy                |   | ------------------------------- |
-|   Artist: The Weeknd            |   | LYRICS (SYNCHRONIZED)           |
-|                                 |   | "I'm tryna put you in the worst |
-|   02:14 ----------o-------- 03:50   |   |  mood, ah..."                   |
-|                                 |   |                                 |
-|       [|<<]   [ |> ]   [>>|]    |   | [Heart Matrix: Active]          |
-|   [320kbps AAC] [Crossfade 4s]  |   | [Soundwave Engine: Online]      |
-+---------------------------------+   +---------------------------------+
-```
+### Desktop Shell & Sovereign Audio Studio
+
+<img src="assets/images/dilse_desktop_shell.png" alt="DilSe Music Desktop Studio Shell" width="100%" style="border-radius: 8px; border: 1px solid #FA2D48;" />
+
+<br/><br/>
+
+### Brand Identity & Onboarding Canvas
+
+<img src="assets/images/dilse_onboarding_preview.png" alt="DilSe Music Onboarding Canvas" width="85%" style="border-radius: 8px; border: 1px solid #FA2D48;" />
+
+<br/>
 
 *The DilSe design system operates on pitch obsidian surfaces (`#09090C`), crisp white typography (`#FFFFFF`), and signature Ruby Heart accents (`#FA2D48`).*
 
