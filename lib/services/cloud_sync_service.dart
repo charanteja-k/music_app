@@ -431,13 +431,20 @@ class CloudSyncService {
 
     try {
       // 1. MANDATORY ZERO-DATA-LOSS STEP: Create atomic safety snapshot on device
-      try {
-        await DataSnapshotService().createSafetySnapshot(
-          triggerReason: 'Pre-CloudSync Safety Backup',
-        );
-      } catch (e) {
-        debugPrint('[CloudSyncService] Pre-sync snapshot warning: $e');
+      // On Web, primary library keys are already persisted in localStorage and preserved.
+      // We skip the redundant heavy snapshot serialization on Web to avoid localStorage freezes and quota pressure.
+      if (!kIsWeb) {
+        try {
+          await DataSnapshotService().createSafetySnapshot(
+            triggerReason: 'Pre-CloudSync Safety Backup',
+          );
+        } catch (e) {
+          debugPrint('[CloudSyncService] Pre-sync snapshot warning: $e');
+        }
       }
+
+      // Cooperative yield to keep UI at 60 FPS
+      await Future<void>.delayed(Duration.zero);
 
       syncMessage.value = 'Connecting to Cloudflare Edge…';
 
@@ -515,7 +522,7 @@ class CloudSyncService {
           );
         }
 
-        // 4. Non-Destructive Bidirectional Merge with Canonical Deduplication
+        // 4. Non-Destructive Bidirectional Merge with Fast O(1) Set Lookups
         syncMessage.value = 'Merging cloud and local libraries…';
         final remoteLikesList =
             (remoteData['likedSongs'] as List<dynamic>? ?? []);
@@ -526,12 +533,15 @@ class CloudSyncService {
         final List<SongItem> mergedLikes = [];
         final Set<String> seenLikeIds = {};
         final Set<String> seenLikeTitles = {};
+        final Set<String> seenLikeCleanTitles = {};
 
         for (final song in localLikes) {
           final id = song.id.trim();
           final title = song.title.trim().toLowerCase();
           if (id.isNotEmpty) seenLikeIds.add(id);
           if (title.isNotEmpty) seenLikeTitles.add(title);
+          final clean = CanonicalSongDedup.cleanTitle(title);
+          if (clean.isNotEmpty) seenLikeCleanTitles.add(clean);
           mergedLikes.add(song);
         }
 
@@ -543,12 +553,15 @@ class CloudSyncService {
               final title = song.title.trim().toLowerCase();
               if (id.isNotEmpty && seenLikeIds.contains(id)) continue;
               if (title.isNotEmpty && seenLikeTitles.contains(title)) continue;
-
-              if (!mergedLikes.any((s) => _areSameSongs(s, song))) {
-                if (id.isNotEmpty) seenLikeIds.add(id);
-                if (title.isNotEmpty) seenLikeTitles.add(title);
-                mergedLikes.add(song);
+              final clean = CanonicalSongDedup.cleanTitle(title);
+              if (clean.isNotEmpty && seenLikeCleanTitles.contains(clean)) {
+                continue;
               }
+
+              if (id.isNotEmpty) seenLikeIds.add(id);
+              if (title.isNotEmpty) seenLikeTitles.add(title);
+              if (clean.isNotEmpty) seenLikeCleanTitles.add(clean);
+              mergedLikes.add(song);
             } catch (_) {}
           }
         }
@@ -558,7 +571,8 @@ class CloudSyncService {
         final Map<String, int> playlistIdxById = {};
         final Map<String, int> playlistIdxByName = {};
 
-        for (final p in localPlaylists) {
+        for (int i = 0; i < localPlaylists.length; i++) {
+          final p = localPlaylists[i];
           final copy = Map<String, dynamic>.from(p);
           copy['songs'] = _dedupSongList(copy['songs'] as List? ?? []);
           final idx = mergedPlaylists.length;
@@ -568,9 +582,14 @@ class CloudSyncService {
           if (id.isNotEmpty) playlistIdxById[id] = idx;
           final name = (copy['name'] ?? '').toString().trim().toLowerCase();
           if (name.isNotEmpty) playlistIdxByName[name] = idx;
+
+          if (i % 15 == 0) {
+            await Future<void>.delayed(Duration.zero);
+          }
         }
 
-        for (final raw in remotePlaylistsList) {
+        for (int i = 0; i < remotePlaylistsList.length; i++) {
+          final raw = remotePlaylistsList[i];
           if (raw is! Map) continue;
           final remoteP = Map<String, dynamic>.from(raw);
           final rId = (remoteP['id'] ?? '').toString().trim();
@@ -599,12 +618,15 @@ class CloudSyncService {
             );
             final Set<String> existingIds = {};
             final Set<String> existingTitles = {};
+            final Set<String> existingCleanTitles = {};
             for (final s in existingSongs) {
               if (s is Map) {
                 final id = (s['id'] ?? s['videoId'] ?? '').toString().trim();
                 if (id.isNotEmpty) existingIds.add(id);
                 final t = (s['title'] ?? '').toString().trim().toLowerCase();
                 if (t.isNotEmpty) existingTitles.add(t);
+                final clean = CanonicalSongDedup.cleanTitle(t);
+                if (clean.isNotEmpty) existingCleanTitles.add(clean);
               }
             }
             final remoteSongs = List<dynamic>.from(
@@ -621,32 +643,75 @@ class CloudSyncService {
               if (rsTitle.isNotEmpty && existingTitles.contains(rsTitle)) {
                 continue;
               }
-
-              if (!existingSongs.any(
-                (s) => s is Map && _areSameSongMaps(s, rs),
-              )) {
-                if (rsId.isNotEmpty) existingIds.add(rsId);
-                if (rsTitle.isNotEmpty) existingTitles.add(rsTitle);
-                existingSongs.add(rs);
+              final rsClean = CanonicalSongDedup.cleanTitle(rsTitle);
+              if (rsClean.isNotEmpty && existingCleanTitles.contains(rsClean)) {
+                continue;
               }
+
+              if (rsId.isNotEmpty) existingIds.add(rsId);
+              if (rsTitle.isNotEmpty) existingTitles.add(rsTitle);
+              if (rsClean.isNotEmpty) existingCleanTitles.add(rsClean);
+              existingSongs.add(rs);
             }
             existingP['songs'] = existingSongs;
           }
+
+          if (i % 15 == 0) {
+            await Future<void>.delayed(Duration.zero);
+          }
         }
 
-        // 5. Persist merged library to local platform storage
-        await _saveMergedLocalLibrary(
-          mergedLikes: mergedLikes,
-          mergedPlaylists: mergedPlaylists,
-        );
+        // Detect whether local library received new items
+        bool localChanged =
+            (mergedLikes.length != localLikes.length) ||
+            (mergedPlaylists.length != localPlaylists.length);
+        if (!localChanged) {
+          for (int i = 0; i < mergedPlaylists.length; i++) {
+            final mSongs = mergedPlaylists[i]['songs'] as List? ?? [];
+            final lSongs = localPlaylists[i]['songs'] as List? ?? [];
+            if (mSongs.length != lSongs.length) {
+              localChanged = true;
+              break;
+            }
+          }
+        }
 
-        // 6. Push the unified union back to Cloudflare
-        await _pushToCloudflare(
-          userId: userId,
-          email: auth.userEmail ?? '',
-          playlists: mergedPlaylists,
-          likedSongs: mergedLikes,
-        );
+        // Detect whether cloud KV needs new items pushed
+        bool cloudChanged =
+            (mergedLikes.length != remoteLikesList.length) ||
+            (mergedPlaylists.length != remotePlaylistsList.length);
+        if (!cloudChanged) {
+          for (int i = 0; i < mergedPlaylists.length; i++) {
+            final mSongs = mergedPlaylists[i]['songs'] as List? ?? [];
+            final rSongs =
+                (i < remotePlaylistsList.length &&
+                    remotePlaylistsList[i] is Map)
+                ? (remotePlaylistsList[i]['songs'] as List? ?? [])
+                : [];
+            if (mSongs.length != rSongs.length) {
+              cloudChanged = true;
+              break;
+            }
+          }
+        }
+
+        // 5. Persist merged library to local platform storage ONLY if local received new data
+        if (localChanged) {
+          await _saveMergedLocalLibrary(
+            mergedLikes: mergedLikes,
+            mergedPlaylists: mergedPlaylists,
+          );
+        }
+
+        // 6. Push the unified union back to Cloudflare ONLY if cloud received new data or forcePushLocal
+        if (cloudChanged || forcePushLocal) {
+          await _pushToCloudflare(
+            userId: userId,
+            email: auth.userEmail ?? '',
+            playlists: mergedPlaylists,
+            likedSongs: mergedLikes,
+          );
+        }
 
         _isSyncing = false;
         syncStatus.value = CloudSyncStatus.success;
@@ -789,6 +854,7 @@ class CloudSyncService {
     final List<Map<String, dynamic>> deduped = [];
     final Set<String> seenIds = {};
     final Set<String> seenTitles = {};
+    final Set<String> seenCleanTitles = {};
 
     for (final item in rawList) {
       if (item is! Map) continue;
@@ -799,14 +865,17 @@ class CloudSyncService {
       if (id.isNotEmpty && seenIds.contains(id)) continue;
       if (title.isNotEmpty && seenTitles.contains(title)) continue;
 
-      final isDup = deduped.any(
-        (existing) => _areSameSongMaps(existing, songMap),
-      );
-      if (!isDup) {
-        if (id.isNotEmpty) seenIds.add(id);
-        if (title.isNotEmpty) seenTitles.add(title);
-        deduped.add(songMap);
+      final cleanTitle = title.isNotEmpty
+          ? CanonicalSongDedup.cleanTitle(title)
+          : '';
+      if (cleanTitle.isNotEmpty && seenCleanTitles.contains(cleanTitle)) {
+        continue;
       }
+
+      if (id.isNotEmpty) seenIds.add(id);
+      if (title.isNotEmpty) seenTitles.add(title);
+      if (cleanTitle.isNotEmpty) seenCleanTitles.add(cleanTitle);
+      deduped.add(songMap);
     }
     return deduped;
   }

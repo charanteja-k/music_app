@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'profile_avatar_helper.dart';
 import '../constants/app_theme_tokens.dart';
 import '../services/preferences_service.dart';
@@ -392,13 +393,19 @@ class ProfileSideDrawer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            'DilSe Music • v3.9.4',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.25),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final version = snapshot.data?.version ?? '3.9.11';
+              return Text(
+                'DilSe Music • v$version',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              );
+            },
           ),
         ],
       ),

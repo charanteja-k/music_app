@@ -248,7 +248,7 @@ class BugReportService with WidgetsBindingObserver {
       'currentIndex': musicService.currentIndex,
     };
 
-    String appVersionStr = '3.9.8+31';
+    String appVersionStr = '3.9.11+34';
     try {
       final info = await PackageInfo.fromPlatform();
       appVersionStr = '${info.version}+${info.buildNumber}';
@@ -308,7 +308,7 @@ class BugReportService with WidgetsBindingObserver {
   String _assembleFlightTelemetry({
     required String userDescription,
     required MusicService musicService,
-    String appVersion = '3.9.9+32',
+    String appVersion = '3.9.11+34',
   }) {
     final song = musicService.currentSong;
     final osName = kIsWeb ? 'Web' : Platform.operatingSystem;
@@ -398,7 +398,7 @@ class BugReportService with WidgetsBindingObserver {
       return false;
     }
 
-    String appVer = '3.9.8+31';
+    String appVer = '3.9.11+34';
     try {
       final info = await PackageInfo.fromPlatform();
       appVer = '${info.version}+${info.buildNumber}';

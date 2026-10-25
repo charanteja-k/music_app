@@ -1273,7 +1273,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final body = Uri.encodeComponent(
       'Please describe the bug or issue you encountered:\n\n\n\n'
       '--- Diagnostic Info ---\n'
-      'App: DilSe Music v3.4.0\n'
+      'App: DilSe Music v3.9.11\n'
       'Platform: $osInfo'
       '$songDetails',
     );

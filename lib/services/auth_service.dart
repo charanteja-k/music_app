@@ -282,11 +282,15 @@ class AuthService extends ChangeNotifier {
         GoogleSignInAccount? account,
       ) async {
         if (account != null) {
+          final accountId = account.id.isNotEmpty ? account.id : account.email;
+          final isSameAsCached =
+              _hasCachedGoogleUser && (_cachedUserId == accountId);
+
           _currentUser = account;
           _isDemoMode = false;
           _isExplicitGuestMode = false;
           _hasCachedGoogleUser = true;
-          _cachedUserId = account.id.isNotEmpty ? account.id : account.email;
+          _cachedUserId = accountId;
           _cachedUserName = account.displayName;
           _cachedUserEmail = account.email;
           _cachedUserPhoto = account.photoUrl;
@@ -319,15 +323,18 @@ class AuthService extends ChangeNotifier {
             debugPrint('[AuthService] Token acquisition non-fatal: $e');
           }
 
-          // 3. Auto-sync library non-destructively in the background
-          CloudSyncService().sync().catchError((e) {
-            debugPrint('[AuthService] Auto-sync error: $e');
-            return const CloudSyncResult(
-              success: false,
-              status: CloudSyncStatus.error,
-              message: 'Auto-sync failed',
-            );
-          });
+          // 3. Only auto-sync on new interactive sign-in transitions, NEVER on initial startup session replay.
+          // Startup cloud synchronization is sequentially orchestrated by HomeScreen in Stage 3.
+          if (!isSameAsCached) {
+            CloudSyncService().sync().catchError((e) {
+              debugPrint('[AuthService] Auto-sync error: $e');
+              return const CloudSyncResult(
+                success: false,
+                status: CloudSyncStatus.error,
+                message: 'Auto-sync failed',
+              );
+            });
+          }
         } else if (!_isDemoMode && !_hasCachedGoogleUser) {
           _currentUser = null;
           _accessToken = null;
