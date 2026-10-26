@@ -55,11 +55,11 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: const [
-                Color(0xFF1E1E28),
+                Color(0xFF181818),
                 Color(0xFF2E2E3E),
                 Color(0xFF38384E),
                 Color(0xFF2E2E3E),
-                Color(0xFF1E1E28),
+                Color(0xFF181818),
               ],
               stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
               transform: _SlidingGradientTransform(slidePercent: value),
@@ -109,7 +109,7 @@ class ShimmerBox extends StatelessWidget {
       height: height,
       margin: margin,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E28),
+        color: const Color(0xFF181818),
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
@@ -127,7 +127,7 @@ class ShimmerBillboard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         height: 200,
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E28),
+          color: const Color(0xFF181818),
           borderRadius: BorderRadius.circular(24),
         ),
       ),

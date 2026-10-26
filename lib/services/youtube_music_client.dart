@@ -294,6 +294,147 @@ class YouTubeMusicClient {
     }
   }
 
+  /// Fetches Top Songs and Trending Hits ranked by real-time play velocity
+  /// directly from YouTube Music explore feeds (browseId: 'FEmusic_charts')
+  /// without sending a text search query.
+  Future<List<Video>> fetchCharts({String? language, int limit = 25}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/browse');
+      final payload = {
+        'context': _buildContext(),
+        'browseId': 'FEmusic_charts',
+      };
+
+      final response = await http
+          .post(uri, headers: _buildHeaders(), body: json.encode(payload))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[YTM] Charts explore returned status: ${response.statusCode}',
+        );
+        return [];
+      }
+
+      final data = json.decode(response.body);
+      final tabs =
+          data['contents']?['singleColumnBrowseResultsRenderer']?['tabs']
+              as List<dynamic>? ??
+          [];
+      if (tabs.isEmpty) return [];
+
+      final sections =
+          tabs[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+              as List<dynamic>? ??
+          [];
+
+      String? targetPlaylistBrowseId;
+      final langLower = language?.toLowerCase().trim() ?? '';
+
+      // Check Section 2 (Languages) if language is specified
+      if (langLower.isNotEmpty && sections.length > 2) {
+        final langShelf = sections[2]['musicCarouselShelfRenderer'];
+        final langItems = langShelf?['contents'] as List<dynamic>? ?? [];
+        for (final item in langItems) {
+          final renderer = item['musicTwoRowItemRenderer'];
+          final title =
+              renderer?['title']?['runs']?[0]?['text'] as String? ?? '';
+          if (title.toLowerCase().contains(langLower)) {
+            targetPlaylistBrowseId =
+                renderer?['navigationEndpoint']?['browseEndpoint']?['browseId']
+                    as String?;
+            if (targetPlaylistBrowseId != null) break;
+          }
+        }
+      }
+
+      // Fallback to Section 1 (Video charts: Trending 20 India or Top 100)
+      if (targetPlaylistBrowseId == null && sections.length > 1) {
+        final videoShelf = sections[1]['musicCarouselShelfRenderer'];
+        final videoItems = videoShelf?['contents'] as List<dynamic>? ?? [];
+        if (videoItems.isNotEmpty) {
+          final renderer = videoItems[0]['musicTwoRowItemRenderer'];
+          targetPlaylistBrowseId =
+              renderer?['navigationEndpoint']?['browseEndpoint']?['browseId']
+                  as String?;
+        }
+      }
+
+      // Default to India Trending 20 if still null
+      targetPlaylistBrowseId ??= 'VLOLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40';
+
+      return await _fetchPlaylistBrowseTracks(
+        targetPlaylistBrowseId,
+        limit: limit,
+      );
+    } catch (e) {
+      debugPrint('[YTM] Charts fetch error: $e');
+      return [];
+    }
+  }
+
+  /// Helper to fetch tracks from a YouTube Music playlist browse endpoint
+  Future<List<Video>> _fetchPlaylistBrowseTracks(
+    String playlistBrowseId, {
+    int limit = 25,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/browse');
+      final payload = {
+        'context': _buildContext(),
+        'browseId': playlistBrowseId,
+      };
+
+      final response = await http
+          .post(uri, headers: _buildHeaders(), body: json.encode(payload))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[YTM] Playlist browse returned status: ${response.statusCode}',
+        );
+        return [];
+      }
+
+      final data = json.decode(response.body);
+      final secContents =
+          data['contents']?['twoColumnBrowseResultsRenderer']?['secondaryContents']?['sectionListRenderer']?['contents']
+              as List<dynamic>? ??
+          data['contents']?['singleColumnBrowseResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']
+              as List<dynamic>? ??
+          [];
+
+      final List<Video> songs = [];
+      for (final sec in secContents) {
+        final shelfItems =
+            (sec['musicPlaylistShelfRenderer']?['contents'] ??
+                    sec['musicShelfRenderer']?['contents'])
+                as List<dynamic>? ??
+            [];
+
+        for (final item in shelfItems) {
+          final renderer = item['musicResponsiveListItemRenderer'];
+          if (renderer == null) continue;
+
+          final song = _parseListItemRenderer(renderer);
+          if (song != null) {
+            songs.add(song);
+            if (songs.length >= limit) break;
+          }
+        }
+        if (songs.length >= limit) break;
+      }
+
+      debugPrint(
+        '[YTM] Extracted ${songs.length} real-time chart songs from $playlistBrowseId',
+      );
+      return songs;
+    } catch (e) {
+      debugPrint('[YTM] Playlist browse track fetch error: $e');
+      return [];
+    }
+  }
+
   Video? _parseListItemRenderer(Map<String, dynamic> renderer) {
     try {
       final flexColumns = renderer['flexColumns'] as List<dynamic>? ?? [];

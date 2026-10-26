@@ -40,7 +40,7 @@ class _BugReportButtonState extends State<BugReportButton> {
               width: widget.size,
               height: widget.size,
               decoration: BoxDecoration(
-                color: const Color(0xFF16161E),
+                color: const Color(0xFF181818),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: 0.08),

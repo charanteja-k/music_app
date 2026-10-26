@@ -205,13 +205,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Rename and Delete options are visible in the opened menu
-      expect(find.text('Rename'), findsOneWidget);
-      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Rename playlist'), findsOneWidget);
+      expect(find.text('Delete playlist'), findsOneWidget);
       expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
       expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
 
       // Tap Rename to verify it triggers rename dialog
-      await tester.tap(find.text('Rename'));
+      await tester.tap(find.text('Rename playlist'));
       await tester.pumpAndSettle();
 
       expect(find.text('Rename Playlist'), findsOneWidget);
@@ -248,7 +248,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap Delete
-    await tester.tap(find.text('Delete'));
+    await tester.tap(find.text('Delete playlist'));
     await tester.pumpAndSettle();
 
     // Verify confirmation dialog

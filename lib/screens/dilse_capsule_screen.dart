@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:io' show File;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
@@ -40,6 +40,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
   AnimationController get _progressController => _storyController;
   bool _isPaused = false;
   bool _isSavingImage = false;
+  DateTime? _pointerDownTime;
 
   @override
   void initState() {
@@ -219,7 +220,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
             Text('Capsule summary copied to clipboard!'),
           ],
         ),
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -238,22 +239,35 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           // Celebratory Confetti & Particle Layer
           _buildConfettiOverlay(),
 
-          // Slide Content with Tap Detection
-          GestureDetector(
+          // Slide Content with Pointer Hold & Tap Detection
+          Listener(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _pauseProgress(),
-            onTapUp: (details) {
+            onPointerDown: (event) {
+              _pointerDownTime = DateTime.now();
+              _pauseProgress();
+            },
+            onPointerUp: (event) {
+              final downTime = _pointerDownTime;
+              final holdMs = downTime != null
+                  ? DateTime.now().difference(downTime).inMilliseconds
+                  : 0;
+              _pointerDownTime = null;
               _resumeProgress();
-              final screenWidth = MediaQuery.of(context).size.width;
-              if (details.localPosition.dx < screenWidth * 0.32) {
-                _previousSlide();
-              } else {
-                _advanceSlide();
+
+              // Quick tap (< 220ms) triggers navigation; holding only pauses story progression
+              if (holdMs < 220) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                if (event.localPosition.dx < screenWidth * 0.32) {
+                  _previousSlide();
+                } else {
+                  _advanceSlide();
+                }
               }
             },
-            onTapCancel: () => _resumeProgress(),
-            onLongPressStart: (_) => _pauseProgress(),
-            onLongPressEnd: (_) => _resumeProgress(),
+            onPointerCancel: (_) {
+              _pointerDownTime = null;
+              _resumeProgress();
+            },
             child: SafeArea(
               child: Column(
                 children: [
@@ -483,23 +497,23 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
               height: 110,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE040FB), Color(0xFF00E5FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                color: const Color(0xFF242434),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE040FB).withValues(alpha: 0.5),
-                    blurRadius: 36,
-                    spreadRadius: 4,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: const Center(
                 child: Icon(
                   Icons.headphones_rounded,
-                  color: Colors.white,
+                  color: Color(0xFF1DB954),
                   size: 54,
                 ),
               ),
@@ -508,14 +522,12 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE040FB), Color(0xFF00E5FF)],
-                ),
+                color: const Color(0xFF1DB954),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE040FB).withValues(alpha: 0.45),
-                    blurRadius: 14,
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 8,
                   ),
                 ],
               ),
@@ -524,14 +536,14 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                 children: [
                   Icon(
                     Icons.celebration_rounded,
-                    color: Colors.white,
+                    color: Colors.black,
                     size: 14,
                   ),
                   SizedBox(width: 6),
                   Text(
                     '2026 CELEBRATION',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontSize: 10.5,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.2,
@@ -610,7 +622,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
         border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFE040FB).withValues(alpha: 0.15),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -681,22 +693,17 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF1DB954).withValues(alpha: 0.28),
-                  const Color(0xFFFFD700).withValues(alpha: 0.12),
-                  Colors.white.withValues(alpha: 0.06),
-                ],
-              ),
+              color: const Color(0xFF14141E),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF1DB954).withValues(alpha: 0.6),
-                width: 1.5,
+                color: const Color(0xFF1DB954).withValues(alpha: 0.4),
+                width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF1DB954).withValues(alpha: 0.25),
-                  blurRadius: 20,
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -911,22 +918,17 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFFF4081).withValues(alpha: 0.32),
-                  const Color(0xFFFF9100).withValues(alpha: 0.12),
-                  Colors.white.withValues(alpha: 0.06),
-                ],
-              ),
+              color: const Color(0xFF14141E),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFFFF4081).withValues(alpha: 0.7),
-                width: 1.5,
+                color: Colors.white.withValues(alpha: 0.10),
+                width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF4081).withValues(alpha: 0.25),
-                  blurRadius: 24,
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -937,9 +939,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                   height: 60,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFFF5252), Color(0xFFFF4081)],
-                    ),
+                    color: Color(0xFF242434),
                   ),
                   child: const Center(
                     child: Icon(
@@ -1095,16 +1095,16 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.14),
+                color: const Color(0xFF242434),
                 border: Border.all(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                  color: Colors.white.withValues(alpha: 0.12),
                   width: 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
-                    blurRadius: 36,
-                    spreadRadius: 4,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 24,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
@@ -1273,17 +1273,12 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                                   height: 32,
                                   decoration: const BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Color(0xFFE040FB),
-                                        Color(0xFF1DB954),
-                                      ],
-                                    ),
+                                    color: Color(0xFF242434),
                                   ),
                                   child: const Center(
                                     child: Icon(
                                       Icons.music_note_rounded,
-                                      color: Colors.white,
+                                      color: Color(0xFF1DB954),
                                       size: 18,
                                     ),
                                   ),
@@ -1326,15 +1321,11 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
                               vertical: 3.5,
                             ),
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF1DB954), Color(0xFF00E5FF)],
-                              ),
+                              color: const Color(0xFF1DB954),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF1DB954,
-                                  ).withValues(alpha: 0.35),
+                                  color: Colors.black.withValues(alpha: 0.25),
                                   blurRadius: 8,
                                 ),
                               ],
@@ -1706,7 +1697,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 0.6,
       size: 8,
       sway: 1.5,
-      color: Color(0xFF00E5FF),
+      color: Color(0xFF1DB954),
       shape: 2,
     ),
     _CapsuleParticle(
@@ -1715,7 +1706,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 1.1,
       size: 6,
       sway: 0.9,
-      color: Color(0xFFE040FB),
+      color: Color(0xFF5038A0),
       shape: 0,
     ),
     _CapsuleParticle(
@@ -1760,7 +1751,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 0.5,
       size: 5,
       sway: 1.0,
-      color: Color(0xFF00E5FF),
+      color: Color(0xFF1DB954),
       shape: 2,
     ),
     _CapsuleParticle(
@@ -1769,7 +1760,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 0.9,
       size: 7,
       sway: 1.2,
-      color: Color(0xFFE040FB),
+      color: Color(0xFF5038A0),
       shape: 0,
     ),
     _CapsuleParticle(
@@ -1814,7 +1805,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 0.8,
       size: 8,
       sway: 1.4,
-      color: Color(0xFF00E5FF),
+      color: Color(0xFF1DB954),
       shape: 2,
     ),
     _CapsuleParticle(
@@ -1823,7 +1814,7 @@ class _DilSeCapsuleScreenState extends State<DilSeCapsuleScreen>
       speed: 0.7,
       size: 6,
       sway: 1.0,
-      color: Color(0xFFE040FB),
+      color: Color(0xFF5038A0),
       shape: 0,
     ),
     _CapsuleParticle(

@@ -83,11 +83,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // 6. Verify Rename and Delete options are accessible through the More menu
-      expect(find.text('Rename'), findsOneWidget);
-      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Rename playlist'), findsOneWidget);
+      expect(find.text('Delete playlist'), findsOneWidget);
 
       // 7. Test Rename flow
-      await tester.tap(find.text('Rename'));
+      await tester.tap(find.text('Rename playlist'));
       await tester.pumpAndSettle();
 
       expect(find.text('Rename Playlist'), findsOneWidget);
@@ -144,7 +144,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Delete
-      await tester.tap(find.text('Delete'));
+      await tester.tap(find.text('Delete playlist'));
       await tester.pumpAndSettle();
 
       expect(find.text('Delete Playlist'), findsOneWidget);
@@ -164,7 +164,7 @@ void main() {
   testWidgets(
     'Playlist song rows expose three-dot More action and preserve presentation and reorder handle',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 

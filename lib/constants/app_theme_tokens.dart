@@ -10,13 +10,13 @@ class AppThemeTokens {
   AppThemeTokens._();
 
   // Backgrounds & Surfaces
-  static const Color oledBackground = Color(0xFF09090C);
-  static const Color surfaceCard = Color(0xFF121218);
-  static const Color surfaceElevated = Color(0xFF1A1A22);
-  static const Color floatingDockSurface = Color(0xFF16161D);
+  static const Color oledBackground = Color(0xFF000000);
+  static const Color surfaceCard = Color(0xFF181818);
+  static const Color surfaceElevated = Color(0xFF1E1E1E);
+  static const Color floatingDockSurface = Color(0xFF121212);
 
   // Subtle 1px borders (replaces GPU-heavy blur passes)
-  static const Color surfaceBorder = Color(0x10FFFFFF); // ~6% white
+  static const Color surfaceBorder = Color(0x14FFFFFF); // ~8% white
   static const Color floatingDockBorder = Color(0x14FFFFFF); // ~8% white
   static const Color highlightBorder = Color(0x28FFFFFF); // ~16% white
 

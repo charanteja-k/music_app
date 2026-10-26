@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -8,6 +9,7 @@ import '../screens/album_screen.dart';
 import '../services/preferences_service.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../models/jio_album.dart';
+import 'desktop/desktop_context_menu.dart';
 
 /// Converts a song Map representation into a youtube_explode Video instance
 /// for seamless interop across existing song action sheets.
@@ -43,6 +45,7 @@ void showPlaylistSongOptionsBottomSheet(
   required String playlistId,
   VoidCallback? onPlayNow,
   VoidCallback? onRemoved,
+  Offset? globalPosition,
 }) {
   final video = songMapToVideo(songMap);
   final thumb = (songMap['thumbnail'] as String?) ?? '';
@@ -61,6 +64,7 @@ void showPlaylistSongOptionsBottomSheet(
             MusicService().removeSongFromPlaylist(playlistId, songId);
             onRemoved?.call();
           },
+    globalPosition: globalPosition,
   );
 }
 
@@ -72,8 +76,29 @@ void showSongOptionsBottomSheet(
   VoidCallback? onRemoveFromPlaylist,
   VoidCallback? onPlayNow,
   String? customThumbnail,
+  Offset? globalPosition,
+  int? queueIndex,
+  bool isNowPlaying = false,
 }) {
   HapticFeedback.lightImpact();
+
+  // DEFECT 1: In desktop mode, strictly route through DesktopContextMenu.
+  // The mobile bottom sheet modal must NEVER appear on desktop viewports.
+  if (kIsWeb || MediaQuery.of(context).size.width >= 1024) {
+    final size = MediaQuery.of(context).size;
+    final pos = globalPosition ?? Offset(size.width / 2, size.height / 3);
+    DesktopContextMenu.showSongMenu(
+      context: context,
+      globalPosition: pos,
+      song: song,
+      currentPlaylistId: currentPlaylistId,
+      onRemovedFromPlaylist: onRemoveFromPlaylist,
+      queueIndex: queueIndex,
+      isNowPlaying: isNowPlaying,
+    );
+    return;
+  }
+
   final musicService = MusicService();
 
   showModalBottomSheet(
@@ -130,7 +155,7 @@ void showSongOptionsBottomSheet(
                         errorBuilder: (_, _, _) => Container(
                           width: 52,
                           height: 52,
-                          color: const Color(0xFF1E1E28),
+                          color: const Color(0xFF181818),
                           child: const Icon(
                             Icons.music_note,
                             color: Colors.white54,
@@ -212,7 +237,7 @@ void showSongOptionsBottomSheet(
               // Action 0b: Start Song Radio
               _buildActionTile(
                 icon: Icons.auto_awesome_rounded,
-                iconColor: const Color(0xFF6C5CE7),
+                iconColor: PreferencesService().legibleThemeColor,
                 title: 'Start Song Radio',
                 subtitle: '50 smart tracks based on this song',
                 onTap: () {
@@ -225,7 +250,7 @@ void showSongOptionsBottomSheet(
               // Action 0c: Go to Album
               _buildActionTile(
                 icon: Icons.album_rounded,
-                iconColor: const Color(0xFF8E2DE2),
+                iconColor: PreferencesService().legibleThemeColor,
                 title: 'Go to Album',
                 subtitle:
                     MusicService.getCachedAlbumTitle(song.id.value) ??
@@ -536,7 +561,7 @@ void showAddToPlaylistSheet(BuildContext context, Video song) {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -579,7 +604,7 @@ void _showNewPlaylistPrompt(BuildContext context, Video song) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1E1E28),
+      backgroundColor: const Color(0xFF181818),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text(
         'Create New Playlist',

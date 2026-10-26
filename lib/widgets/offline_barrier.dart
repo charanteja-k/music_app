@@ -27,7 +27,7 @@ class OfflineBarrier extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF161622),
+                color: const Color(0xFF181818),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: const Color(0xFFFFB74D).withValues(alpha: 0.35),

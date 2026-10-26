@@ -161,7 +161,7 @@ class _CloudBackupTopBarButtonState extends State<CloudBackupTopBarButton>
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF161622),
+                  color: const Color(0xFF181818),
                   border: Border.all(
                     color: accentColor.withValues(alpha: 0.45),
                     width: 1.5,
@@ -240,7 +240,7 @@ class AppUpdateTopBarButton extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF161622),
+                      color: const Color(0xFF181818),
                       border: Border.all(
                         color: const Color(0xFFE03E52).withValues(alpha: 0.5),
                         width: 1.5,
@@ -275,7 +275,7 @@ class AppUpdateTopBarButton extends StatelessWidget {
                         color: const Color(0xFF22C55E),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF161622),
+                          color: const Color(0xFF181818),
                           width: 1.5,
                         ),
                         boxShadow: [

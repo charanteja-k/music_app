@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_app/layouts/desktop_layout_state.dart';
+import 'package:music_app/services/music_service.dart';
 import 'package:music_app/widgets/desktop/desktop_left_sidebar.dart';
 
 void main() {
@@ -401,6 +402,136 @@ void main() {
           DesktopLayoutState.activeNavTab.value,
           DesktopNavTab.customPlaylist,
         );
+      },
+    );
+
+    test(
+      'DesktopLeftSidebar.resolveArtworkUrl resolves artwork across all schema variants',
+      () {
+        // Direct properties
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'artworkUrl': 'https://example.com/art.jpg',
+          }),
+          'https://example.com/art.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'thumbnail': 'https://example.com/thumb.jpg',
+          }),
+          'https://example.com/thumb.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'thumbnailUrl': 'https://example.com/thumb_url.jpg',
+          }),
+          'https://example.com/thumb_url.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'imageUrl': 'https://example.com/image.jpg',
+          }),
+          'https://example.com/image.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'coverUrl': 'https://example.com/cover.jpg',
+          }),
+          'https://example.com/cover.jpg',
+        );
+
+        // Sourced from songs list
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'songs': [
+              {'thumbnail': 'https://example.com/song_thumb.jpg'},
+            ],
+          }),
+          'https://example.com/song_thumb.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'tracks': [
+              {'artworkUrl': 'https://example.com/track_art.jpg'},
+            ],
+          }),
+          'https://example.com/track_art.jpg',
+        );
+
+        expect(
+          DesktopLeftSidebar.resolveArtworkUrl({
+            'songs': [
+              {'id': 'dQw4w9WgXcQ'},
+            ],
+          }),
+          'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+        );
+
+        expect(DesktopLeftSidebar.resolveArtworkUrl({}), '');
+      },
+    );
+
+    testWidgets(
+      'Playlist thumbnails render in both expanded mode and compact mode',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        final musicService = MusicService();
+        musicService.customPlaylists.clear();
+        musicService.customPlaylists.add({
+          'id': 'my_test_pl',
+          'name': 'Indie Chill',
+          'thumbnail': 'https://example.com/indie.jpg',
+          'tracks': [],
+        });
+        addTearDown(() => musicService.customPlaylists.clear());
+
+        // 1. Expanded mode test
+        DesktopLayoutState.leftSidebarWidth.value = 280.0;
+        DesktopLayoutState.isLeftSidebarCollapsed.value = false;
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 280.0,
+                child: DesktopLeftSidebar(width: 280.0),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Indie Chill'), findsOneWidget);
+        // Verify Image widget is rendered for the playlist thumbnail
+        expect(find.byType(Image), findsWidgets);
+
+        // 2. Compact mode test
+        DesktopLayoutState.leftSidebarWidth.value = 72.0;
+        DesktopLayoutState.isLeftSidebarCollapsed.value = true;
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 72.0,
+                child: DesktopLeftSidebar(width: 72.0),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Compact playlist tooltip & thumbnail image
+        expect(find.byTooltip('Indie Chill • Playlist'), findsOneWidget);
+        expect(find.byType(Image), findsWidgets);
       },
     );
   });

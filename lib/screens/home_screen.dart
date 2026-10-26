@@ -20,6 +20,7 @@ import 'custom_playlist_screen.dart';
 import '../models/jio_album.dart';
 import '../constants/app_theme_tokens.dart';
 import '../services/studio_search_service.dart';
+import '../services/trending_catalog_service.dart';
 import '../services/auth_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/update_service.dart';
@@ -50,8 +51,22 @@ class _HomeScreenState extends State<HomeScreen>
   List<Video> _dailyMix1 = [];
   List<Video> _dailyMix2 = [];
   List<JioAlbum> _trendingAlbums = [];
+  int _selectedAlbumLangIndex = 0;
+  static const List<String> _albumLanguages = [
+    'Hindi',
+    'Telugu',
+    'Tamil',
+    'Punjabi',
+    'Malayalam',
+    'Kannada',
+  ];
   CircadianContext? _circadianContext;
   List<DailyMixConfig> _dailyMixConfigs = [];
+  final ScrollController _circadianScrollController = ScrollController();
+  final ScrollController _chartsScrollController = ScrollController();
+  final ScrollController _albumsScrollController = ScrollController();
+  final ScrollController _personalizedScrollController = ScrollController();
+
   // 1-Door Sequential Shelf Loading Flags
   bool _isLoadingDailyMix1 = true;
   bool _isLoadingDailyMix2 = true;
@@ -198,6 +213,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _circadianScrollController.dispose();
+    _chartsScrollController.dispose();
+    _albumsScrollController.dispose();
+    _personalizedScrollController.dispose();
     _musicService.removeListener(_onPrefsChanged);
     _prefs.removeListener(_onPrefsChanged);
     DesktopLayoutState.prioritizedPlaylistDoor.removeListener(_onPrefsChanged);
@@ -520,21 +539,22 @@ class _HomeScreenState extends State<HomeScreen>
         if (mounted) setState(() => _isLoadingCharts = false);
       }
 
-      // Priority 5: Trending Now
+      // Priority 5: Trending Now (authentic velocity-based trending)
       await pauseIfSearchActive();
       if (!mounted) return;
       try {
-        final trending = CanonicalSongDedup.deduplicateList(
-          _musicService.hasPreloadedHome &&
-                  _musicService.preloadedTrending.isNotEmpty
-              ? _musicService.preloadedTrending
-              : await _musicService
-                    .searchSongs('$primaryLang Trending')
-                    .timeout(
-                      const Duration(seconds: 8),
-                      onTimeout: () => <Video>[],
-                    ),
-        );
+        final trending =
+            _musicService.hasPreloadedHome &&
+                _musicService.preloadedTrending.isNotEmpty
+            ? CanonicalSongDedup.deduplicateList(
+                _musicService.preloadedTrending,
+              )
+            : await TrendingCatalogService()
+                  .fetchTrendingSongs(language: primaryLang, limit: 30)
+                  .timeout(
+                    const Duration(seconds: 8),
+                    onTimeout: () => <Video>[],
+                  );
         if (mounted) {
           setState(() {
             if (trending.isNotEmpty) _trendingNow = trending;
@@ -549,28 +569,26 @@ class _HomeScreenState extends State<HomeScreen>
         if (mounted) setState(() => _isLoadingTrending = false);
       }
 
-      // Priority 6: Soundtracks & Albums
+      // Priority 6: Soundtracks & Albums (authentic top albums)
       await pauseIfSearchActive();
       if (!mounted) return;
+
+      // Sync language chip index with user's primary language
+      final primaryIdx = _albumLanguages.indexWhere(
+        (l) => l.toLowerCase() == primaryLang.toLowerCase(),
+      );
+      if (primaryIdx != -1 && _selectedAlbumLangIndex != primaryIdx) {
+        _selectedAlbumLangIndex = primaryIdx;
+      }
+
       if (_trendingAlbums.isEmpty) {
         try {
-          var albums = await _musicService
-              .searchAlbums('$primaryLang Soundtracks', limit: 12)
+          final albums = await TrendingCatalogService()
+              .fetchTopAlbums(language: primaryLang, limit: 12)
               .timeout(
                 const Duration(seconds: 8),
                 onTimeout: () => <JioAlbum>[],
               );
-          if (albums.length < 3) {
-            final fallbackAlbums = await _musicService
-                .searchAlbums(primaryLang, limit: 12)
-                .timeout(
-                  const Duration(seconds: 8),
-                  onTimeout: () => <JioAlbum>[],
-                );
-            if (fallbackAlbums.isNotEmpty) {
-              albums = fallbackAlbums;
-            }
-          }
           if (mounted) {
             setState(() {
               if (albums.isNotEmpty) _trendingAlbums = albums;
@@ -788,6 +806,33 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Future<void> _onAlbumLanguageSelected(int index) async {
+    if (_selectedAlbumLangIndex == index && _trendingAlbums.isNotEmpty) return;
+    final lang = _albumLanguages[index];
+    setState(() => _selectedAlbumLangIndex = index);
+
+    final cached = TrendingCatalogService().getCachedAlbums(lang);
+    if (cached != null && cached.isNotEmpty) {
+      setState(() => _trendingAlbums = cached);
+      return;
+    }
+
+    setState(() => _isLoadingAlbums = true);
+    try {
+      final albums = await TrendingCatalogService()
+          .fetchTopAlbums(language: lang, limit: 12)
+          .timeout(const Duration(seconds: 8), onTimeout: () => <JioAlbum>[]);
+      if (mounted) {
+        setState(() {
+          if (albums.isNotEmpty) _trendingAlbums = albums;
+          _isLoadingAlbums = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAlbums = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -869,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 ],
                               ),
                               child: CircleAvatar(
-                                backgroundColor: const Color(0xFF1E1E28),
+                                backgroundColor: const Color(0xFF181818),
                                 radius: 20,
                                 backgroundImage: getProfileImageProvider(
                                   _prefs.profileImagePath,
@@ -924,7 +969,7 @@ class _HomeScreenState extends State<HomeScreen>
                         decoration: BoxDecoration(
                           color: isSelected
                               ? Colors.white.withValues(alpha: 0.16)
-                              : const Color(0xFF161622),
+                              : const Color(0xFF181818),
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(
                             color: isSelected
@@ -981,8 +1026,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           _circadianContext!.title.toUpperCase(),
                           _circadianContext!.subtitle,
+                          scrollController: _circadianScrollController,
                         ),
-                        _buildHorizontalChartCards(_circadianMix),
+                        _buildHorizontalChartCards(
+                          _circadianMix,
+                          controller: _circadianScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingCircadian &&
                           _circadianContext != null) ...[
@@ -999,8 +1048,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           'TOP CHARTS: INDIA',
                           'Updated Daily',
+                          scrollController: _chartsScrollController,
                         ),
-                        _buildHorizontalChartCards(_topChartsIndia),
+                        _buildHorizontalChartCards(
+                          _topChartsIndia,
+                          controller: _chartsScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingCharts) ...[
                         _buildSectionHeader(
@@ -1013,7 +1066,9 @@ class _HomeScreenState extends State<HomeScreen>
 
                       // BLOCKBUSTER SOUNDTRACKS & ALBUMS
                       if (_trendingAlbums.isNotEmpty) ...[
-                        _buildAlbumsSection(),
+                        _buildAlbumsSection(
+                          controller: _albumsScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingAlbums) ...[
                         _buildSectionHeader(
@@ -1029,8 +1084,12 @@ class _HomeScreenState extends State<HomeScreen>
                         _buildSectionHeader(
                           'MADE FOR YOU',
                           'Curated for your taste',
+                          scrollController: _personalizedScrollController,
                         ),
-                        _buildHorizontalChartCards(_personalizedMixes),
+                        _buildHorizontalChartCards(
+                          _personalizedMixes,
+                          controller: _personalizedScrollController,
+                        ),
                         const SizedBox(height: 24),
                       ] else if (_isLoadingPersonalized) ...[
                         _buildSectionHeader(
@@ -1064,6 +1123,7 @@ class _HomeScreenState extends State<HomeScreen>
       required List<Color> gradientColors,
       required IconData icon,
       String? query,
+      String? imageUrl,
     }) {
       HapticFeedback.lightImpact();
       if (isDesktop) {
@@ -1075,6 +1135,7 @@ class _HomeScreenState extends State<HomeScreen>
           initialSongs: initialSongs,
           gradientColors: gradientColors,
           icon: icon,
+          imageUrl: imageUrl,
         );
       } else {
         Navigator.push(
@@ -1087,6 +1148,7 @@ class _HomeScreenState extends State<HomeScreen>
               initialSongs: initialSongs,
               gradientColors: gradientColors,
               icon: icon,
+              imageUrl: imageUrl,
             ),
           ),
         );
@@ -1108,17 +1170,19 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    final items = <_HomeQuickAccessItem>[
-      _HomeQuickAccessItem(
+    final items = <HomeQuickAccessItem>[
+      HomeQuickAccessItem(
         title: dailyMix1?.title ?? 'Daily Mix 1',
         icon: Icons.shuffle_rounded,
-        iconGradient: const [Color(0xFFE040FB), Color(0xFF1DB954)],
+        solidColor: const Color(0xFF2E3856),
+        iconGradient: const [Color(0xFF2E3856), Color(0xFF1E2438)],
         isLoading: _isLoadingDailyMix1 && _dailyMix1.isEmpty,
         imageUrl: _dailyMix1.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_dailyMix1.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_dailyMix1.first)
                   : null)
             : null,
+        songs: _dailyMix1,
         onTap: () => openCurated(
           playlistId: 'daily_mix_1',
           title: dailyMix1?.title ?? 'Daily Mix 1',
@@ -1127,35 +1191,74 @@ class _HomeScreenState extends State<HomeScreen>
               dailyMix1?.query ??
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Mix',
           initialSongs: _dailyMix1,
-          gradientColors: const [Color(0xFFE040FB), Color(0xFF1DB954)],
+          gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
           icon: Icons.shuffle_rounded,
+          imageUrl: _dailyMix1.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_dailyMix1.first)
+              : null,
+        ),
+        onPlay: () {
+          if (_dailyMix1.isNotEmpty) {
+            _musicService.playPlaylist(_dailyMix1, 0);
+          } else {
+            openCurated(
+              playlistId: 'daily_mix_1',
+              title: dailyMix1?.title ?? 'Daily Mix 1',
+              subtitle: dailyMix1?.subtitle ?? 'Curated for you',
+              query:
+                  dailyMix1?.query ??
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Mix',
+              initialSongs: _dailyMix1,
+              gradientColors: const [Color(0xFF2E3856), Color(0xFF1E2438)],
+              icon: Icons.shuffle_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'daily_mix_1',
+            'title': dailyMix1?.title ?? 'Daily Mix 1',
+            'isCurated': true,
+            'songs': _dailyMix1,
+          },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Liked Songs',
         icon: Icons.favorite_rounded,
-        iconGradient: const [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+        solidColor: const Color(0xFF5038A0),
+        iconGradient: const [Color(0xFF5038A0), Color(0xFF382270)],
         imageUrl: _musicService.likedSongs.isNotEmpty
             ? _musicService.likedSongs.first['thumbnail']
             : null,
         onTap: openLikedSongs,
-        onSecondaryTap: (pos) => DesktopContextMenu.showPlaylistMenu(
+        onPlay: () {
+          if (_musicService.likedSongs.isNotEmpty) {
+            _musicService.playLikedSong(_musicService.likedSongs.first);
+          } else {
+            openLikedSongs();
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
           context: context,
           globalPosition: pos,
-          playlistId: 'liked_songs',
-          playlistName: 'Liked Songs',
+          playlist: 'liked_songs',
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: dailyMix2?.title ?? 'Daily Mix 2',
         icon: Icons.graphic_eq_rounded,
-        iconGradient: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
+        solidColor: const Color(0xFF223544),
+        iconGradient: const [Color(0xFF223544), Color(0xFF162430)],
         isLoading: _isLoadingDailyMix2 && _dailyMix2.isEmpty,
         imageUrl: _dailyMix2.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_dailyMix2.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_dailyMix2.first)
                   : null)
             : null,
+        songs: _dailyMix2,
         onTap: () => openCurated(
           playlistId: 'daily_mix_2',
           title: dailyMix2?.title ?? 'Daily Mix 2',
@@ -1164,19 +1267,51 @@ class _HomeScreenState extends State<HomeScreen>
               dailyMix2?.query ??
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Hits',
           initialSongs: _dailyMix2,
-          gradientColors: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
+          gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
           icon: Icons.graphic_eq_rounded,
+          imageUrl: _dailyMix2.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_dailyMix2.first)
+              : null,
+        ),
+        onPlay: () {
+          if (_dailyMix2.isNotEmpty) {
+            _musicService.playPlaylist(_dailyMix2, 0);
+          } else {
+            openCurated(
+              playlistId: 'daily_mix_2',
+              title: dailyMix2?.title ?? 'Daily Mix 2',
+              subtitle: dailyMix2?.subtitle ?? 'Curated for you',
+              query:
+                  dailyMix2?.query ??
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Hits',
+              initialSongs: _dailyMix2,
+              gradientColors: const [Color(0xFF223544), Color(0xFF162430)],
+              icon: Icons.graphic_eq_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'daily_mix_2',
+            'title': dailyMix2?.title ?? 'Daily Mix 2',
+            'isCurated': true,
+            'songs': _dailyMix2,
+          },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Top Charts',
         icon: Icons.trending_up_rounded,
-        iconGradient: const [Color(0xFFFF512F), Color(0xFFDD2476)],
+        solidColor: const Color(0xFF382B24),
+        iconGradient: const [Color(0xFF382B24), Color(0xFF241A14)],
         imageUrl: _topChartsIndia.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_topChartsIndia.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
                   : null)
             : null,
+        songs: _topChartsIndia,
         onTap: () => openCurated(
           playlistId: 'top_charts_india',
           title: 'Top Charts India',
@@ -1184,19 +1319,50 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               'Top Charts India ${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'}',
           initialSongs: _topChartsIndia,
-          gradientColors: const [Color(0xFFFF512F), Color(0xFFDD2476)],
+          gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
           icon: Icons.trending_up_rounded,
+          imageUrl: _topChartsIndia.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
+              : null,
+        ),
+        onPlay: () {
+          if (_topChartsIndia.isNotEmpty) {
+            _musicService.playPlaylist(_topChartsIndia, 0);
+          } else {
+            openCurated(
+              playlistId: 'top_charts_india',
+              title: 'Top Charts India',
+              subtitle: 'Updated Daily',
+              query:
+                  'Top Charts India ${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'}',
+              initialSongs: _topChartsIndia,
+              gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
+              icon: Icons.trending_up_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'top_charts_india',
+            'title': 'Top Charts India',
+            'isCurated': true,
+            'songs': _topChartsIndia,
+          },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'New Releases',
-        icon: Icons.fiber_new_rounded,
-        iconGradient: const [Color(0xFF11998E), Color(0xFF38EF7D)],
+        icon: Icons.album_rounded,
+        solidColor: const Color(0xFF1E382A),
+        iconGradient: const [Color(0xFF1E382A), Color(0xFF12241A)],
         imageUrl: _newReleases.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_newReleases.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_newReleases.first)
                   : null)
             : null,
+        songs: _newReleases,
         onTap: () => openCurated(
           playlistId: 'new_releases',
           title: 'New Releases',
@@ -1204,20 +1370,51 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
           initialSongs: _newReleases,
-          gradientColors: const [Color(0xFF11998E), Color(0xFF38EF7D)],
-          icon: Icons.fiber_new_rounded,
+          gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
+          icon: Icons.album_rounded,
+          imageUrl: _newReleases.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_newReleases.first)
+              : null,
+        ),
+        onPlay: () {
+          if (_newReleases.isNotEmpty) {
+            _musicService.playPlaylist(_newReleases, 0);
+          } else {
+            openCurated(
+              playlistId: 'new_releases',
+              title: 'New Releases',
+              subtitle: 'Fresh Music',
+              query:
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
+              initialSongs: _newReleases,
+              gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
+              icon: Icons.album_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'new_releases',
+            'title': 'New Releases',
+            'isCurated': true,
+            'songs': _newReleases,
+          },
         ),
       ),
-      _HomeQuickAccessItem(
+      HomeQuickAccessItem(
         title: 'Trending',
         icon: Icons.whatshot_rounded,
-        iconGradient: const [Color(0xFFF857A6), Color(0xFFFF5858)],
+        solidColor: const Color(0xFF38222A),
+        iconGradient: const [Color(0xFF38222A), Color(0xFF24141A)],
         isLoading: _isLoadingTrending && _trendingNow.isEmpty,
         imageUrl: _trendingNow.isNotEmpty
             ? (MusicService.resolveArtworkUrl(_trendingNow.first).isNotEmpty
                   ? MusicService.resolveArtworkUrl(_trendingNow.first)
                   : null)
             : null,
+        songs: _trendingNow,
         onTap: () => openCurated(
           playlistId: 'trending_now',
           title: 'Trending Now',
@@ -1225,8 +1422,37 @@ class _HomeScreenState extends State<HomeScreen>
           query:
               '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Trending',
           initialSongs: _trendingNow,
-          gradientColors: const [Color(0xFFF857A6), Color(0xFFFF5858)],
+          gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
           icon: Icons.whatshot_rounded,
+          imageUrl: _trendingNow.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_trendingNow.first)
+              : null,
+        ),
+        onPlay: () {
+          if (_trendingNow.isNotEmpty) {
+            _musicService.playPlaylist(_trendingNow, 0);
+          } else {
+            openCurated(
+              playlistId: 'trending_now',
+              title: 'Trending Now',
+              subtitle: 'Global Pick',
+              query:
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Trending',
+              initialSongs: _trendingNow,
+              gradientColors: const [Color(0xFF38222A), Color(0xFF24141A)],
+              icon: Icons.whatshot_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'trending_now',
+            'title': 'Trending Now',
+            'isCurated': true,
+            'songs': _trendingNow,
+          },
         ),
       ),
     ];
@@ -1242,105 +1468,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final item = items[index];
-          return Material(
-            color: Colors.transparent,
-            child: GestureDetector(
-              onSecondaryTapDown: item.onSecondaryTap != null
-                  ? (details) => item.onSecondaryTap!(details.globalPosition)
-                  : null,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppThemeTokens.radiusSmall),
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  item.onTap();
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppThemeTokens.surfaceCard,
-                    borderRadius: BorderRadius.circular(
-                      AppThemeTokens.radiusSmall,
-                    ),
-                    border: Border.all(
-                      color: AppThemeTokens.surfaceBorder,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(AppThemeTokens.radiusSmall),
-                          bottomLeft: Radius.circular(
-                            AppThemeTokens.radiusSmall,
-                          ),
-                        ),
-                        child: SizedBox(
-                          width: 52,
-                          height: 52,
-                          child: item.isLoading
-                              ? const ShimmerBox(
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: 0,
-                                )
-                              : item.imageUrl != null &&
-                                    item.imageUrl!.isNotEmpty
-                              ? Image.network(
-                                  item.imageUrl!,
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: item.iconGradient,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      item.icon,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: item.iconGradient,
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    item.icon,
-                                    color: Colors.white,
-                                    size: 22,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppThemeTokens.textPrimary,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
+          return HomeShortcutCard(item: item);
         }, childCount: items.length),
       ),
     );
@@ -1556,7 +1684,7 @@ class _HomeScreenState extends State<HomeScreen>
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF161622),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.12),
@@ -1725,8 +1853,10 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildAlbumsSection() {
-    if (_trendingAlbums.isEmpty) return const SizedBox.shrink();
+  Widget _buildAlbumsSection({ScrollController? controller}) {
+    if (_trendingAlbums.isEmpty && !_isLoadingAlbums) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1734,10 +1864,59 @@ class _HomeScreenState extends State<HomeScreen>
         _buildSectionHeader(
           'BLOCKBUSTER SOUNDTRACKS',
           'Full Movie & Studio Albums',
+          scrollController: controller,
         ),
+        // Language Filter Chips for Soundtracks & Albums
+        SizedBox(
+          height: 38,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: _albumLanguages.length,
+            itemBuilder: (context, idx) {
+              final isSelected = _selectedAlbumLangIndex == idx;
+              return GestureDetector(
+                onTap: () => _onAlbumLanguageSelected(idx),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(right: 8, bottom: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? _prefs.themeColor.withValues(alpha: 0.22)
+                        : const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isSelected
+                          ? _prefs.themeColor.withValues(alpha: 0.70)
+                          : Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    _albumLanguages[idx],
+                    style: TextStyle(
+                      color: isSelected ? _prefs.themeColor : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
         SizedBox(
           height: 220,
           child: ListView.builder(
+            controller: controller,
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1773,13 +1952,10 @@ class _HomeScreenState extends State<HomeScreen>
                   }
                 },
                 onSecondaryTapDown: (details) {
-                  DesktopContextMenu.showAlbumMenu(
+                  showUnifiedAlbumMenu(
                     context: context,
                     globalPosition: details.globalPosition,
-                    albumTitle: album.title,
-                    albumArtist: album.artist,
-                    albumId: album.id,
-                    albumArtwork: album.artwork,
+                    album: album,
                   );
                 },
                 child: Container(
@@ -1835,9 +2011,9 @@ class _HomeScreenState extends State<HomeScreen>
                                     border: Border.all(
                                       color: isSingle
                                           ? Colors.white24
-                                          : const Color(
-                                              0xFF7C3AED,
-                                            ).withValues(alpha: 0.6),
+                                          : _prefs.themeColor.withValues(
+                                              alpha: 0.6,
+                                            ),
                                       width: 1,
                                     ),
                                   ),
@@ -1848,7 +2024,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     style: TextStyle(
                                       color: isSingle
                                           ? Colors.white70
-                                          : const Color(0xFFA78BFA),
+                                          : _prefs.themeColor,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.2,
@@ -1898,11 +2074,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        album.artist.isNotEmpty
-                            ? album.artist
-                            : (album.year.isNotEmpty
-                                  ? album.year
-                                  : 'Soundtrack'),
+                        TrendingCatalogService.formatAlbumSubtitle(album),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1925,7 +2097,7 @@ class _HomeScreenState extends State<HomeScreen>
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1F1B2C), Color(0xFF120E1E)],
+          colors: [Color(0xFF181818), Color(0xFF121212)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1934,7 +2106,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.album_rounded, color: Color(0xFFA78BFA), size: 40),
+            Icon(Icons.album_rounded, color: _prefs.themeColor, size: 40),
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1956,42 +2128,60 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSectionHeader(String title, String subtitle) {
+  Widget _buildSectionHeader(
+    String title,
+    String subtitle, {
+    ScrollController? scrollController,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            subtitle.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.45),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subtitle.toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
-          ),
+          if (scrollController != null)
+            _ShelfChevronControls(controller: scrollController),
         ],
       ),
     );
   }
 
-  Widget _buildHorizontalChartCards(List<Video> videos) {
+  Widget _buildHorizontalChartCards(
+    List<Video> videos, {
+    ScrollController? controller,
+  }) {
     if (videos.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 215,
       child: ListView.builder(
+        controller: controller,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -2004,6 +2194,13 @@ class _HomeScreenState extends State<HomeScreen>
             onTap: () {
               HapticFeedback.lightImpact();
               _musicService.playPlaylist(videos, index);
+            },
+            onSecondaryTapDown: (details) {
+              showUnifiedTrackMenu(
+                context: context,
+                globalPosition: details.globalPosition,
+                song: song,
+              );
             },
             child: Container(
               width: 152,
@@ -2301,22 +2498,408 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-class _HomeQuickAccessItem {
+class HomeQuickAccessItem {
   final String title;
   final IconData icon;
+  final Color solidColor;
   final List<Color> iconGradient;
   final String? imageUrl;
+  final List<Video> songs;
   final bool isLoading;
   final VoidCallback onTap;
+  final VoidCallback? onPlay;
   final void Function(Offset globalPosition)? onSecondaryTap;
 
-  const _HomeQuickAccessItem({
+  const HomeQuickAccessItem({
     required this.title,
     required this.icon,
-    required this.iconGradient,
+    this.solidColor = const Color(0xFF242434),
+    this.iconGradient = const [Color(0xFF242434), Color(0xFF1E1E2C)],
     this.imageUrl,
+    this.songs = const [],
     this.isLoading = false,
     required this.onTap,
+    this.onPlay,
     this.onSecondaryTap,
   });
+
+  /// 4-tier artwork resolution pipeline:
+  /// Tier 1: Explicit Entity Thumbnail (if non-null and non-empty)
+  /// Tier 2: First Track Artwork (MusicService.resolveArtworkUrl(songs.first))
+  /// Tier 3: Curated High-Res Genre/Release Artwork (CuratedPlaylistScreen.getCuratedGenreFallback)
+  /// Tier 4: Null (triggers stylized minimalist gradient container with centered vinyl icon)
+  String? resolveArtwork() {
+    // Liked Songs special case: if no explicit thumbnail exists, return null so it falls
+    // back cleanly to the iconic purple gradient + heart icon (Tier 4).
+    if (title.toLowerCase().contains('liked')) {
+      if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+        return imageUrl!.trim();
+      }
+      return null;
+    }
+
+    // Tier 1 — Explicit Entity Thumbnail
+    if (imageUrl != null && imageUrl!.trim().isNotEmpty) {
+      return imageUrl!.trim();
+    }
+
+    // Tier 2 — First Track Artwork
+    if (songs.isNotEmpty) {
+      final trackArt = MusicService.resolveArtworkUrl(songs.first);
+      if (trackArt.trim().isNotEmpty) {
+        return trackArt.trim();
+      }
+    }
+
+    // Tier 3 — Curated High-Res Genre/Release Artwork
+    final curatedFallback = CuratedPlaylistScreen.getCuratedGenreFallback(
+      title,
+    );
+    if (curatedFallback.trim().isNotEmpty) {
+      return curatedFallback.trim();
+    }
+
+    return null;
+  }
+}
+
+class HomeShortcutCard extends StatefulWidget {
+  final HomeQuickAccessItem item;
+
+  const HomeShortcutCard({super.key, required this.item});
+
+  @override
+  State<HomeShortcutCard> createState() => _HomeShortcutCardState();
+}
+
+class _HomeShortcutCardState extends State<HomeShortcutCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final targetCache = (52 * dpr).round().clamp(52, 2048);
+    final isDesktopViewport = MediaQuery.of(context).size.width >= 1024;
+    final resolvedUrl = widget.item.resolveArtwork();
+
+    return Material(
+      color: Colors.transparent,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onSecondaryTapDown: widget.item.onSecondaryTap != null
+              ? (details) => widget.item.onSecondaryTap!(details.globalPosition)
+              : null,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6.0),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.item.onTap();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: _isHovered
+                    ? const Color(0xFF282834)
+                    : const Color(0xFF16161E),
+                borderRadius: BorderRadius.circular(6.0),
+                border: Border.all(
+                  color: Colors.white.withValues(
+                    alpha: _isHovered ? 0.12 : 0.06,
+                  ),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(6.0),
+                    ),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: widget.item.isLoading
+                          ? const ShimmerBox(
+                              width: 52,
+                              height: 52,
+                              borderRadius: 0,
+                            )
+                          : (resolvedUrl != null && resolvedUrl.isNotEmpty)
+                          ? Image.network(
+                              resolvedUrl,
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                              cacheWidth: targetCache,
+                              cacheHeight: targetCache,
+                              frameBuilder:
+                                  (
+                                    context,
+                                    child,
+                                    frame,
+                                    wasSynchronouslyLoaded,
+                                  ) {
+                                    if (wasSynchronouslyLoaded ||
+                                        frame != null) {
+                                      return child;
+                                    }
+                                    return const ShimmerBox(
+                                      width: 52,
+                                      height: 52,
+                                      borderRadius: 0,
+                                    );
+                                  },
+                              errorBuilder: (_, _, _) => _buildTier4Fallback(),
+                            )
+                          : _buildTier4Fallback(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFFFFFFF),
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (isDesktopViewport)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: AnimatedOpacity(
+                        opacity: _isHovered ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: IgnorePointer(
+                          ignoring: !_isHovered,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                if (widget.item.onPlay != null) {
+                                  widget.item.onPlay!();
+                                } else {
+                                  widget.item.onTap();
+                                }
+                              },
+                              customBorder: const CircleBorder(),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF1DB954),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black45,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.black,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTier4Fallback() {
+    final isLiked = widget.item.title.toLowerCase().contains('liked');
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: widget.item.iconGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          isLiked ? Icons.favorite_rounded : Icons.album_rounded,
+          color: Colors.white.withValues(alpha: isLiked ? 0.9 : 0.40),
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+class _ShelfChevronControls extends StatefulWidget {
+  final ScrollController controller;
+
+  const _ShelfChevronControls({required this.controller});
+
+  @override
+  State<_ShelfChevronControls> createState() => _ShelfChevronControlsState();
+}
+
+class _ShelfChevronControlsState extends State<_ShelfChevronControls> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(_ShelfChevronControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onScroll);
+      widget.controller.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (mounted) setState(() {});
+  }
+
+  void _scrollLeft() {
+    if (!widget.controller.hasClients) return;
+    final target = (widget.controller.offset - 480.0).clamp(
+      0.0,
+      widget.controller.position.maxScrollExtent,
+    );
+    widget.controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _scrollRight() {
+    if (!widget.controller.hasClients) return;
+    final target = (widget.controller.offset + 480.0).clamp(
+      0.0,
+      widget.controller.position.maxScrollExtent,
+    );
+    widget.controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasClients = widget.controller.hasClients;
+    final canScrollLeft = hasClients && widget.controller.offset > 0.0;
+    final canScrollRight =
+        hasClients &&
+        widget.controller.position.maxScrollExtent > 0 &&
+        widget.controller.offset <
+            widget.controller.position.maxScrollExtent - 1.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ChevronButton(
+          icon: Icons.chevron_left_rounded,
+          tooltip: 'Previous',
+          enabled: canScrollLeft,
+          onTap: _scrollLeft,
+        ),
+        const SizedBox(width: 8.0),
+        _ChevronButton(
+          icon: Icons.chevron_right_rounded,
+          tooltip: 'Next',
+          enabled: canScrollRight,
+          onTap: _scrollRight,
+        ),
+      ],
+    );
+  }
+}
+
+class _ChevronButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ChevronButton({
+    required this.icon,
+    required this.tooltip,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_ChevronButton> createState() => _ChevronButtonState();
+}
+
+class _ChevronButtonState extends State<_ChevronButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: widget.enabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+        child: GestureDetector(
+          onTap: widget.enabled ? widget.onTap : null,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: widget.enabled ? 1.0 : 0.3,
+            child: Container(
+              width: 28.0,
+              height: 28.0,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isHovered && widget.enabled
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
+              ),
+              child: Center(
+                child: Icon(widget.icon, size: 18.0, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

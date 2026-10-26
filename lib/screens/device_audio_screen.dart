@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
 import '../constants/app_theme_tokens.dart';
 import '../services/device_audio_service.dart';
 import '../services/music_service.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/dilse_scrollbar.dart';
 import '../widgets/song_options_bottom_sheet.dart';
+import '../widgets/desktop/desktop_context_menu.dart';
 
 /// Full-screen In-Device Music Screen.
 /// Plays local audio files (.mp3, .m4a, .flac, .wav, .opus) directly with 0 stream data.
@@ -400,121 +400,117 @@ class _DeviceAudioScreenState extends State<DeviceAudioScreen> {
                 width: 0.75,
               ),
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 3,
-              ),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _musicService.playDeviceSong(song);
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onSecondaryTapDown: (details) {
+                showUnifiedTrackMenu(
+                  context: context,
+                  globalPosition: details.globalPosition,
+                  song: songMapToVideo(song),
+                );
               },
-              leading: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? AppThemeTokens.brandRuby.withValues(alpha: 0.25)
-                      : AppThemeTokens.surfaceElevated,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isCurrent
-                        ? AppThemeTokens.brandRuby.withValues(alpha: 0.5)
-                        : Colors.white12,
-                    width: 0.75,
-                  ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 3,
                 ),
-                child: Center(
-                  child: isCurrent
-                      ? AnimatedEqualizer(
-                          isPlaying: _musicService.isPlaying,
-                          size: 20,
-                        )
-                      : const Icon(
-                          Icons.audio_file_rounded,
-                          color: Colors.white70,
-                          size: 22,
-                        ),
-                ),
-              ),
-              title: Text(
-                song['title'] ?? 'Unknown Track',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
-                  fontSize: 14,
-                ),
-              ),
-              subtitle: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      song['author'] ?? song['artist'] ?? 'Local File',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppThemeTokens.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      ext,
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (sizeStr.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '• $sizeStr',
-                      style: const TextStyle(
-                        color: AppThemeTokens.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              trailing: IconButton(
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  color: Colors.white60,
-                  size: 20,
-                ),
-                onPressed: () {
-                  final video = Video(
-                    VideoId(song['id'] ?? ''),
-                    song['title'] ?? '',
-                    song['author'] ?? '',
-                    ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
-                    DateTime.now(),
-                    '',
-                    null,
-                    '',
-                    null,
-                    ThumbnailSet(song['id'] ?? ''),
-                    null,
-                    Engagement(0, null, null),
-                    false,
-                  );
-                  showSongOptionsBottomSheet(context, video);
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _musicService.playDeviceSong(song);
                 },
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? AppThemeTokens.brandRuby.withValues(alpha: 0.25)
+                        : AppThemeTokens.surfaceElevated,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isCurrent
+                          ? AppThemeTokens.brandRuby.withValues(alpha: 0.5)
+                          : Colors.white12,
+                      width: 0.75,
+                    ),
+                  ),
+                  child: Center(
+                    child: isCurrent
+                        ? AnimatedEqualizer(
+                            isPlaying: _musicService.isPlaying,
+                            size: 20,
+                          )
+                        : const Icon(
+                            Icons.audio_file_rounded,
+                            color: Colors.white70,
+                            size: 22,
+                          ),
+                  ),
+                ),
+                title: Text(
+                  song['title'] ?? 'Unknown Track',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        song['author'] ?? song['artist'] ?? 'Local File',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppThemeTokens.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        ext,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (sizeStr.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '• $sizeStr',
+                        style: const TextStyle(
+                          color: AppThemeTokens.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                trailing: IconButton(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Colors.white60,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    final video = songMapToVideo(song);
+                    showSongOptionsBottomSheet(context, video);
+                  },
+                ),
               ),
             ),
           );

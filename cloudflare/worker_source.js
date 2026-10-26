@@ -452,6 +452,68 @@ export default {
       }
     }
 
+    // 10. JioSaavn Native Trending Songs: /jio/trending?lang=hindi&limit=30
+    if (url.pathname === '/jio/trending') {
+      const lang = url.searchParams.get('lang') || 'hindi';
+      const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '30')));
+
+      try {
+        const results = await getJioTrendingSongs(lang, limit);
+        return new Response(JSON.stringify(results), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=1800',
+            ...CORS_HEADERS,
+          },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // 11. JioSaavn Top Charts: /jio/charts?lang=hindi
+    if (url.pathname === '/jio/charts') {
+      const lang = url.searchParams.get('lang') || 'hindi';
+
+      try {
+        const results = await getJioTopCharts(lang);
+        return new Response(JSON.stringify(results), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+            ...CORS_HEADERS,
+          },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // 12. JioSaavn Featured & Top Albums: /jio/featured_albums?lang=hindi&limit=20
+    if (url.pathname === '/jio/featured_albums') {
+      const lang = url.searchParams.get('lang') || 'hindi';
+      const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '20')));
+
+      try {
+        const results = await getJioFeaturedAlbums(lang, limit);
+        return new Response(JSON.stringify(results), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+            ...CORS_HEADERS,
+          },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        });
+      }
+    }
+
     return new Response('Not Found', { status: 404, headers: CORS_HEADERS });
   },
 };
@@ -1732,4 +1794,268 @@ async function searchYtmSongs(query, limit = 20) {
   } catch (e) {
     return [];
   }
+}
+
+const SPAM_AND_JUNK_FILTER =
+  /\b(trending(\s+version)?|1\s*min(\s*mix)?|reels?(\s*version)?|viral(\s*version)?|(speed|sped)(\s*up)?|slowed(\s*\+\s*reverb)?|classic.*soundtrack|vol(ume)?\.?\s*\d+|greatest\s+hits|best\s+of|party\s+mix|jukebox|compilation|golden\s+era|archive)\b/i;
+
+function cleanString(str) {
+  if (!str) return '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .trim();
+}
+
+/**
+ * Fetches authentic JioSaavn trending songs using native chart/trending modules
+ * without any keyword search stuffing.
+ */
+async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
+  const language = lang.toLowerCase().trim();
+  const geoHeaders = {
+    ...JIO_GEO_HEADERS,
+    Cookie: `L=${language}; DL=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03`,
+  };
+
+  const songs = [];
+  const seenIds = new Set();
+
+  function addSong(r) {
+    if (!r || !r.id || seenIds.has(String(r.id))) return;
+    const mi = r.more_info || {};
+    const title = cleanString(r.title || r.song);
+    const album = cleanString(mi.album || r.album);
+    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).join(', ');
+    const artist = cleanString(primaryArtists || r.subtitle || r.primary_artists || mi.music || r.singers || 'DilSe Music');
+
+    // Strict spam, 1-min reel cut, and compilation filter
+    if (SPAM_AND_JUNK_FILTER.test(title) || SPAM_AND_JUNK_FILTER.test(album) || SPAM_AND_JUNK_FILTER.test(artist)) {
+      return;
+    }
+
+    const encMedia = mi.encrypted_media_url || r.encrypted_media_url || '';
+    const streamUrl = decryptMediaUrl(encMedia);
+    let artwork = (r.image || '').replace('150x150', '500x500');
+    if (artwork.startsWith('http:')) artwork = artwork.replace('http:', 'https:');
+    if (artwork.includes('default_') || !artwork.startsWith('http')) artwork = '';
+
+    const duration = parseInt(mi.duration || r.duration || '0', 10) || 0;
+
+    seenIds.add(String(r.id));
+    songs.push({
+      id: String(r.id),
+      title: title || 'Unknown Title',
+      author: artist,
+      album: album,
+      duration: duration,
+      thumbnail: artwork,
+      streamUrl: streamUrl,
+      source: 'jiosaavn',
+      bitrate: '320kbps',
+    });
+  }
+
+  // 1. Fetch content.getTrending
+  try {
+    const url = 'https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0';
+    const res = await fetch(url, { headers: geoHeaders });
+    if (res.ok) {
+      let text = await res.text();
+      text = text.replace(/^\uFEFF/, '').trim();
+      const list = JSON.parse(text);
+      if (Array.isArray(list)) {
+        for (const item of list) {
+          if (item.type === 'song') {
+            addSong(item);
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  // 2. Fetch content.getBrowseModules (new_trending and new_albums)
+  if (songs.length < limit) {
+    try {
+      const url = 'https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0';
+      const res = await fetch(url, { headers: geoHeaders });
+      if (res.ok) {
+        let text = await res.text();
+        text = text.replace(/^\uFEFF/, '').trim();
+        const data = JSON.parse(text);
+        const candidates = [...(data.new_trending || []), ...(data.new_albums || [])];
+        for (const item of candidates) {
+          if (item.type === 'song') {
+            addSong(item);
+            if (songs.length >= limit) break;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 3. Fallback to official top charts playlist if still low
+  if (songs.length < 15) {
+    try {
+      const chartUrl = 'https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0';
+      const chartRes = await fetch(chartUrl, { headers: geoHeaders });
+      if (chartRes.ok) {
+        let chartText = await chartRes.text();
+        chartText = chartText.replace(/^\uFEFF/, '').trim();
+        const chartList = JSON.parse(chartText);
+        if (Array.isArray(chartList) && chartList.length > 0) {
+          const matchedChart = chartList.find(c => (c.title || '').toLowerCase().includes(language)) || chartList[0];
+          if (matchedChart && matchedChart.id) {
+            const detailUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&api_version=4&_format=json&ctx=web6dot0&listid=${matchedChart.id}`;
+            const detailRes = await fetch(detailUrl, { headers: geoHeaders });
+            if (detailRes.ok) {
+              let detailText = await detailRes.text();
+              detailText = detailText.replace(/^\uFEFF/, '').trim();
+              const detailData = JSON.parse(detailText);
+              for (const song of detailData.list || []) {
+                addSong(song);
+                if (songs.length >= limit) break;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  return songs.slice(0, limit);
+}
+
+/**
+ * Fetches JioSaavn Top Charts playlists metadata.
+ */
+async function getJioTopCharts(lang = 'hindi') {
+  const language = lang.toLowerCase().trim();
+  const geoHeaders = {
+    ...JIO_GEO_HEADERS,
+    Cookie: `L=${language}; DL=${language}; country=IN`,
+  };
+
+  try {
+    const url = 'https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0';
+    const res = await fetch(url, { headers: geoHeaders });
+    if (!res.ok) return [];
+    let text = await res.text();
+    text = text.replace(/^\uFEFF/, '').trim();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) return [];
+
+    return data.map(c => {
+      let img = (c.image || '').replace('150x150', '500x500');
+      if (img.startsWith('http:')) img = img.replace('http:', 'https:');
+      return {
+        id: String(c.id),
+        title: cleanString(c.title || 'Top Chart'),
+        image: img,
+        count: parseInt(c.count || '50', 10) || 50,
+      };
+    });
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Fetches JioSaavn Top & Featured Albums for a specific language
+ * with strict spam and modern release year (>= 2018) enforcement.
+ */
+async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
+  const language = lang.toLowerCase().trim();
+  const geoHeaders = {
+    ...JIO_GEO_HEADERS,
+    Cookie: `L=${language}; DL=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03`,
+  };
+
+  const albums = [];
+  const seenIds = new Set();
+
+  function addAlbum(r) {
+    if (!r || !r.id || seenIds.has(String(r.id))) return;
+    const mi = r.more_info || {};
+    const title = cleanString(r.title);
+    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).join(', ');
+    const artist = cleanString(primaryArtists || mi.music || r.subtitle || 'Various Artists');
+
+    // Strict spam and compilation filter
+    if (SPAM_AND_JUNK_FILTER.test(title) || SPAM_AND_JUNK_FILTER.test(artist)) {
+      return;
+    }
+
+    // Modern release year verification (year >= 2018)
+    const rawDate = String(mi.release_date || r.year || mi.year || '');
+    let yearNum = 0;
+    const yearMatch = rawDate.match(/\b(19\d{2}|20\d{2})\b/);
+    if (yearMatch) {
+      yearNum = parseInt(yearMatch[1], 10);
+      if (yearNum < 2018) return; // Drop retro compilations
+    }
+
+    let artwork = (r.image || '').replace('150x150', '500x500');
+    if (artwork.startsWith('http:')) artwork = artwork.replace('http:', 'https:');
+    if (artwork.includes('default_') || artwork.includes('album-default') || !artwork.startsWith('http')) {
+      artwork = '';
+    }
+
+    const songCount = parseInt(mi.song_count || r.song_count || '8', 10) || 8;
+    const itemLang = (r.language || mi.language || language).toLowerCase();
+
+    seenIds.add(String(r.id));
+    albums.push({
+      id: String(r.id),
+      title: title || 'Unknown Album',
+      artist: artist,
+      artwork: artwork,
+      year: yearNum > 0 ? String(yearNum) : (rawDate.slice(0, 4) || '2026'),
+      songCount: songCount,
+      language: itemLang,
+      type: 'album',
+    });
+  }
+
+  // 1. Fetch from content.getBrowseModules
+  try {
+    const url = 'https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0';
+    const res = await fetch(url, { headers: geoHeaders });
+    if (res.ok) {
+      let text = await res.text();
+      text = text.replace(/^\uFEFF/, '').trim();
+      const data = JSON.parse(text);
+      const candidates = [...(data.new_albums || []), ...(data.new_trending || [])];
+      for (const item of candidates) {
+        if (item.type === 'album') {
+          addAlbum(item);
+          if (albums.length >= limit) break;
+        }
+      }
+    }
+  } catch (_) {}
+
+  // 2. Fetch from content.getTrending
+  if (albums.length < limit) {
+    try {
+      const url = 'https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0';
+      const res = await fetch(url, { headers: geoHeaders });
+      if (res.ok) {
+        let text = await res.text();
+        text = text.replace(/^\uFEFF/, '').trim();
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            if (item.type === 'album') {
+              addAlbum(item);
+              if (albums.length >= limit) break;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  return albums.slice(0, limit);
 }

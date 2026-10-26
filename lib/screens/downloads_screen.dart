@@ -6,7 +6,7 @@ import '../services/music_service.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/dilse_scrollbar.dart';
 import '../widgets/song_options_bottom_sheet.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
+import '../widgets/desktop/desktop_context_menu.dart';
 
 /// Dedicated full-screen Downloads Hub — 4th core destination in the bottom dock.
 /// Guaranteed 100% offline playback with storage telemetry and instant search.
@@ -297,121 +297,117 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 2,
-              ),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _musicService.playDownloadedSong(song);
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onSecondaryTapDown: (details) {
+                showUnifiedTrackMenu(
+                  context: context,
+                  globalPosition: details.globalPosition,
+                  song: songMapToVideo(song),
+                );
               },
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.network(
-                        song['thumbnail'] ?? '',
-                        cacheWidth: 120,
-                        cacheHeight: 120,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: AppThemeTokens.surfaceCard,
-                          child: const Icon(
-                            Icons.music_note,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ),
-                      if (isCurrent)
-                        Container(
-                          color: Colors.black54,
-                          child: Center(
-                            child: AnimatedEqualizer(
-                              isPlaying: _musicService.isPlaying,
-                              size: 20,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _musicService.playDownloadedSong(song);
+                },
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          song['thumbnail'] ?? '',
+                          cacheWidth: 120,
+                          cacheHeight: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: AppThemeTokens.surfaceCard,
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white54,
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              ),
-              title: Text(
-                song['title'] ?? 'Unknown Title',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
-                  fontSize: 14.5,
-                ),
-              ),
-              subtitle: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      song['author'] ?? 'Unknown Artist',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 12.5,
-                      ),
+                        if (isCurrent)
+                          Container(
+                            color: Colors.black54,
+                            child: Center(
+                              child: AnimatedEqualizer(
+                                isPlaying: _musicService.isPlaying,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (sizeBytes > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                ),
+                title: Text(
+                  song['title'] ?? 'Unknown Title',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isCurrent ? AppThemeTokens.brandRuby : Colors.white,
+                    fontSize: 14.5,
+                  ),
+                ),
+                subtitle: Row(
+                  children: [
+                    Flexible(
                       child: Text(
-                        sizeFormatted,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                        song['author'] ?? 'Unknown Artist',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 12.5,
                         ),
                       ),
                     ),
+                    if (sizeBytes > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          sizeFormatted,
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-              trailing: IconButton(
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  color: Colors.white54,
-                  size: 20,
                 ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  final video = Video(
-                    VideoId(song['id'] ?? ''),
-                    song['title'] ?? '',
-                    song['author'] ?? '',
-                    ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
-                    DateTime.now(),
-                    '',
-                    null,
-                    '',
-                    null,
-                    ThumbnailSet(song['id'] ?? ''),
-                    null,
-                    Engagement(0, null, null),
-                    false,
-                  );
-                  showSongOptionsBottomSheet(context, video);
-                },
+                trailing: IconButton(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    final video = songMapToVideo(song);
+                    showSongOptionsBottomSheet(context, video);
+                  },
+                ),
               ),
             ),
           );

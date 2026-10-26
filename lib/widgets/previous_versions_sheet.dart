@@ -152,7 +152,7 @@ class _PreviousVersionsSheetState extends State<PreviousVersionsSheet> {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E24),
+          backgroundColor: const Color(0xFF181818),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -516,7 +516,7 @@ class _PreviousVersionsSheetState extends State<PreviousVersionsSheet> {
       decoration: BoxDecoration(
         color: isCurrent
             ? themeColor.withValues(alpha: 0.08)
-            : const Color(0xFF1A1A22),
+            : const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCurrent

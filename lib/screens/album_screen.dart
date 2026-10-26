@@ -41,6 +41,7 @@ class AlbumScreen extends StatefulWidget {
 class _AlbumScreenState extends State<AlbumScreen>
     with SingleTickerProviderStateMixin {
   final MusicService _music = MusicService();
+  final PreferencesService _prefs = PreferencesService();
   final ScrollController _scrollController = ScrollController();
   JioAlbum? _album;
   bool _loading = true;
@@ -263,10 +264,10 @@ class _AlbumScreenState extends State<AlbumScreen>
 
                 // Loading / Error
                 if (_loading)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     child: Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF7C3AED),
+                        color: _prefs.themeColor,
                       ),
                     ),
                   )
@@ -299,9 +300,9 @@ class _AlbumScreenState extends State<AlbumScreen>
                               });
                               _loadAlbum();
                             },
-                            child: const Text(
+                            child: Text(
                               'Retry',
-                              style: TextStyle(color: Color(0xFF7C3AED)),
+                              style: TextStyle(color: _prefs.themeColor),
                             ),
                           ),
                         ],
@@ -344,7 +345,7 @@ class _AlbumScreenState extends State<AlbumScreen>
                             const SizedBox(height: 24),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF7C3AED),
+                                backgroundColor: _prefs.themeColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -433,100 +434,112 @@ class _AlbumScreenState extends State<AlbumScreen>
     String artist,
     String year,
   ) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Blurred background
-        if (artwork.isNotEmpty)
-          Image.network(
-            artwork,
-            fit: BoxFit.cover,
-            errorBuilder: (_, e2, st) =>
-                const ColoredBox(color: Color(0xFF1A1A2E)),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        if (_album != null) {
+          showUnifiedAlbumMenu(
+            context: context,
+            globalPosition: details.globalPosition,
+            album: _album!,
+          );
+        }
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Blurred background
+          if (artwork.isNotEmpty)
+            Image.network(
+              artwork,
+              fit: BoxFit.cover,
+              errorBuilder: (_, e2, st) =>
+                  const ColoredBox(color: Color(0xFF1A1A2E)),
+            ),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(color: Colors.black.withValues(alpha: 0.55)),
           ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(color: Colors.black.withValues(alpha: 0.55)),
-        ),
-        // Album art + info
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 24,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Cover art
-              Hero(
-                tag: 'album-art-${widget.albumId ?? widget.album?.id}',
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: artwork.isNotEmpty
-                        ? Image.network(
-                            artwork,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, e2, st) =>
-                                _buildStylizedVinylCover(
-                                  title,
-                                  artist,
-                                  size: 160,
-                                ),
-                          )
-                        : _buildStylizedVinylCover(title, artist, size: 160),
+          // Album art + info
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Cover art
+                Hero(
+                  tag: 'album-art-${widget.albumId ?? widget.album?.id}',
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: artwork.isNotEmpty
+                          ? Image.network(
+                              artwork,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, e2, st) =>
+                                  _buildStylizedVinylCover(
+                                    title,
+                                    artist,
+                                    size: 160,
+                                  ),
+                            )
+                          : _buildStylizedVinylCover(title, artist, size: 160),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (artist.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
                       Text(
-                        artist,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                         textAlign: TextAlign.center,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (artist.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          artist,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -542,13 +555,11 @@ class _AlbumScreenState extends State<AlbumScreen>
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-                  ),
+                  color: _prefs.themeColor,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                      color: _prefs.themeColor.withValues(alpha: 0.35),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -642,6 +653,43 @@ class _AlbumScreenState extends State<AlbumScreen>
               );
             },
           ),
+          const SizedBox(width: 12),
+          // More Options 3-Dot Button (DEFECT 2 - C)
+          Builder(
+            builder: (btnCtx) => GestureDetector(
+              onTap: () {
+                final renderBox = btnCtx.findRenderObject() as RenderBox?;
+                final offset =
+                    renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+                final buttonSize = renderBox?.size ?? Size.zero;
+                final menuPosition = Offset(
+                  offset.dx,
+                  offset.dy + buttonSize.height,
+                );
+                showUnifiedAlbumMenu(
+                  context: context,
+                  globalPosition: menuPosition,
+                  album: _album!,
+                );
+              },
+              child: Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.more_vert_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -703,7 +751,7 @@ class _AlbumScreenState extends State<AlbumScreen>
             title: Text(
               title,
               style: TextStyle(
-                color: isPlaying ? const Color(0xFF7C3AED) : Colors.white,
+                color: isPlaying ? _prefs.themeColor : Colors.white,
                 fontSize: 14,
                 fontWeight: isPlaying ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -828,7 +876,7 @@ class _AlbumScreenState extends State<AlbumScreen>
               shape: BoxShape.circle,
               color: Colors.black.withValues(alpha: 0.65),
               border: Border.all(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                color: _prefs.themeColor.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
@@ -836,7 +884,7 @@ class _AlbumScreenState extends State<AlbumScreen>
               child: Text(
                 title.isNotEmpty ? title[0].toUpperCase() : '♪',
                 style: TextStyle(
-                  color: const Color(0xFFA78BFA),
+                  color: _prefs.themeColor,
                   fontSize: size * 0.16,
                   fontWeight: FontWeight.w900,
                 ),

@@ -16,6 +16,50 @@ enum ScrubberStyle { waveform, classic }
 
 enum ProgressLineStyle { wave, classic }
 
+enum PlaylistSortOption {
+  customOrder,
+  title,
+  artist,
+  album,
+  recentlyAdded,
+  releaseDate,
+  duration,
+}
+
+extension PlaylistSortOptionExt on PlaylistSortOption {
+  String get label {
+    switch (this) {
+      case PlaylistSortOption.customOrder:
+        return 'Custom order';
+      case PlaylistSortOption.title:
+        return 'Title';
+      case PlaylistSortOption.artist:
+        return 'Artist';
+      case PlaylistSortOption.album:
+        return 'Album';
+      case PlaylistSortOption.recentlyAdded:
+        return 'Recently added';
+      case PlaylistSortOption.releaseDate:
+        return 'Release date';
+      case PlaylistSortOption.duration:
+        return 'Duration';
+    }
+  }
+}
+
+enum PlaylistViewMode { list, compact }
+
+extension PlaylistViewModeExt on PlaylistViewMode {
+  String get label {
+    switch (this) {
+      case PlaylistViewMode.compact:
+        return 'Compact';
+      case PlaylistViewMode.list:
+        return 'List';
+    }
+  }
+}
+
 enum AudioQualityPreset {
   studioMaster, // 320 kbps (Direct JioSaavn 320k CDN / max bitrate)
   high, // 160 kbps (High Fidelity Opus / 160k AAC)
@@ -214,9 +258,47 @@ class PreferencesService extends ChangeNotifier {
   Map<int, double> _equalizerBands = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0};
   double _bassBoost = 0.0;
   double _virtualizer = 0.0;
-  Color _themeColor = const Color(0xFFFA2D48); // Default DilSe Crimson
+  static const List<Map<String, dynamic>> organicPalette = [
+    {
+      'name': 'Sage Leaf',
+      'subtitle': 'Muted herbal eucalyptus',
+      'color': Color(0xFF8FA382),
+    },
+    {
+      'name': 'Baked Terracotta',
+      'subtitle': 'Natural earthen clay',
+      'color': Color(0xFFBD6B52),
+    },
+    {
+      'name': 'Desert Sandstone',
+      'subtitle': 'Warm canyon mineral',
+      'color': Color(0xFFC89D54),
+    },
+    {
+      'name': 'River Slate',
+      'subtitle': 'Tidepool stone wash',
+      'color': Color(0xFF4D727A),
+    },
+    {
+      'name': 'Forest Moss',
+      'subtitle': 'Evergreen canopy green',
+      'color': Color(0xFF44624A),
+    },
+    {
+      'name': 'Desert Flora',
+      'subtitle': 'Muted wildflower tone',
+      'color': Color(0xFFAF7373),
+    },
+    {
+      'name': 'Weathered Cedar',
+      'subtitle': 'Driftwood timber charcoal',
+      'color': Color(0xFF8A705E),
+    },
+  ];
+
+  Color _themeColor = const Color(0xFF8FA382); // Default Sage Leaf (Organic)
   final ValueNotifier<Color> themeColorNotifier = ValueNotifier<Color>(
-    const Color(0xFFFA2D48),
+    const Color(0xFF8FA382),
   );
   double _cacheSizeMB = 500.0;
   String _customServerUrl = '';
@@ -314,6 +396,28 @@ class PreferencesService extends ChangeNotifier {
       : ProgressLineStyle.classic;
   AudioQualityPreset get audioQuality => _audioQuality;
   AudioFormatPreference get audioFormat => _audioFormat;
+  PlaylistSortOption _playlistSortOption = PlaylistSortOption.customOrder;
+  PlaylistViewMode _playlistViewMode = PlaylistViewMode.list;
+
+  PlaylistSortOption get playlistSortOption => _playlistSortOption;
+  PlaylistViewMode get playlistViewMode => _playlistViewMode;
+
+  Future<void> setPlaylistSortOption(PlaylistSortOption option) async {
+    _playlistSortOption = option;
+    notifyListeners();
+    try {
+      await _prefs.setString('playlistSortOption', option.name);
+    } catch (_) {}
+  }
+
+  Future<void> setPlaylistViewMode(PlaylistViewMode mode) async {
+    _playlistViewMode = mode;
+    notifyListeners();
+    try {
+      await _prefs.setString('playlistViewMode', mode.name);
+    } catch (_) {}
+  }
+
   bool get pureDjFlowEnabled => _pureDjFlowEnabled;
   String get lyricsDisplayMode => _lyricsDisplayMode;
   String get userName => _userName.isEmpty ? 'Friend' : _userName;
@@ -400,7 +504,7 @@ class PreferencesService extends ChangeNotifier {
       } catch (_) {}
     }
 
-    int colorValue = _prefs.getInt('themeColor') ?? 0xFFFA2D48;
+    int colorValue = _prefs.getInt('themeColor') ?? 0xFF8FA382;
     _themeColor = Color(colorValue);
     themeColorNotifier.value = _themeColor;
     _cacheSizeMB = _prefs.getDouble('cacheSizeMB') ?? 500.0;
@@ -490,6 +594,16 @@ class PreferencesService extends ChangeNotifier {
       orElse: () => AudioFormatPreference.auto,
     );
     _lyricsDisplayMode = _prefs.getString('lyricsDisplayMode') ?? 'original';
+    final sortStr = _prefs.getString('playlistSortOption') ?? 'customOrder';
+    _playlistSortOption = PlaylistSortOption.values.firstWhere(
+      (e) => e.name == sortStr,
+      orElse: () => PlaylistSortOption.customOrder,
+    );
+    final viewStr = _prefs.getString('playlistViewMode') ?? 'list';
+    _playlistViewMode = PlaylistViewMode.values.firstWhere(
+      (e) => e.name == viewStr,
+      orElse: () => PlaylistViewMode.list,
+    );
 
     final historyJson = _prefs.getString('listeningHistoryJson');
     if (historyJson != null && historyJson.isNotEmpty) {

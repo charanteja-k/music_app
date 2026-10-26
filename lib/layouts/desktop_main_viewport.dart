@@ -64,6 +64,9 @@ class DesktopMainViewport extends StatelessWidget {
                       subtitle: curatedData['subtitle'] as String,
                       query: curatedData['query'] as String?,
                       initialSongs: curatedData['initialSongs'] as List<Video>?,
+                      fetchSongs:
+                          curatedData['fetchSongs']
+                              as Future<List<Video>> Function()?,
                       gradientColors:
                           curatedData['gradientColors'] as List<Color>?,
                       icon: curatedData['icon'] as IconData?,
@@ -132,7 +135,10 @@ class DesktopMainViewport extends StatelessWidget {
       index: _getTabIndex(tab),
       children: const [
         HomeScreen(key: PageStorageKey('desktop_home_viewport')),
-        SearchScreen(key: PageStorageKey('desktop_search_viewport')),
+        SearchScreen(
+          key: PageStorageKey('desktop_search_viewport'),
+          isDesktopView: true,
+        ),
         LibraryScreen(key: PageStorageKey('desktop_library_viewport')),
       ],
     );

@@ -28,7 +28,7 @@ class AuthService extends ChangeNotifier {
 
   GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb ? defaultClientId : null,
-    serverClientId: defaultClientId,
+    serverClientId: kIsWeb ? null : defaultClientId,
     scopes: const <String>['email'],
   );
 
@@ -218,7 +218,7 @@ class AuthService extends ChangeNotifier {
       _isMissingClientId = false;
       _googleSignIn = GoogleSignIn(
         clientId: kIsWeb ? _clientId : null,
-        serverClientId: _clientId,
+        serverClientId: kIsWeb ? null : _clientId,
         scopes: const <String>['email'],
       );
     }
@@ -422,7 +422,21 @@ class AuthService extends ChangeNotifier {
       return true;
     } catch (e) {
       final err = e.toString();
-      _lastError = err;
+      if (err.contains('popup_blocked') || err.contains('blocked')) {
+        _lastError =
+            'Google Sign-In popup was blocked by your browser. Please allow popups for localhost and retry.';
+      } else if (err.contains('origin') ||
+          err.contains('idpiframe') ||
+          err.contains('unauthorized_client') ||
+          err.contains('403')) {
+        _lastError =
+            'OAuth origin mismatch: Please add http://localhost:3000 to Authorized JavaScript Origins in Google Cloud Console.';
+      } else if (err.contains('popup_closed') || err.contains('closed')) {
+        _lastError =
+            'Sign-in popup was closed before completing authentication.';
+      } else {
+        _lastError = err;
+      }
       if (err.contains('clientId') ||
           err.contains('Missing') ||
           err.contains('channel-error') ||

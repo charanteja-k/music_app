@@ -16,6 +16,7 @@ import 'custom_playlist_screen.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/playlist_action_menu.dart';
 import '../widgets/dilse_scrollbar.dart';
+import '../widgets/desktop/desktop_context_menu.dart';
 import '../services/device_audio_service.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../constants/app_theme_tokens.dart';
@@ -1094,7 +1095,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.08),
                           width: 1,
@@ -1191,7 +1192,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161622),
+              color: const Color(0xFF181818),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.08),
@@ -1205,14 +1206,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                   height: 52,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                        color: const Color(0xFFBA385C).withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -1497,165 +1498,182 @@ class _LibraryScreenState extends State<LibraryScreen>
             }
             final isSpotify = _isSpotifyPlaylist(playlist);
 
-            return ListTile(
-              key: ValueKey('playlist_row_$id'),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 4,
-              ),
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E28),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      width: 1,
-                    ),
-                  ),
-                  child: playlistCover != null && playlistCover.isNotEmpty
-                      ? Transform.scale(
-                          scale:
-                              playlistCover.startsWith('https://i.ytimg.com/')
-                              ? 1.35
-                              : 1.0,
-                          child: Image.network(
-                            playlistCover,
-                            fit: BoxFit.cover,
-                            cacheWidth: 120,
-                            cacheHeight: 120,
-                            errorBuilder: (_, _, _) => Icon(
-                              Icons.queue_music_rounded,
-                              color: isSpotify
-                                  ? const Color(0xFF1DB954)
-                                  : _prefs.themeColor.withValues(alpha: 0.85),
-                              size: 24,
-                            ),
-                          ),
-                        )
-                      : Icon(
-                          Icons.queue_music_rounded,
-                          color: isSpotify
-                              ? const Color(0xFF1DB954)
-                              : _prefs.themeColor.withValues(alpha: 0.85),
-                          size: 24,
-                        ),
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onSecondaryTapDown: (details) {
+                showUnifiedPlaylistMenu(
+                  context: context,
+                  globalPosition: details.globalPosition,
+                  playlist: playlist,
+                  onDeleted: () {
+                    if (mounted) setState(() {});
+                  },
+                );
+              },
+              child: ListTile(
+                key: ValueKey('playlist_row_$id'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
                 ),
-              ),
-              title: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        fontSize: 15,
-                        letterSpacing: -0.2,
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF181818),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1,
                       ),
                     ),
+                    child: playlistCover != null && playlistCover.isNotEmpty
+                        ? Transform.scale(
+                            scale:
+                                playlistCover.startsWith('https://i.ytimg.com/')
+                                ? 1.35
+                                : 1.0,
+                            child: Image.network(
+                              playlistCover,
+                              fit: BoxFit.cover,
+                              cacheWidth: 120,
+                              cacheHeight: 120,
+                              errorBuilder: (_, _, _) => Icon(
+                                Icons.queue_music_rounded,
+                                color: isSpotify
+                                    ? const Color(0xFF1DB954)
+                                    : _prefs.themeColor.withValues(alpha: 0.85),
+                                size: 24,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.queue_music_rounded,
+                            color: isSpotify
+                                ? const Color(0xFF1DB954)
+                                : _prefs.themeColor.withValues(alpha: 0.85),
+                            size: 24,
+                          ),
                   ),
-                  if (isSpotify) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1DB954).withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: const Color(0xFF1DB954).withValues(alpha: 0.3),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: const Text(
-                        'Spotify',
-                        style: TextStyle(
-                          color: Color(0xFF1DB954),
-                          fontSize: 10,
+                ),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
+                          color: Colors.white,
+                          fontSize: 15,
+                          letterSpacing: -0.2,
                         ),
                       ),
+                    ),
+                    if (isSpotify) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF1DB954,
+                          ).withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF1DB954,
+                            ).withValues(alpha: 0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Text(
+                          'Spotify',
+                          style: TextStyle(
+                            color: Color(0xFF1DB954),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: Text(
+                  isSpotify
+                      ? '${songs.length} tracks • Spotify Ingested'
+                      : '${songs.length} tracks • Personal',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      key: ValueKey('playlist_play_$id'),
+                      icon: const Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                      tooltip: 'Play playlist',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
+                      onPressed: songs.isEmpty
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              _musicService.playCustomPlaylist(id, 0);
+                            },
+                    ),
+                    const SizedBox(width: 4),
+                    PlaylistActionMenu(
+                      key: ValueKey('playlist_more_$id'),
+                      playlistId: id,
+                      playlistName: name,
+                      isSpotifyImport: isSpotify,
+                      onRename: () => _showRenamePlaylistDialog(id, name),
+                      onDelete: () => _showDeletePlaylistDialog(id, name),
+                      onToggleSource: () {
+                        final nowSpotify = _isSpotifyPlaylist(playlist);
+                        if (nowSpotify) {
+                          _prefs.unregisterSpotifyPlaylistId(id);
+                          _prefs.registerManualPlaylistId(id);
+                          _musicService.setPlaylistSource(id, isSpotify: false);
+                        } else {
+                          _prefs.unregisterManualPlaylistId(id);
+                          _prefs.registerSpotifyPlaylistId(id);
+                          _musicService.setPlaylistSource(id, isSpotify: true);
+                        }
+                        setState(() {});
+                      },
                     ),
                   ],
-                ],
-              ),
-              subtitle: Text(
-                isSpotify
-                    ? '${songs.length} tracks • Spotify Ingested'
-                    : '${songs.length} tracks • Personal',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 13,
                 ),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  if (kIsWeb && MediaQuery.of(context).size.width >= 1024) {
+                    DesktopLayoutState.openPlaylist(id);
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CustomPlaylistScreen(playlistId: id),
+                      ),
+                    );
+                  }
+                },
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    key: ValueKey('playlist_play_$id'),
-                    icon: const Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: Colors.white,
-                      size: 36,
-                    ),
-                    tooltip: 'Play playlist',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                    onPressed: songs.isEmpty
-                        ? null
-                        : () {
-                            HapticFeedback.lightImpact();
-                            _musicService.playCustomPlaylist(id, 0);
-                          },
-                  ),
-                  const SizedBox(width: 4),
-                  PlaylistActionMenu(
-                    key: ValueKey('playlist_more_$id'),
-                    playlistId: id,
-                    playlistName: name,
-                    isSpotifyImport: isSpotify,
-                    onRename: () => _showRenamePlaylistDialog(id, name),
-                    onDelete: () => _showDeletePlaylistDialog(id, name),
-                    onToggleSource: () {
-                      final nowSpotify = _isSpotifyPlaylist(playlist);
-                      if (nowSpotify) {
-                        _prefs.unregisterSpotifyPlaylistId(id);
-                        _prefs.registerManualPlaylistId(id);
-                        _musicService.setPlaylistSource(id, isSpotify: false);
-                      } else {
-                        _prefs.unregisterManualPlaylistId(id);
-                        _prefs.registerSpotifyPlaylistId(id);
-                        _musicService.setPlaylistSource(id, isSpotify: true);
-                      }
-                      setState(() {});
-                    },
-                  ),
-                ],
-              ),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                if (kIsWeb && MediaQuery.of(context).size.width >= 1024) {
-                  DesktopLayoutState.openPlaylist(id);
-                } else {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => CustomPlaylistScreen(playlistId: id),
-                    ),
-                  );
-                }
-              },
             );
           },
         );
@@ -1722,7 +1740,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheWidth: 120,
                       cacheHeight: 120,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -1844,7 +1862,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheHeight: 120,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -1931,7 +1949,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: const Color(0xFF1E1E28),
+                        backgroundColor: const Color(0xFF181818),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -2248,7 +2266,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   child: Container(
                     width: 52,
                     height: 52,
-                    color: const Color(0xFF1E1E28),
+                    color: const Color(0xFF181818),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -2376,112 +2394,140 @@ class _LibraryScreenState extends State<LibraryScreen>
       itemCount: albums.length,
       itemBuilder: (context, index) {
         final album = albums[index];
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 4,
-          ),
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 52,
-              height: 52,
-              child: album.thumbnail.isNotEmpty
-                  ? Image.network(
-                      album.thumbnail,
-                      fit: BoxFit.cover,
-                      cacheWidth: 120,
-                      cacheHeight: 120,
-                      errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onSecondaryTapDown: (details) {
+            showUnifiedAlbumMenu(
+              context: context,
+              globalPosition: details.globalPosition,
+              album: album,
+            );
+          },
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: album.thumbnail.isNotEmpty
+                    ? Image.network(
+                        album.thumbnail,
+                        fit: BoxFit.cover,
+                        cacheWidth: 120,
+                        cacheHeight: 120,
+                        errorBuilder: (_, _, _) => Container(
+                          color: const Color(0xFF181818),
+                          child: const Icon(
+                            Icons.album_rounded,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.album_rounded,
                           color: Colors.white54,
                         ),
                       ),
-                    )
-                  : Container(
-                      color: const Color(0xFF1E1E28),
-                      child: const Icon(
-                        Icons.album_rounded,
-                        color: Colors.white54,
-                      ),
-                    ),
+              ),
             ),
-          ),
-          title: Text(
-            album.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              fontSize: 14.5,
-              letterSpacing: -0.2,
+            title: Text(
+              album.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                fontSize: 14.5,
+                letterSpacing: -0.2,
+              ),
             ),
-          ),
-          subtitle: Text(
-            '${album.artist} • ${album.songs.length} tracks',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 12.5,
+            subtitle: Text(
+              '${album.artist} • ${album.songs.length} tracks',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12.5,
+              ),
             ),
-          ),
-          trailing: IconButton(
-            icon: const Icon(
-              Icons.play_circle_fill_rounded,
-              color: Colors.white,
-              size: 32,
+            trailing: IconButton(
+              icon: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _playAlbum(album);
+              },
             ),
-            onPressed: () {
+            onTap: () {
               HapticFeedback.lightImpact();
-              _playAlbum(album);
+              _selectedAlbum.value = album;
             },
           ),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _selectedAlbum.value = album;
-          },
         );
       },
     );
   }
 
   Widget _buildAlbumCard(LibraryAlbum album) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _selectedAlbum.value = album;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        showUnifiedAlbumMenu(
+          context: context,
+          globalPosition: details.globalPosition,
+          album: album,
+        );
       },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF161622),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.06),
-            width: 1,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _selectedAlbum.value = album;
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF181818),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.06),
+              width: 1,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    album.thumbnail.isNotEmpty
-                        ? Image.network(
-                            album.thumbnail,
-                            fit: BoxFit.cover,
-                            cacheWidth: 260,
-                            cacheHeight: 260,
-                            errorBuilder: (_, _, _) => Container(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      album.thumbnail.isNotEmpty
+                          ? Image.network(
+                              album.thumbnail,
+                              fit: BoxFit.cover,
+                              cacheWidth: 260,
+                              cacheHeight: 260,
+                              errorBuilder: (_, _, _) => Container(
+                                color: const Color(0xFF222230),
+                                child: const Icon(
+                                  Icons.album_rounded,
+                                  color: Colors.white38,
+                                  size: 40,
+                                ),
+                              ),
+                            )
+                          : Container(
                               color: const Color(0xFF222230),
                               child: const Icon(
                                 Icons.album_rounded,
@@ -2489,71 +2535,63 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 size: 40,
                               ),
                             ),
-                          )
-                        : Container(
-                            color: const Color(0xFF222230),
-                            child: const Icon(
-                              Icons.album_rounded,
-                              color: Colors.white38,
-                              size: 40,
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _playAlbum(album);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black45,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
                             ),
-                          ),
-                    Positioned(
-                      right: 8,
-                      bottom: 8,
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _playAlbum(album);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black45,
-                                blurRadius: 8,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: Colors.black,
-                            size: 20,
+                            child: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.black,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              album.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 13.5,
-                letterSpacing: -0.2,
+              const SizedBox(height: 10),
+              Text(
+                album.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  letterSpacing: -0.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${album.artist} • ${album.songs.length} tracks',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 11.5,
+              const SizedBox(height: 2),
+              Text(
+                '${album.artist} • ${album.songs.length} tracks',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 11.5,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2563,33 +2601,69 @@ class _LibraryScreenState extends State<LibraryScreen>
     return Column(
       children: [
         // Album Detail Top Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 16, 6),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                tooltip: 'Back to Albums',
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _selectedAlbum.value = null;
-                },
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  album.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onSecondaryTapDown: (details) {
+            showUnifiedAlbumMenu(
+              context: context,
+              globalPosition: details.globalPosition,
+              album: album,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 16, 6),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
                     color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    letterSpacing: -0.4,
+                  ),
+                  tooltip: 'Back to Albums',
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _selectedAlbum.value = null;
+                  },
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    album.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      letterSpacing: -0.4,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                Builder(
+                  builder: (btnCtx) => IconButton(
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      color: Colors.white70,
+                    ),
+                    tooltip: 'More options',
+                    onPressed: () {
+                      final renderBox = btnCtx.findRenderObject() as RenderBox?;
+                      final offset =
+                          renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+                      final size = renderBox?.size ?? Size.zero;
+                      showUnifiedAlbumMenu(
+                        context: context,
+                        globalPosition: Offset(
+                          offset.dx,
+                          offset.dy + size.height,
+                        ),
+                        album: album,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -2687,7 +2761,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161622),
+              color: const Color(0xFF181818),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: const Color(0xFF1DB954).withValues(alpha: 0.5),
@@ -2846,131 +2920,146 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ? songs.first['thumbnail'] as String?
                         : null;
 
-                    return ListTile(
-                      key: ValueKey('spotify_playlist_row_$id'),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF161622),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              width: 1,
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onSecondaryTapDown: (details) {
+                        showUnifiedPlaylistMenu(
+                          context: context,
+                          globalPosition: details.globalPosition,
+                          playlist: playlist,
+                          onDeleted: () {
+                            if (mounted) setState(() {});
+                          },
+                        );
+                      },
+                      child: ListTile(
+                        key: ValueKey('spotify_playlist_row_$id'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF181818),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child:
-                              firstThumbnail != null &&
-                                  firstThumbnail.isNotEmpty
-                              ? Image.network(
-                                  firstThumbnail,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: 120,
-                                  cacheHeight: 120,
-                                  errorBuilder: (_, _, _) => const Icon(
+                            child:
+                                firstThumbnail != null &&
+                                    firstThumbnail.isNotEmpty
+                                ? Image.network(
+                                    firstThumbnail,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: 120,
+                                    cacheHeight: 120,
+                                    errorBuilder: (_, _, _) => const Icon(
+                                      Icons.queue_music_rounded,
+                                      color: Colors.white60,
+                                      size: 26,
+                                    ),
+                                  )
+                                : const Icon(
                                     Icons.queue_music_rounded,
                                     color: Colors.white60,
                                     size: 26,
                                   ),
-                                )
-                              : const Icon(
-                                  Icons.queue_music_rounded,
-                                  color: Colors.white60,
-                                  size: 26,
-                                ),
-                        ),
-                      ),
-                      title: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          fontSize: 15,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${songs.length} tracks • Spotify Ingested',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 13,
-                        ),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            key: ValueKey('spotify_playlist_play_$id'),
-                            icon: const Icon(
-                              Icons.play_circle_fill_rounded,
-                              color: Colors.white,
-                              size: 36,
-                            ),
-                            tooltip: 'Play playlist',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                            onPressed: songs.isEmpty
-                                ? null
-                                : () {
-                                    HapticFeedback.lightImpact();
-                                    _musicService.playCustomPlaylist(id, 0);
-                                  },
                           ),
-                          const SizedBox(width: 4),
-                          PlaylistActionMenu(
-                            key: ValueKey('spotify_playlist_more_$id'),
-                            playlistId: id,
-                            playlistName: name,
-                            isSpotifyImport: true,
-                            onRename: () => _showRenamePlaylistDialog(id, name),
-                            onDelete: () => _showDeletePlaylistDialog(id, name),
-                            onToggleSource: () {
-                              final nowSpotify = _isSpotifyPlaylist(playlist);
-                              if (nowSpotify) {
-                                _prefs.unregisterSpotifyPlaylistId(id);
-                                _prefs.registerManualPlaylistId(id);
-                                _musicService.setPlaylistSource(
-                                  id,
-                                  isSpotify: false,
-                                );
-                              } else {
-                                _prefs.unregisterManualPlaylistId(id);
-                                _prefs.registerSpotifyPlaylistId(id);
-                                _musicService.setPlaylistSource(
-                                  id,
-                                  isSpotify: true,
-                                );
-                              }
-                              setState(() {});
-                            },
+                        ),
+                        title: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            fontSize: 15,
+                            letterSpacing: -0.2,
                           ),
-                        ],
-                      ),
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        if (kIsWeb &&
-                            MediaQuery.of(context).size.width >= 1024) {
-                          DesktopLayoutState.openPlaylist(id);
-                        } else {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  CustomPlaylistScreen(playlistId: id),
+                        ),
+                        subtitle: Text(
+                          '${songs.length} tracks • Spotify Ingested',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 13,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              key: ValueKey('spotify_playlist_play_$id'),
+                              icon: const Icon(
+                                Icons.play_circle_fill_rounded,
+                                color: Colors.white,
+                                size: 36,
+                              ),
+                              tooltip: 'Play playlist',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
+                              onPressed: songs.isEmpty
+                                  ? null
+                                  : () {
+                                      HapticFeedback.lightImpact();
+                                      _musicService.playCustomPlaylist(id, 0);
+                                    },
                             ),
-                          );
-                        }
-                      },
+                            const SizedBox(width: 4),
+                            PlaylistActionMenu(
+                              key: ValueKey('spotify_playlist_more_$id'),
+                              playlistId: id,
+                              playlistName: name,
+                              isSpotifyImport: true,
+                              onRename: () =>
+                                  _showRenamePlaylistDialog(id, name),
+                              onDelete: () =>
+                                  _showDeletePlaylistDialog(id, name),
+                              onToggleSource: () {
+                                final nowSpotify = _isSpotifyPlaylist(playlist);
+                                if (nowSpotify) {
+                                  _prefs.unregisterSpotifyPlaylistId(id);
+                                  _prefs.registerManualPlaylistId(id);
+                                  _musicService.setPlaylistSource(
+                                    id,
+                                    isSpotify: false,
+                                  );
+                                } else {
+                                  _prefs.unregisterManualPlaylistId(id);
+                                  _prefs.registerSpotifyPlaylistId(id);
+                                  _musicService.setPlaylistSource(
+                                    id,
+                                    isSpotify: true,
+                                  );
+                                }
+                                setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          if (kIsWeb &&
+                              MediaQuery.of(context).size.width >= 1024) {
+                            DesktopLayoutState.openPlaylist(id);
+                          } else {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CustomPlaylistScreen(playlistId: id),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     );
                   },
                 ),
@@ -3062,7 +3151,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       cacheWidth: 120,
                       cacheHeight: 120,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF1E1E28),
+                        color: const Color(0xFF181818),
                         child: const Icon(
                           Icons.music_note,
                           color: Colors.white54,
@@ -3340,7 +3429,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget _buildArtistAvatarFallback(String name) {
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'A';
     return Container(
-      color: const Color(0xFF1E1E28),
+      color: const Color(0xFF181818),
       alignment: Alignment.center,
       child: Text(
         initial,
@@ -3368,7 +3457,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: const Color(0xFF161622),
+                color: const Color(0xFF181818),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white12, width: 1),
               ),

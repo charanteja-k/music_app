@@ -620,7 +620,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                       child: Container(
                         height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF161622),
+                          color: const Color(0xFF181818),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.08),

@@ -254,7 +254,7 @@ class _MiniPlayerState extends State<MiniPlayer> with WidgetsBindingObserver {
                                             errorBuilder: (_, _, _) =>
                                                 Container(
                                                   color: const Color(
-                                                    0xFF1E1E28,
+                                                    0xFF181818,
                                                   ),
                                                   child: const Icon(
                                                     Icons.music_note_rounded,
@@ -264,7 +264,7 @@ class _MiniPlayerState extends State<MiniPlayer> with WidgetsBindingObserver {
                                                 ),
                                           )
                                         : Container(
-                                            color: const Color(0xFF1E1E28),
+                                            color: const Color(0xFF181818),
                                             child: const Icon(
                                               Icons.music_note_rounded,
                                               color: Colors.white38,
@@ -274,7 +274,7 @@ class _MiniPlayerState extends State<MiniPlayer> with WidgetsBindingObserver {
                                   ),
                                 )
                               : Container(
-                                  color: const Color(0xFF1E1E28),
+                                  color: const Color(0xFF181818),
                                   child: const Icon(
                                     Icons.music_note_rounded,
                                     color: Colors.white38,

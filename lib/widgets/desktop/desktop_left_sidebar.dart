@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../../layouts/desktop_layout_state.dart';
 import '../../services/music_service.dart';
@@ -21,6 +22,46 @@ class DesktopLeftSidebar extends StatefulWidget {
   final double width;
 
   const DesktopLeftSidebar({super.key, required this.width});
+
+  /// Resolves the authentic playlist artwork URL from direct properties
+  /// (`artworkUrl`, `thumbnail`, `thumbnailUrl`, `imageUrl`, `coverUrl`) or from
+  /// the playlist's first track/song entry.
+  static String resolveArtworkUrl(Map<String, dynamic> pl) {
+    final direct =
+        (pl['artworkUrl'] ??
+                pl['thumbnail'] ??
+                pl['thumbnailUrl'] ??
+                pl['imageUrl'] ??
+                pl['coverUrl'] ??
+                '')
+            .toString();
+    if (direct.isNotEmpty) return direct;
+
+    final songs = (pl['songs'] as List?) ?? (pl['tracks'] as List?);
+    if (songs != null && songs.isNotEmpty) {
+      final first = songs.first;
+      if (first is Map) {
+        final thumb =
+            (first['thumbnail'] ??
+                    first['thumbnailUrl'] ??
+                    first['artworkUrl'] ??
+                    first['imageUrl'] ??
+                    '')
+                .toString();
+        if (thumb.isNotEmpty) return thumb;
+        final songId = first['id']?.toString() ?? '';
+        if (songId.isNotEmpty) {
+          final hd = MusicService.getHdThumbnail(songId);
+          if (hd.isNotEmpty) return hd;
+        }
+      } else if (first is Video) {
+        final thumb = MusicService.getHdThumbnail(first.id.value);
+        if (thumb.isNotEmpty) return thumb;
+        return first.thumbnails.lowResUrl;
+      }
+    }
+    return '';
+  }
 
   @override
   State<DesktopLeftSidebar> createState() => _DesktopLeftSidebarState();
@@ -48,7 +89,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E28),
+        backgroundColor: const Color(0xFF181818),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Create New Playlist',
@@ -194,11 +235,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   DesktopLayoutState.openPlaylist('liked_songs');
                 },
                 onSecondaryTapDown: (details) {
-                  DesktopContextMenu.showPlaylistMenu(
+                  showUnifiedPlaylistMenu(
                     context: context,
                     globalPosition: details.globalPosition,
-                    playlistId: 'liked_songs',
-                    playlistName: 'Liked Songs',
+                    playlist: 'liked_songs',
+                    isSidebar: true,
                   );
                 },
               ),
@@ -246,14 +287,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                           },
                           onSecondaryTapDown: (details) {
                             if (id.isNotEmpty) {
-                              final name = pl['name']?.toString() ?? 'Playlist';
-                              final isSpotify = pl['isSpotify'] == true;
-                              DesktopContextMenu.showPlaylistMenu(
+                              showUnifiedPlaylistMenu(
                                 context: context,
                                 globalPosition: details.globalPosition,
-                                playlistId: id,
-                                playlistName: name,
-                                isSpotifyImport: isSpotify,
+                                playlist: pl,
+                                isSidebar: true,
                                 onCreatePlaylist: _showCreatePlaylistDialog,
                               );
                             }
@@ -428,92 +466,36 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                           ],
                         ),
                       ),
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          hoverColor: Colors.white.withValues(alpha: 0.08),
-                        ),
-                        child: PopupMenuButton<String>(
-                          tooltip: 'Add or import playlist',
-                          padding: EdgeInsets.zero,
-                          color: const Color(0xFF18181F),
-                          elevation: 10,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: Color(0xFF282836)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Button 1: Dedicated Spotify / Exportify Import Button
+                          _SidebarHeaderActionButton(
+                            tooltip: 'Import from Spotify / Exportify',
+                            onPressed: () => showDesktopImportModal(context),
+                            builder: (isHovered) => CustomPaint(
+                              size: const Size(16, 16),
+                              painter: _SpotifyIconPainter(
+                                color: isHovered
+                                    ? const Color(0xFF1DB954)
+                                    : const Color(0xFFB3B3B3),
+                              ),
+                            ),
                           ),
-                          offset: const Offset(0, 36),
-                          onSelected: (val) {
-                            if (val == 'create') {
-                              _showCreatePlaylistDialog();
-                            } else if (val == 'import') {
-                              showDesktopImportModal(context);
-                            }
-                          },
-                          constraints: const BoxConstraints(
-                            minWidth: 280.0,
-                            maxWidth: 320.0,
-                          ),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            alignment: Alignment.center,
-                            child: const Icon(
+                          const SizedBox(width: 8),
+                          // Button 2: Dedicated Add Playlist Button (+)
+                          _SidebarHeaderActionButton(
+                            tooltip: 'Create Playlist',
+                            onPressed: _showCreatePlaylistDialog,
+                            builder: (isHovered) => Icon(
                               Icons.add_rounded,
-                              color: Colors.white70,
-                              size: 22.0,
+                              size: 20,
+                              color: isHovered
+                                  ? Colors.white
+                                  : const Color(0xFFB3B3B3),
                             ),
                           ),
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'create',
-                              height: 42,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.playlist_add_rounded,
-                                    color: Colors.white,
-                                    size: 19,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Create New Playlist',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'import',
-                              height: 42,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.file_download_outlined,
-                                    color: Color(0xFF1DB954),
-                                    size: 19,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Import Playlist (Spotify / Exportify)',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -939,7 +921,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF282836)
+                ? const Color(0xFF282828)
                 : Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(16.0),
             border: Border.all(
@@ -1028,11 +1010,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     final targetPosition = renderBox.localToGlobal(const Offset(64, 120));
     final selected = await showMenu<String>(
       context: context,
-      color: const Color(0xFF18181F),
+      color: const Color(0xFF181818),
       elevation: 10,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF282836)),
+        side: const BorderSide(color: Color(0xFF282828)),
       ),
       position: RelativeRect.fromRect(
         targetPosition & const Size(40, 40),
@@ -1158,11 +1140,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
       onExit: (_) => setState(() => _hoveredRowId = null),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
-          DesktopContextMenu.showPlaylistMenu(
+          showUnifiedPlaylistMenu(
             context: context,
             globalPosition: details.globalPosition,
-            playlistId: 'liked_songs',
-            playlistName: 'Liked Songs',
+            playlist: 'liked_songs',
+            isSidebar: true,
           );
         },
         child: InkWell(
@@ -1182,15 +1164,15 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
             ),
             child: Row(
               children: [
-                // 48x48 Gradient Liked Songs Squircle
+                // 48x48 Solid Liked Songs Squircle
                 Container(
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF450AF5), Color(0xFFC4EFD9)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
                     ),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
@@ -1256,11 +1238,32 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
     );
   }
 
+  Widget _buildPlaylistFallback(bool isSpotify, String name) {
+    return Container(
+      color: const Color(0xFF282828),
+      alignment: Alignment.center,
+      child: isSpotify
+          ? const Icon(
+              Icons.stream_rounded,
+              color: Color(0xFF1DB954),
+              size: 22.0,
+            )
+          : Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'P',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 17.0,
+              ),
+            ),
+    );
+  }
+
   Widget _buildPlaylistRow(BuildContext context, Map<String, dynamic> pl) {
     final id = pl['id']?.toString() ?? '';
     final name = pl['name']?.toString() ?? 'Untitled Playlist';
     final isSpotify = pl['isSpotify'] == true;
-    final thumb = pl['thumbnailUrl']?.toString() ?? '';
+    final thumb = DesktopLeftSidebar.resolveArtworkUrl(pl);
     final trackCount =
         pl['trackCount'] as int? ??
         (pl['tracks'] as List?)?.length ??
@@ -1278,12 +1281,11 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
       child: GestureDetector(
         onSecondaryTapDown: (details) {
           if (id.isNotEmpty) {
-            DesktopContextMenu.showPlaylistMenu(
+            showUnifiedPlaylistMenu(
               context: context,
               globalPosition: details.globalPosition,
-              playlistId: id,
-              playlistName: name,
-              isSpotifyImport: isSpotify,
+              playlist: pl,
+              isSidebar: true,
               onCreatePlaylist: _showCreatePlaylistDialog,
             );
           }
@@ -1312,33 +1314,35 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF282836),
+                    color: const Color(0xFF282828),
                     borderRadius: BorderRadius.circular(6.0),
-                    image: thumb.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(thumb),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: thumb.isNotEmpty
-                      ? null
-                      : Center(
-                          child: isSpotify
-                              ? const Icon(
-                                  Icons.stream_rounded,
-                                  color: Color(0xFF1DB954),
-                                  size: 22.0,
-                                )
-                              : Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 17.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6.0),
+                    child: thumb.isNotEmpty
+                        ? Image.network(
+                            thumb,
+                            fit: BoxFit.cover,
+                            cacheWidth: 96,
+                            cacheHeight: 96,
+                            errorBuilder: (_, _, _) =>
+                                _buildPlaylistFallback(isSpotify, name),
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: const Color(0xFF282828),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    size: 20.0,
+                                    color: Color(0xFF737373),
                                   ),
                                 ),
-                        ),
+                              );
+                            },
+                          )
+                        : _buildPlaylistFallback(isSpotify, name),
+                  ),
                 ),
                 const SizedBox(width: 12.0),
 
@@ -1444,7 +1448,7 @@ class _DesktopLeftSidebarState extends State<DesktopLeftSidebar> {
                 height: 48.0,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF282836),
+                  color: const Color(0xFF282828),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.12),
                     width: 1.0,
@@ -1584,9 +1588,9 @@ class _CompactLikedSongsTileState extends State<_CompactLikedSongsTile> {
                   height: 48.0,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF450AF5), Color(0xFF8E8EE5)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
+                      colors: [Color(0xFFBA385C), Color(0xFF6B1D32)],
                     ),
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
@@ -1637,39 +1641,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
   bool _isHovered = false;
 
   String _resolveArtworkUrl() {
-    final pl = widget.playlist;
-    final direct =
-        (pl['artworkUrl'] ??
-                pl['thumbnail'] ??
-                pl['imageUrl'] ??
-                pl['coverUrl'] ??
-                '')
-            .toString();
-    if (direct.isNotEmpty) return direct;
-
-    final songs = (pl['songs'] as List?) ?? (pl['tracks'] as List?);
-    if (songs != null && songs.isNotEmpty) {
-      final first = songs.first;
-      if (first is Map) {
-        final thumb =
-            (first['thumbnail'] ??
-                    first['artworkUrl'] ??
-                    first['imageUrl'] ??
-                    '')
-                .toString();
-        if (thumb.isNotEmpty) return thumb;
-        final songId = first['id']?.toString() ?? '';
-        if (songId.isNotEmpty) {
-          final hd = MusicService.getHdThumbnail(songId);
-          if (hd.isNotEmpty) return hd;
-        }
-      } else if (first is Video) {
-        final thumb = MusicService.getHdThumbnail(first.id.value);
-        if (thumb.isNotEmpty) return thumb;
-        return first.thumbnails.lowResUrl;
-      }
-    }
-    return '';
+    return DesktopLeftSidebar.resolveArtworkUrl(widget.playlist);
   }
 
   @override
@@ -1697,7 +1669,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
                   width: 48.0,
                   height: 48.0,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E24),
+                    color: const Color(0xFF181818),
                     borderRadius: BorderRadius.circular(6.0),
                     border: Border.all(
                       color: widget.isSelected
@@ -1721,7 +1693,7 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(
-                                color: const Color(0xFF1E1E24),
+                                color: const Color(0xFF181818),
                                 child: const Center(
                                   child: Icon(
                                     Icons.music_note_rounded,
@@ -1757,13 +1729,119 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
   }
 
   Widget _buildFallback() {
+    final isSpotify = widget.playlist['isSpotify'] == true;
+    final name = widget.playlist['name']?.toString() ?? 'P';
     return Container(
-      color: const Color(0xFF1E1E24),
+      color: const Color(0xFF181818),
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.music_note_rounded,
-        size: 22.0,
-        color: Color(0xFF737373),
+      child: isSpotify
+          ? const Icon(
+              Icons.stream_rounded,
+              color: Color(0xFF1DB954),
+              size: 22.0,
+            )
+          : Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'P',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 17.0,
+              ),
+            ),
+    );
+  }
+}
+
+/// Spotify brand icon vector painter (3 authentic arcs).
+class _SpotifyIconPainter extends CustomPainter {
+  final Color color;
+  const _SpotifyIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Top arc
+    paint.strokeWidth = w * 0.14;
+    final topPath = Path();
+    topPath.moveTo(w * 0.16, h * 0.36);
+    topPath.quadraticBezierTo(w * 0.50, h * 0.16, w * 0.84, h * 0.38);
+    canvas.drawPath(topPath, paint);
+
+    // Middle arc
+    paint.strokeWidth = w * 0.125;
+    final midPath = Path();
+    midPath.moveTo(w * 0.22, h * 0.56);
+    midPath.quadraticBezierTo(w * 0.50, h * 0.40, w * 0.78, h * 0.58);
+    canvas.drawPath(midPath, paint);
+
+    // Bottom arc
+    paint.strokeWidth = w * 0.11;
+    final botPath = Path();
+    botPath.moveTo(w * 0.28, h * 0.76);
+    botPath.quadraticBezierTo(w * 0.50, h * 0.63, w * 0.72, h * 0.77);
+    canvas.drawPath(botPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpotifyIconPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// 32x32 Sidebar Header Action Button with soft circular hover highlights.
+class _SidebarHeaderActionButton extends StatefulWidget {
+  final String tooltip;
+  final VoidCallback onPressed;
+  final Widget Function(bool isHovered) builder;
+
+  const _SidebarHeaderActionButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.builder,
+  });
+
+  @override
+  State<_SidebarHeaderActionButton> createState() =>
+      _SidebarHeaderActionButtonState();
+}
+
+class _SidebarHeaderActionButtonState
+    extends State<_SidebarHeaderActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return DilSeTooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onPressed();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _isHovered
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.transparent,
+            ),
+            alignment: Alignment.center,
+            child: widget.builder(_isHovered),
+          ),
+        ),
       ),
     );
   }

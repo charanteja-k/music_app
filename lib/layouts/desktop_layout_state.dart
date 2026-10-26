@@ -58,6 +58,9 @@ class DesktopLayoutState {
     '',
   );
 
+  /// Alias for globalSearchQuery matching prompt specification.
+  static ValueNotifier<String> get searchQuery => globalSearchQuery;
+
   /// Explicitly submitted search query (triggered only on Enter, search button, or suggestion click).
   static final ValueNotifier<String> submittedSearchQuery =
       ValueNotifier<String>('');
@@ -212,6 +215,7 @@ class DesktopLayoutState {
     dynamic gradientColors,
     dynamic icon,
     String? imageUrl,
+    dynamic fetchSongs,
   }) {
     activePlaylistId.value = playlistId;
     activeCuratedPlaylistData.value = {
@@ -222,6 +226,7 @@ class DesktopLayoutState {
       'gradientColors': gradientColors,
       'icon': icon,
       'imageUrl': imageUrl,
+      'fetchSongs': fetchSongs,
     };
     activeArtistName.value = null;
     activeAlbumData.value = null;

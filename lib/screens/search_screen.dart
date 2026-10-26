@@ -9,6 +9,7 @@ import '../services/preferences_service.dart';
 import '../services/dynamic_artist_service.dart';
 import '../services/canonical_song_dedup.dart';
 import '../services/studio_search_service.dart';
+import '../services/trending_catalog_service.dart';
 import '../models/jio_album.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../widgets/song_options_bottom_sheet.dart';
@@ -24,9 +25,10 @@ import '../services/connectivity_service.dart';
 import '../widgets/offline_barrier.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.isActive = true});
+  const SearchScreen({super.key, this.isActive = true, this.isDesktopView});
 
   final bool isActive;
+  final bool? isDesktopView;
 
   @override
   State<SearchScreen> createState() => SearchScreenState();
@@ -87,7 +89,12 @@ class SearchScreenState extends State<SearchScreen>
   int _searchTabIndex = 0; // 0 = Songs, 1 = Albums
   List<SearchSuggestion> _suggestions = [];
   Timer? _debounceTimer;
+  Timer? _desktopSearchDebounce;
   bool _isSearching = false;
+
+  bool get _isDesktop =>
+      widget.isDesktopView ??
+      ((MediaQuery.maybeOf(context)?.size.width ?? 0) >= 1024);
   bool _isSubmittingSearch = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -104,7 +111,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Bollywood Hits',
       'subtitle': 'Top Trending & Classics',
       'query': 'Bollywood Top Hits 2026',
-      'colors': [const Color(0xFFE13300)],
+      'colors': [const Color(0xFFE13300), const Color(0xFF7A1C00)],
       'icon': Icons.whatshot_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80',
@@ -113,7 +120,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Telugu Beats',
       'subtitle': 'Groove, Melodies & Mass',
       'query': 'Telugu Top Songs',
-      'colors': [const Color(0xFFB06239)],
+      'colors': [const Color(0xFFB06239), const Color(0xFF5E341E)],
       'icon': Icons.music_note_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80',
@@ -122,7 +129,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Pop & Global',
       'subtitle': 'Chartbusters & Hits',
       'query': 'Global Pop Hits',
-      'colors': [const Color(0xFF27856A)],
+      'colors': [const Color(0xFF27856A), const Color(0xFF134235)],
       'icon': Icons.public_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80',
@@ -131,7 +138,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Punjabi Hits',
       'subtitle': 'Bhangra, Dhol & Bass',
       'query': 'Punjabi Top Hits',
-      'colors': [const Color(0xFF8D67AB)],
+      'colors': [const Color(0xFF8D67AB), const Color(0xFF4C375C)],
       'icon': Icons.speaker_group_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=300&q=80',
@@ -140,7 +147,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Lo-Fi & Chill',
       'subtitle': 'Focus, Relax & Study',
       'query': 'Lofi Chill Beats',
-      'colors': [const Color(0xFF477D95)],
+      'colors': [const Color(0xFF477D95), const Color(0xFF233E4A)],
       'icon': Icons.bedtime_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300&q=80',
@@ -149,7 +156,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Workout Energy',
       'subtitle': 'High BPM & Motivation',
       'query': 'Workout Music Beats',
-      'colors': [const Color(0xFFE91429)],
+      'colors': [const Color(0xFFE91429), const Color(0xFF7A0A16)],
       'icon': Icons.bolt_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&q=80',
@@ -158,7 +165,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Romance & Love',
       'subtitle': 'Soulful & Melodies',
       'query': 'Romantic Hindi Songs',
-      'colors': [const Color(0xFF8C1932)],
+      'colors': [const Color(0xFF8C1932), const Color(0xFF4A0D1B)],
       'icon': Icons.favorite_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=300&q=80',
@@ -167,7 +174,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Hip-Hop & Rap',
       'subtitle': 'Bars, Trap & 808s',
       'query': 'Hip Hop Hits',
-      'colors': [const Color(0xFFBA5D07)],
+      'colors': [const Color(0xFFBA5D07), const Color(0xFF633204)],
       'icon': Icons.mic_external_on_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=300&q=80',
@@ -176,7 +183,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Party & Dance',
       'subtitle': 'Club Nights & EDM',
       'query': 'Party Dance Club Hits',
-      'colors': [const Color(0xFF7358FF)],
+      'colors': [const Color(0xFFBD6B52), const Color(0xFF5A3327)],
       'icon': Icons.celebration_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&q=80',
@@ -185,7 +192,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Indie & Acoustic',
       'subtitle': 'Raw, Unplugged & Vibe',
       'query': 'Indian Indie Acoustic Songs',
-      'colors': [const Color(0xFF608108)],
+      'colors': [const Color(0xFF608108), const Color(0xFF324304)],
       'icon': Icons.audiotrack_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=300&q=80',
@@ -194,7 +201,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Tamil Hits',
       'subtitle': 'Kollywood & Folk Melodies',
       'query': 'Tamil Top Hits',
-      'colors': [const Color(0xFFD16A1E)],
+      'colors': [const Color(0xFFD16A1E), const Color(0xFF6E3710)],
       'icon': Icons.music_note_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&q=80',
@@ -203,7 +210,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Malayalam',
       'subtitle': 'Sandalwood & Soulful',
       'query': 'Malayalam Top Songs',
-      'colors': [const Color(0xFF186048)],
+      'colors': [const Color(0xFF186048), const Color(0xFF0C3024)],
       'icon': Icons.nature_people_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80',
@@ -212,7 +219,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Devotional',
       'subtitle': 'Spiritual & Bhakti',
       'query': 'Devotional Songs',
-      'colors': [const Color(0xFFA87452)],
+      'colors': [const Color(0xFFA87452), const Color(0xFF573C2A)],
       'icon': Icons.spa_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&q=80',
@@ -221,7 +228,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Ghazals & Sufi',
       'subtitle': 'Timeless Poetry',
       'query': 'Ghazals Sufi Songs',
-      'colors': [const Color(0xFF50505A)],
+      'colors': [const Color(0xFF50505A), const Color(0xFF28282D)],
       'icon': Icons.menu_book_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=300&q=80',
@@ -230,7 +237,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Rock & Metal',
       'subtitle': 'Riffs & Anthems',
       'query': 'Rock Metal Hits',
-      'colors': [const Color(0xFFB0283B)],
+      'colors': [const Color(0xFFB0283B), const Color(0xFF5C151F)],
       'icon': Icons.electric_bolt_rounded,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=300&q=80',
@@ -239,7 +246,7 @@ class SearchScreenState extends State<SearchScreen>
       'title': 'Sleep & Relax',
       'subtitle': 'Ambient & Calm',
       'query': 'Sleep Ambient Relax',
-      'colors': [const Color(0xFF1E3264)],
+      'colors': [const Color(0xFF1E3264), const Color(0xFF0F1A34)],
       'icon': Icons.nightlight_round,
       'thumbnailUrl':
           'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&q=80',
@@ -277,17 +284,29 @@ class SearchScreenState extends State<SearchScreen>
       _performSearch(DesktopLayoutState.submittedSearchQuery.value);
     } else if (DesktopLayoutState.globalSearchQuery.value.isNotEmpty) {
       _searchController.text = DesktopLayoutState.globalSearchQuery.value;
+      if (_isDesktop) {
+        _performSearch(DesktopLayoutState.globalSearchQuery.value);
+      }
     }
   }
 
   void _onGlobalSearchQueryChanged() {
     final query = DesktopLayoutState.globalSearchQuery.value;
-    if (query.isNotEmpty && _searchController.text != query) {
-      _searchController.text = query;
-      // Do NOT trigger heavy _performSearch while typing!
-      // Setting _searchController.text triggers _onSearchChanged()
-      // which fetches lightweight autocomplete suggestions.
-    } else if (query.isEmpty && _searchController.text.isNotEmpty) {
+    if (query.isNotEmpty) {
+      if (_searchController.text != query) {
+        _searchController.text = query;
+      }
+      if (_isDesktop) {
+        _desktopSearchDebounce?.cancel();
+        _desktopSearchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          if (_currentQuery != query && query.isNotEmpty) {
+            _performSearch(query);
+          }
+        });
+      }
+    } else if (query.isEmpty) {
+      _desktopSearchDebounce?.cancel();
       _debounceTimer?.cancel();
       clearSearchAndDismiss();
     }
@@ -296,6 +315,7 @@ class SearchScreenState extends State<SearchScreen>
   void _onSubmittedSearchQueryChanged() {
     final query = DesktopLayoutState.submittedSearchQuery.value;
     if (query.isNotEmpty) {
+      _desktopSearchDebounce?.cancel();
       _searchController.text = query;
       _debounceTimer?.cancel();
       _isSubmittingSearch = true;
@@ -318,7 +338,7 @@ class SearchScreenState extends State<SearchScreen>
 
   void _onSearchChanged() {
     setState(() {});
-    if (_isSubmittingSearch || _isSearching) return;
+    if (_isDesktop || _isSubmittingSearch || _isSearching) return;
     _debounceTimer?.cancel();
     final query = _searchController.text.trim();
     if (query.isEmpty) {
@@ -389,6 +409,7 @@ class SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
+    _desktopSearchDebounce?.cancel();
     DesktopLayoutState.globalSearchQuery.removeListener(
       _onGlobalSearchQueryChanged,
     );
@@ -577,48 +598,54 @@ class SearchScreenState extends State<SearchScreen>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0B0B0F),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0B0B0F),
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          leading: isSearchActive
-              ? IconButton(
-                  key: const ValueKey('search_appbar_back_btn'),
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
+        appBar: _isDesktop
+            ? null
+            : AppBar(
+                backgroundColor: const Color(0xFF0B0B0F),
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                leading: isSearchActive
+                    ? IconButton(
+                        key: const ValueKey('search_appbar_back_btn'),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        tooltip: 'Back to Browse',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          clearSearchAndDismiss();
+                        },
+                      )
+                    : null,
+                title: const Text(
+                  'Search',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
-                    size: 24,
+                    letterSpacing: -0.8,
                   ),
-                  tooltip: 'Back to Browse',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    clearSearchAndDismiss();
-                  },
-                )
-              : null,
-          title: const Text(
-            'Search',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.8,
-            ),
-          ),
-        ),
+                ),
+              ),
         body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: _isDesktop
+              ? const EdgeInsets.all(24.0)
+              : const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Modern Frosted Search Field - permanently mounted so it never unmounts or drops keyboard focus
-              _buildSearchInputField(isSearchActive),
-              const SizedBox(height: 16),
+              // Viewport-aware search bar: suppressed on desktop, preserved on mobile (<1024px)
+              if (!_isDesktop) ...[
+                _buildMobileSearchBar(),
+                const SizedBox(height: 16),
+              ],
 
               // Content Area: Either Searching, Live Suggestions, Search Results, or Browse Categories
               Expanded(
@@ -629,7 +656,8 @@ class SearchScreenState extends State<SearchScreen>
                                 color: Theme.of(context).primaryColor,
                               ),
                             )
-                          : (_searchController.text.trim().isNotEmpty &&
+                          : (!_isDesktop &&
+                                _searchController.text.trim().isNotEmpty &&
                                 _suggestions.isNotEmpty &&
                                 !_isSubmittingSearch &&
                                 _searchController.text.trim() != _currentQuery)
@@ -1082,6 +1110,9 @@ class SearchScreenState extends State<SearchScreen>
     );
   }
 
+  /// Mobile search bar wrapper matching deduplication directive.
+  Widget _buildMobileSearchBar() => _buildSearchInputField(isSearchActive);
+
   /// Modern Frosted Search Input Field
   Widget _buildSearchInputField(bool isSearchActive) {
     return Container(
@@ -1200,11 +1231,11 @@ class SearchScreenState extends State<SearchScreen>
               switch (item.type) {
                 case 'artist':
                   typeIcon = Icons.person_rounded;
-                  iconColor = const Color(0xFFA78BFA);
+                  iconColor = _prefs.legibleThemeColor;
                   break;
                 case 'album':
                   typeIcon = Icons.album_rounded;
-                  iconColor = const Color(0xFF60A5FA);
+                  iconColor = _prefs.legibleThemeColor;
                   break;
                 default:
                   typeIcon = Icons.history_rounded;
@@ -1575,6 +1606,9 @@ class SearchScreenState extends State<SearchScreen>
                         gradientColors: cat['colors'] as List<Color>?,
                         icon: cat['icon'] as IconData?,
                         imageUrl: cat['thumbnailUrl'] as String?,
+                        fetchSongs: () => StudioSearchService().searchSongs(
+                          cat['query'] as String,
+                        ),
                       );
                     } else {
                       Navigator.push(
@@ -1789,7 +1823,7 @@ class SearchScreenState extends State<SearchScreen>
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
                 color: active
-                    ? const Color(0xFF7C3AED)
+                    ? _prefs.themeColor
                     : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
@@ -1800,7 +1834,7 @@ class SearchScreenState extends State<SearchScreen>
                 boxShadow: active
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                          color: _prefs.themeColor.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
@@ -1827,14 +1861,10 @@ class SearchScreenState extends State<SearchScreen>
     if (!mounted) return;
     setState(() => _isLoadingBrowseAlbums = true);
     try {
-      var albums = await _musicService.searchAlbums(
-        '$lang Soundtracks',
+      final albums = await TrendingCatalogService().fetchTopAlbums(
+        language: lang,
         limit: 24,
       );
-      if (albums.length < 4) {
-        final fallback = await _musicService.searchAlbums(lang, limit: 24);
-        if (fallback.isNotEmpty) albums = fallback;
-      }
       if (mounted) {
         setState(() {
           _browseAlbums = albums;
@@ -1864,17 +1894,17 @@ class SearchScreenState extends State<SearchScreen>
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.16),
+                    color: _prefs.themeColor.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                      color: _prefs.themeColor.withValues(alpha: 0.35),
                       width: 1,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.album_rounded,
                     size: 16,
-                    color: Color(0xFFA78BFA),
+                    color: _prefs.themeColor,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1937,7 +1967,7 @@ class SearchScreenState extends State<SearchScreen>
                           }
                         },
                         selectedColor: Theme.of(context).primaryColor,
-                        backgroundColor: const Color(0xFF161622),
+                        backgroundColor: const Color(0xFF181818),
                         labelStyle: TextStyle(
                           color: _selectedAlbumBrowseLang == lang
                               ? Colors.black
@@ -2020,6 +2050,14 @@ class SearchScreenState extends State<SearchScreen>
   Widget _buildAlbumItemCard(JioAlbum album, {required String heroPrefix}) {
     final isSingle = album.songCount <= 1;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) {
+        showUnifiedAlbumMenu(
+          context: context,
+          globalPosition: details.globalPosition,
+          album: album,
+        );
+      },
       onTap: () {
         HapticFeedback.lightImpact();
         _prefs.addToSearchHistory(album.title, type: 'album');
@@ -2093,16 +2131,14 @@ class SearchScreenState extends State<SearchScreen>
                         border: Border.all(
                           color: isSingle
                               ? Colors.white24
-                              : const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                              : _prefs.themeColor.withValues(alpha: 0.5),
                           width: 1,
                         ),
                       ),
                       child: Text(
                         isSingle ? 'Single' : '${album.songCount} Songs',
                         style: TextStyle(
-                          color: isSingle
-                              ? Colors.white70
-                              : const Color(0xFFA78BFA),
+                          color: isSingle ? Colors.white70 : _prefs.themeColor,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
@@ -2133,29 +2169,15 @@ class SearchScreenState extends State<SearchScreen>
                       ),
                     ),
                     const SizedBox(height: 2),
-                    if (album.artist.isNotEmpty)
-                      Text(
-                        album.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.60),
-                          fontSize: 11,
-                        ),
+                    Text(
+                      TrendingCatalogService.formatAlbumSubtitle(album),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.60),
+                        fontSize: 11,
                       ),
-                    if (album.year.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          album.year,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2209,15 +2231,15 @@ class SearchScreenState extends State<SearchScreen>
               shape: BoxShape.circle,
               color: Colors.black.withValues(alpha: 0.6),
               border: Border.all(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                color: _prefs.themeColor.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
             child: Center(
               child: Text(
                 album.title.isNotEmpty ? album.title[0].toUpperCase() : '♪',
-                style: const TextStyle(
-                  color: Color(0xFFA78BFA),
+                style: TextStyle(
+                  color: _prefs.themeColor,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),

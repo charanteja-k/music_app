@@ -43,129 +43,137 @@ class DesktopSearchDropdown extends StatelessWidget {
             targetAnchor: Alignment.bottomCenter,
             followerAnchor: Alignment.topCenter,
             offset: const Offset(0, 6.0),
-            child: MouseRegion(
-              onEnter: (_) => onHoverChanged?.call(true),
-              onExit: (_) => onHoverChanged?.call(false),
-              child: Container(
-                width: dropdownWidth,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF18181F),
-                  borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      blurRadius: 20.0,
-                      offset: const Offset(0, 10),
+            child: TapRegion(
+              groupId: 'desktop_search_overlay',
+              child: MouseRegion(
+                onEnter: (_) => onHoverChanged?.call(true),
+                onExit: (_) => onHoverChanged?.call(false),
+                child: Container(
+                  width: dropdownWidth,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF181818),
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1.0,
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: AnimatedBuilder(
-                    animation: prefs,
-                    builder: (context, _) {
-                      final recentSearches = prefs.getRecentSearches();
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        blurRadius: 20.0,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: AnimatedBuilder(
+                      animation: prefs,
+                      builder: (context, _) {
+                        final recentSearches = prefs.getRecentSearches();
 
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Header
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              16.0,
-                              14.0,
-                              16.0,
-                              8.0,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Recent searches',
-                                  style: TextStyle(
-                                    color: Color(0xFFFFFFFF),
-                                    fontSize: 14.0,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.2,
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Header
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                16.0,
+                                14.0,
+                                16.0,
+                                8.0,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Recent searches',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFFFFF),
+                                      fontSize: 14.0,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.2,
+                                    ),
                                   ),
-                                ),
-                                if (recentSearches.isNotEmpty)
-                                  _ClearAllButton(
-                                    onTap: () async {
-                                      await prefs.clearRecentSearches();
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-
-                          // List container or empty state
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 380.0),
-                            child: recentSearches.isEmpty
-                                ? const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 24.0,
-                                      horizontal: 16.0,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'No recent searches',
-                                        style: TextStyle(
-                                          color: Color(0xFF737373),
-                                          fontSize: 13.0,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : RawScrollbar(
-                                    thumbColor: Colors.white.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                    radius: const Radius.circular(4.0),
-                                    thickness: 4.0,
-                                    child: ListView.builder(
-                                      shrinkWrap: true,
-                                      padding: const EdgeInsets.only(
-                                        bottom: 8.0,
-                                      ),
-                                      itemCount: recentSearches.length,
-                                      itemBuilder: (context, index) {
-                                        final item = recentSearches[index];
-                                        return _RecentSearchItemRow(
-                                          item: item,
-                                          onTap: () {
-                                            _handleItemSelection(item);
-                                          },
-                                          onRemove: () async {
-                                            final id =
-                                                (item['id'] as String?) ??
-                                                (item['title'] as String?) ??
-                                                '';
-                                            final title =
-                                                (item['title'] as String?) ??
-                                                '';
-                                            await prefs.removeRecentSearch(id);
-                                            if (title.isNotEmpty) {
-                                              await prefs
-                                                  .removeFromSearchHistory(
-                                                    title,
-                                                  );
-                                            }
-                                          },
-                                        );
+                                  if (recentSearches.isNotEmpty)
+                                    _ClearAllButton(
+                                      onTap: () async {
+                                        await prefs.clearRecentSearches();
                                       },
                                     ),
-                                  ),
-                          ),
-                        ],
-                      );
-                    },
+                                ],
+                              ),
+                            ),
+
+                            // List container or empty state
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxHeight: 380.0,
+                              ),
+                              child: recentSearches.isEmpty
+                                  ? const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24.0,
+                                        horizontal: 16.0,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          'No recent searches',
+                                          style: TextStyle(
+                                            color: Color(0xFF737373),
+                                            fontSize: 13.0,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : RawScrollbar(
+                                      thumbColor: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
+                                      radius: const Radius.circular(4.0),
+                                      thickness: 4.0,
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8.0,
+                                        ),
+                                        itemCount: recentSearches.length,
+                                        itemBuilder: (context, index) {
+                                          final item = recentSearches[index];
+                                          return _RecentSearchItemRow(
+                                            item: item,
+                                            onTap: () {
+                                              _handleItemSelection(item);
+                                            },
+                                            onRemove: () async {
+                                              final id =
+                                                  (item['id'] as String?) ??
+                                                  (item['title'] as String?) ??
+                                                  '';
+                                              final title =
+                                                  (item['title'] as String?) ??
+                                                  '';
+                                              await prefs.removeRecentSearch(
+                                                id,
+                                              );
+                                              if (title.isNotEmpty) {
+                                                await prefs
+                                                    .removeFromSearchHistory(
+                                                      title,
+                                                    );
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),

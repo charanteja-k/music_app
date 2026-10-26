@@ -98,7 +98,7 @@ class _VinylRecordPlayerState extends State<VinylRecordPlayer>
                   colors: [
                     Color(0xFF16161A),
                     Color(0xFF0D0D10),
-                    Color(0xFF1A1A22),
+                    Color(0xFF1A1A1A),
                     Color(0xFF09090C),
                     Color(0xFF141418),
                     Color(0xFF050507),
