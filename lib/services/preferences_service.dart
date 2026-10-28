@@ -2179,6 +2179,32 @@ class PreferencesService extends ChangeNotifier {
     return _listeningHistory.isNotEmpty || _mostPlayedSongs.isNotEmpty;
   }
 
+  /// Persistent storage for pending app updates so the notify indicator survives restarts and dismissal
+  Map<String, dynamic>? get pendingUpdateInfo {
+    if (!_isInitialized) return null;
+    final raw = _prefs.getString('pending_update_info_json');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return json.decode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setPendingUpdateInfo(Map<String, dynamic>? info) async {
+    if (!_isInitialized) return;
+    if (info == null) {
+      await _prefs.remove('pending_update_info_json');
+    } else {
+      await _prefs.setString('pending_update_info_json', json.encode(info));
+    }
+    notifyListeners();
+  }
+
+  Future<void> clearPendingUpdateInfo() async {
+    await setPendingUpdateInfo(null);
+  }
+
   @visibleForTesting
   void resetForTesting() {
     _isInitialized = false;

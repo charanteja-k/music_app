@@ -224,7 +224,14 @@ class _InteractiveUpdateDialogState extends State<InteractiveUpdateDialog>
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () {
+                        UpdateService().latestUpdateInfoNotifier.value =
+                            widget.info;
+                        PreferencesService().setPendingUpdateInfo(
+                          widget.info.toJson(),
+                        );
+                        Navigator.of(context).pop();
+                      },
                       child: const Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Icon(
@@ -550,7 +557,16 @@ class _InteractiveUpdateDialogState extends State<InteractiveUpdateDialog>
                             // "Later" button
                             Expanded(
                               child: TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
+                                onPressed: () {
+                                  UpdateService()
+                                          .latestUpdateInfoNotifier
+                                          .value =
+                                      widget.info;
+                                  PreferencesService().setPendingUpdateInfo(
+                                    widget.info.toJson(),
+                                  );
+                                  Navigator.of(context).pop();
+                                },
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,

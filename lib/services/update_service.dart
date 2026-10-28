@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:ota_update/ota_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'preferences_service.dart';
+
 class AppUpdateInfo {
   final String tagName;
   final String releaseName;
@@ -27,6 +29,30 @@ class AppUpdateInfo {
     required this.hasUpdate,
     this.releasePageUrl,
   });
+
+  Map<String, dynamic> toJson() => {
+    'tagName': tagName,
+    'releaseName': releaseName,
+    'changelog': changelog,
+    'downloadUrl': downloadUrl,
+    'apkSizeBytes': apkSizeBytes,
+    'currentVersion': currentVersion,
+    'currentBuildNumber': currentBuildNumber,
+    'hasUpdate': hasUpdate,
+    'releasePageUrl': releasePageUrl,
+  };
+
+  factory AppUpdateInfo.fromJson(Map<String, dynamic> json) => AppUpdateInfo(
+    tagName: json['tagName'] as String? ?? '',
+    releaseName: json['releaseName'] as String? ?? '',
+    changelog: json['changelog'] as String? ?? '',
+    downloadUrl: json['downloadUrl'] as String? ?? '',
+    apkSizeBytes: (json['apkSizeBytes'] as num?)?.toInt() ?? 0,
+    currentVersion: json['currentVersion'] as String? ?? '',
+    currentBuildNumber: json['currentBuildNumber'] as String? ?? '',
+    hasUpdate: json['hasUpdate'] as bool? ?? false,
+    releasePageUrl: json['releasePageUrl'] as String?,
+  );
 
   String get formattedSize {
     if (apkSizeBytes <= 0) return 'Unknown size';
@@ -72,7 +98,21 @@ class GitHubReleaseItem {
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
   factory UpdateService() => _instance;
-  UpdateService._internal();
+  UpdateService._internal() {
+    _hydrateFromCache();
+  }
+
+  void _hydrateFromCache() {
+    final cached = PreferencesService().pendingUpdateInfo;
+    if (cached != null) {
+      try {
+        final info = AppUpdateInfo.fromJson(cached);
+        if (info.hasUpdate) {
+          latestUpdateInfoNotifier.value = info;
+        }
+      } catch (_) {}
+    }
+  }
 
   static const String _githubRepoOwner = 'charanteja-k';
   static const String _githubRepoName = 'music_app';
@@ -105,7 +145,8 @@ class UpdateService {
         debugPrint(
           '[UpdateService] GitHub releases returned status: ${response.statusCode}',
         );
-        return null;
+        _hydrateFromCache();
+        return latestUpdateInfoNotifier.value;
       }
 
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -133,13 +174,6 @@ class UpdateService {
         }
       }
 
-      if (!kIsWeb && (apkDownloadUrl == null || apkDownloadUrl.isEmpty)) {
-        debugPrint(
-          '[UpdateService] No APK asset found in latest GitHub release ($tagName)',
-        );
-        return null;
-      }
-
       final hasUpdate = _isRemoteNewer(
         remoteTag: tagName,
         currentVersion: currentVersion,
@@ -157,11 +191,20 @@ class UpdateService {
         hasUpdate: hasUpdate,
         releasePageUrl: releasePage,
       );
+
       latestUpdateInfoNotifier.value = info;
+
+      if (hasUpdate) {
+        await PreferencesService().setPendingUpdateInfo(info.toJson());
+      } else {
+        await PreferencesService().clearPendingUpdateInfo();
+      }
+
       return info;
     } catch (e) {
       debugPrint('[UpdateService] Error checking for updates: $e');
-      return null;
+      _hydrateFromCache();
+      return latestUpdateInfoNotifier.value;
     }
   }
 

@@ -21,9 +21,11 @@ import '../models/jio_album.dart';
 import '../constants/app_theme_tokens.dart';
 import '../services/studio_search_service.dart';
 import '../services/trending_catalog_service.dart';
+import '../services/taste_matrix_scorer.dart';
 import '../services/auth_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/update_service.dart';
+import '../services/youtube_music_client.dart';
 import '../widgets/auth/google_profile_header_button.dart';
 import '../widgets/auth/google_cloud_backup_prompt_dialog.dart';
 import '../widgets/top_bar_cloud_actions.dart';
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<Video> _circadianMix = [];
   List<Video> _dailyMix1 = [];
   List<Video> _dailyMix2 = [];
+  List<Video> _nostalgicMix = [];
   List<JioAlbum> _trendingAlbums = [];
   int _selectedAlbumLangIndex = 0;
   static const List<String> _albumLanguages = [
@@ -70,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
   // 1-Door Sequential Shelf Loading Flags
   bool _isLoadingDailyMix1 = true;
   bool _isLoadingDailyMix2 = true;
+  bool _isLoadingNostalgic = true;
   bool _isLoadingCircadian = true;
   bool _isLoadingCharts = true;
   bool _isLoadingTrending = true;
@@ -235,16 +239,65 @@ class _HomeScreenState extends State<HomeScreen>
     return _prefs.getTimeOfDayGreeting();
   }
 
-  /// Fetches an optimized, pure JioSaavn Studio 320kbps catalog for Daily Mix.
-  /// Strictly guarantees 100% official studio tracks, 0 YouTube video noise,
-  /// 0 wedding/DJ noise, and 0 duplicate tracks.
+  /// Fetches an optimized, ML-driven smart radio mix or studio catalog for Daily Mix.
+  /// Prioritizes YouTube Music ML Radio Automix (FEmusic / next radio) based on
+  /// user's top played songs and artist affinities, falling back to JioSaavn 320k catalog.
   Future<List<Video>> _loadRichDailyMix(DailyMixConfig config) async {
     try {
+      // 1. Resolve a seed track for ML Smart Radio Automix
+      String? seedVideoId;
+      final leadArtist = PreferencesService.extractSingleLeadArtist(
+        config.query,
+      );
+      if (leadArtist.isNotEmpty) {
+        for (final item in _prefs.mostPlayedSongs) {
+          final author = (item['author'] as String? ?? '').toLowerCase();
+          if (author.contains(leadArtist.toLowerCase())) {
+            final id = (item['id'] as String? ?? '').trim();
+            if (id.isNotEmpty && !id.startsWith('jio_')) {
+              seedVideoId = id;
+              break;
+            }
+          }
+        }
+      }
+
+      // If no lead artist match from most played, check overall top played song
+      if (seedVideoId == null || seedVideoId.isEmpty) {
+        final top = _prefs.mostPlayedSongs.firstOrNull;
+        if (top != null) {
+          final id = (top['id'] as String? ?? '').trim();
+          if (id.isNotEmpty && !id.startsWith('jio_')) {
+            seedVideoId = id;
+          }
+        }
+      }
+
+      // If we have a valid YouTube seed ID, fetch Google's smart radio automix!
+      if (seedVideoId != null && seedVideoId.isNotEmpty) {
+        final radioTracks = await YouTubeMusicClient()
+            .fetchRadioTracks(seedVideoId, limit: 35)
+            .timeout(const Duration(seconds: 7), onTimeout: () => <Video>[]);
+        if (radioTracks.isNotEmpty) {
+          debugPrint(
+            '[HomeScreen] Successfully seeded ${radioTracks.length} ML Radio tracks for ${config.title}',
+          );
+          return radioTracks;
+        }
+      }
+
+      // 2. Direct JioSaavn Studio 320kbps catalog fallback
       final jioMix = await _musicService.fetchJioDailyMix(config, limit: 35);
       if (jioMix.isNotEmpty) return jioMix;
+
+      // 3. Studio Search fallback
       return await _musicService.searchSongs(config.query, limit: 35);
     } catch (_) {
-      return await _musicService.searchSongs(config.query, limit: 35);
+      try {
+        return await _musicService.searchSongs(config.query, limit: 35);
+      } catch (_) {
+        return [];
+      }
     }
   }
 
@@ -274,6 +327,9 @@ class _HomeScreenState extends State<HomeScreen>
     final cachedPersonalized = _deserializeCachedVideos(
       _prefs.getCachedHomeFeed('personalized'),
     );
+    final cachedNostalgic = _deserializeCachedVideos(
+      _prefs.getCachedHomeFeed('nostalgic'),
+    );
     final cachedAlbumsJson = _prefs.getCachedHomeFeed('albums');
     List<JioAlbum> cachedAlbums = [];
     if (cachedAlbumsJson != null && cachedAlbumsJson.isNotEmpty) {
@@ -291,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen>
         cachedCircadian.isNotEmpty ||
         cachedMix1.isNotEmpty ||
         cachedCharts.isNotEmpty ||
+        cachedNostalgic.isNotEmpty ||
         cachedAlbums.isNotEmpty;
     if (hadAnyCache) {
       if (mounted) {
@@ -306,6 +363,10 @@ class _HomeScreenState extends State<HomeScreen>
           if (cachedMix2.isNotEmpty) {
             _dailyMix2 = cachedMix2;
             _isLoadingDailyMix2 = false;
+          }
+          if (cachedNostalgic.isNotEmpty) {
+            _nostalgicMix = cachedNostalgic;
+            _isLoadingNostalgic = false;
           }
           if (cachedCharts.isNotEmpty) {
             _topChartsIndia = cachedCharts;
@@ -503,15 +564,51 @@ class _HomeScreenState extends State<HomeScreen>
         if (mounted) setState(() => _isLoadingCircadian = false);
       }
 
-      // Priority 4: Top Charts India
+      // Priority 3.5: Nostalgic Mix (Forgotten gems + taste matrix affinity seed)
       await pauseIfSearchActive();
       if (!mounted) return;
       try {
-        List<Video> charts = CanonicalSongDedup.deduplicateList(
-          await StudioSearchService()
-              .searchSongs('Top Charts India $primaryLang', limit: 30)
-              .timeout(const Duration(seconds: 10), onTimeout: () => <Video>[]),
-        );
+        final nostalgic = await _loadNostalgicMix(primaryLang);
+        if (mounted) {
+          setState(() {
+            if (nostalgic.isNotEmpty) _nostalgicMix = nostalgic;
+            _isLoadingNostalgic = false;
+          });
+          if (nostalgic.isNotEmpty) {
+            _prefs.cacheHomeFeed('nostalgic', _serializeVideos(nostalgic));
+            _musicService.enrichArtworkForSongs(nostalgic);
+          }
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isLoadingNostalgic = false);
+      }
+
+      // Priority 4: Top Charts India (Official InnerTube FEmusic_charts)
+      await pauseIfSearchActive();
+      if (!mounted) return;
+      try {
+        List<Video> charts = [];
+        try {
+          charts = CanonicalSongDedup.deduplicateList(
+            await YouTubeMusicClient()
+                .fetchCharts(language: primaryLang, limit: 30)
+                .timeout(
+                  const Duration(seconds: 8),
+                  onTimeout: () => <Video>[],
+                ),
+          );
+        } catch (_) {}
+
+        if (charts.isEmpty) {
+          charts = CanonicalSongDedup.deduplicateList(
+            await StudioSearchService()
+                .searchSongs('Top Charts India $primaryLang', limit: 30)
+                .timeout(
+                  const Duration(seconds: 10),
+                  onTimeout: () => <Video>[],
+                ),
+          );
+        }
         if (charts.isEmpty) {
           charts = CanonicalSongDedup.deduplicateList(
             _musicService.hasPreloadedHome &&
@@ -756,6 +853,159 @@ class _HomeScreenState extends State<HomeScreen>
       }).toList();
     } catch (_) {
       return [];
+    }
+  }
+
+  Video? _songMapToVideo(Map<String, dynamic> m) {
+    final id = (m['id'] as String?)?.trim() ?? '';
+    if (id.isEmpty) return null;
+    final streamUrl = m['streamUrl'] as String?;
+    if (streamUrl != null && streamUrl.isNotEmpty) {
+      MusicService.cacheWebStreamUrl(id, streamUrl);
+    }
+    final thumb = (m['thumbnail'] as String?) ?? '';
+    if (thumb.isNotEmpty) {
+      MusicService.registerArtwork(id, thumb);
+    }
+    final durMs =
+        (m['durationMs'] as num?)?.toInt() ??
+        (((m['duration'] as num?)?.toInt() ?? 0) * 1000);
+
+    return Video(
+      VideoId(id),
+      (m['title'] as String?) ?? 'Unknown Title',
+      (m['author'] as String?) ?? (m['artist'] as String?) ?? 'Unknown Artist',
+      ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+      DateTime.now(),
+      '',
+      null,
+      '',
+      Duration(milliseconds: durMs),
+      ThumbnailSet(id),
+      null,
+      Engagement(0, null, null),
+      false,
+    );
+  }
+
+  /// Fetches a personalized "Nostalgic" / forgotten gems mix:
+  /// - Extracts past favorites from older history & liked songs that haven't been played in recent sessions.
+  /// - Uses on-device Taste Matrix & Artist Affinity graph to seed deeper cuts via YouTubeMusicClient radio.
+  /// - Falls back to timeless retro classics in the user's preferred language.
+  Future<List<Video>> _loadNostalgicMix(String primaryLang) async {
+    final List<Video> result = [];
+    final seenIds = <String>{};
+
+    try {
+      // 1. Gather recent 15 song IDs to strictly avoid recently heard tracks
+      final history = _prefs.listeningHistory;
+      final recentPlayedIds = history
+          .take(15)
+          .map((s) => s['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      // 2. Discover forgotten favorites: older listening history (index 15+) and untouched liked songs
+      final forgottenCandidates = <Map<String, dynamic>>[];
+      if (history.length > 15) {
+        for (int i = 15; i < history.length; i++) {
+          final s = history[i];
+          final id = s['id']?.toString() ?? '';
+          if (id.isNotEmpty && !recentPlayedIds.contains(id)) {
+            forgottenCandidates.add(s);
+          }
+        }
+      }
+
+      for (final s in _musicService.likedSongs) {
+        final id = s['id']?.toString() ?? '';
+        if (id.isNotEmpty && !recentPlayedIds.contains(id)) {
+          forgottenCandidates.add(s);
+        }
+      }
+
+      // Convert forgotten candidates into Videos
+      for (final map in forgottenCandidates.take(12)) {
+        final v = _songMapToVideo(map);
+        if (v != null && !seenIds.contains(v.id.value)) {
+          seenIds.add(v.id.value);
+          result.add(v);
+        }
+      }
+
+      // 3. User Affinity Graph & Seeded ML Radio Deep Cuts
+      final matrix = _prefs.getTasteMatrix();
+      String? seedTrackId;
+
+      // Prefer seeding from an older forgotten track from user's history
+      if (forgottenCandidates.isNotEmpty) {
+        final cand = forgottenCandidates.firstWhere((c) {
+          final id = c['id']?.toString() ?? '';
+          return id.isNotEmpty && !id.startsWith('jio_');
+        }, orElse: () => <String, dynamic>{});
+        if (cand.isNotEmpty) {
+          seedTrackId = cand['id']?.toString();
+        }
+      }
+
+      // If no candidate from forgotten history, use least played track from overall library
+      if (seedTrackId == null || seedTrackId.isEmpty) {
+        if (_prefs.mostPlayedSongs.isNotEmpty) {
+          final leastPlayed = _prefs.mostPlayedSongs.lastOrNull;
+          final id = leastPlayed?['id']?.toString() ?? '';
+          if (id.isNotEmpty && !id.startsWith('jio_')) {
+            seedTrackId = id;
+          }
+        }
+      }
+
+      if (seedTrackId != null && seedTrackId.isNotEmpty) {
+        final radioTracks = await YouTubeMusicClient()
+            .fetchRadioTracks(seedTrackId, limit: 30)
+            .timeout(const Duration(seconds: 7), onTimeout: () => <Video>[]);
+
+        for (final track in radioTracks) {
+          if (!recentPlayedIds.contains(track.id.value) &&
+              !seenIds.contains(track.id.value)) {
+            seenIds.add(track.id.value);
+            result.add(track);
+          }
+        }
+      }
+
+      // 4. Retro / Timeless Classics Fallback (Golden era hits of top affinity artist / language)
+      if (result.length < 15) {
+        final leadArtist = matrix.topArtists.firstOrNull ?? '';
+        final query = leadArtist.isNotEmpty
+            ? '$leadArtist $primaryLang classic retro hits'
+            : '$primaryLang classic evergreen hits';
+
+        final fallbackTracks = await _musicService
+            .searchSongs(query, limit: 30)
+            .timeout(const Duration(seconds: 7), onTimeout: () => <Video>[]);
+
+        for (final track in fallbackTracks) {
+          if (!recentPlayedIds.contains(track.id.value) &&
+              !seenIds.contains(track.id.value)) {
+            seenIds.add(track.id.value);
+            result.add(track);
+          }
+        }
+      }
+
+      // 5. Score and filter through on-device TasteMatrixScorer
+      final scored = TasteMatrixScorer().scoreAndRankCandidates(
+        result,
+        targetLanguage: primaryLang,
+        maxResults: 35,
+        preserveOriginalOrder: false,
+      );
+
+      return scored.isNotEmpty
+          ? scored
+          : CanonicalSongDedup.deduplicateList(result);
+    } catch (_) {
+      return CanonicalSongDedup.deduplicateList(result);
     }
   }
 
@@ -1170,6 +1420,48 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
+    // Resolve user's top played custom playlist for Slot 5 ([Actual Playlist Name])
+    Map<String, dynamic>? topCustomPlaylist;
+    List<Map<String, dynamic>> topPlaylistSongs = [];
+    if (_musicService.customPlaylists.isNotEmpty) {
+      final scored = _musicService.customPlaylists.map((pl) {
+        final rawSongs = (pl['songs'] as List?) ?? [];
+        int score = 0;
+        for (final s in rawSongs) {
+          if (s is Map) {
+            score += (s['playCount'] as num?)?.toInt() ?? 0;
+          }
+        }
+        score += (pl['playCount'] as num?)?.toInt() ?? 0;
+        if (score == 0) {
+          score = rawSongs.length;
+        }
+        return {'pl': pl, 'score': score};
+      }).toList();
+
+      scored.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+      topCustomPlaylist = scored.first['pl'] as Map<String, dynamic>?;
+      final rawList = (topCustomPlaylist?['songs'] as List?) ?? [];
+      topPlaylistSongs = rawList.whereType<Map<String, dynamic>>().toList();
+    }
+
+    final hasTopPlaylist = topCustomPlaylist != null;
+    final topPlaylistId = (topCustomPlaylist?['id'] as String?) ?? '';
+    final topPlaylistTitle = hasTopPlaylist
+        ? ((topCustomPlaylist['name'] ??
+                  topCustomPlaylist['title'] ??
+                  'My Playlist')
+              as String)
+        : (_prefs.mostPlayedSongs.isNotEmpty ? 'Most Played' : 'Discover Mix');
+    final topPlaylistImage = hasTopPlaylist
+        ? (topPlaylistSongs.isNotEmpty
+              ? (topPlaylistSongs.first['thumbnail'] as String? ??
+                    topPlaylistSongs.first['image'] as String?)
+              : null)
+        : (_prefs.mostPlayedSongs.isNotEmpty
+              ? _prefs.mostPlayedSongs.first['thumbnail'] as String?
+              : null);
+
     final items = <HomeQuickAccessItem>[
       HomeQuickAccessItem(
         title: dailyMix1?.title ?? 'Daily Mix 1',
@@ -1302,32 +1594,77 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
       HomeQuickAccessItem(
-        title: 'Top Charts',
-        icon: Icons.trending_up_rounded,
-        solidColor: const Color(0xFF382B24),
-        iconGradient: const [Color(0xFF382B24), Color(0xFF241A14)],
-        imageUrl: _topChartsIndia.isNotEmpty
-            ? (MusicService.resolveArtworkUrl(_topChartsIndia.first).isNotEmpty
-                  ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
+        title: 'Nostalgic',
+        icon: Icons.auto_awesome_rounded,
+        solidColor: const Color(0xFF5A381E),
+        iconGradient: const [Color(0xFF5A381E), Color(0xFF2E1A0C)],
+        isLoading: _isLoadingNostalgic && _nostalgicMix.isEmpty,
+        imageUrl: _nostalgicMix.isNotEmpty
+            ? (MusicService.resolveArtworkUrl(_nostalgicMix.first).isNotEmpty
+                  ? MusicService.resolveArtworkUrl(_nostalgicMix.first)
                   : null)
             : null,
-        songs: _topChartsIndia,
+        songs: _nostalgicMix,
         onTap: () => openCurated(
-          playlistId: 'top_charts_india',
-          title: 'Top Charts India',
-          subtitle: 'Updated Daily',
+          playlistId: 'nostalgic_mix',
+          title: 'Nostalgic',
+          subtitle: 'Forgotten favorites & deep cuts',
           query:
-              'Top Charts India ${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'}',
-          initialSongs: _topChartsIndia,
-          gradientColors: const [Color(0xFF382B24), Color(0xFF241A14)],
-          icon: Icons.trending_up_rounded,
-          imageUrl: _topChartsIndia.isNotEmpty
-              ? MusicService.resolveArtworkUrl(_topChartsIndia.first)
+              '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Retro Classics',
+          initialSongs: _nostalgicMix,
+          gradientColors: const [Color(0xFF5A381E), Color(0xFF2E1A0C)],
+          icon: Icons.auto_awesome_rounded,
+          imageUrl: _nostalgicMix.isNotEmpty
+              ? MusicService.resolveArtworkUrl(_nostalgicMix.first)
               : null,
         ),
         onPlay: () {
-          if (_topChartsIndia.isNotEmpty) {
-            _musicService.playPlaylist(_topChartsIndia, 0);
+          if (_nostalgicMix.isNotEmpty) {
+            _musicService.playPlaylist(_nostalgicMix, 0);
+          } else {
+            openCurated(
+              playlistId: 'nostalgic_mix',
+              title: 'Nostalgic',
+              subtitle: 'Forgotten favorites & deep cuts',
+              query:
+                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Retro Classics',
+              initialSongs: _nostalgicMix,
+              gradientColors: const [Color(0xFF5A381E), Color(0xFF2E1A0C)],
+              icon: Icons.auto_awesome_rounded,
+            );
+          }
+        },
+        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
+          context: context,
+          globalPosition: pos,
+          playlist: {
+            'id': 'nostalgic_mix',
+            'title': 'Nostalgic',
+            'isCurated': true,
+            'songs': _nostalgicMix,
+          },
+        ),
+      ),
+      HomeQuickAccessItem(
+        title: topPlaylistTitle,
+        icon: Icons.playlist_play_rounded,
+        solidColor: const Color(0xFF1E382A),
+        iconGradient: const [Color(0xFF1E382A), Color(0xFF12241A)],
+        imageUrl: topPlaylistImage,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (hasTopPlaylist) {
+            if (isDesktop) {
+              DesktopLayoutState.openPlaylist(topPlaylistId);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CustomPlaylistScreen(playlistId: topPlaylistId),
+                ),
+              );
+            }
           } else {
             openCurated(
               playlistId: 'top_charts_india',
@@ -1341,67 +1678,21 @@ class _HomeScreenState extends State<HomeScreen>
             );
           }
         },
-        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
-          context: context,
-          globalPosition: pos,
-          playlist: {
-            'id': 'top_charts_india',
-            'title': 'Top Charts India',
-            'isCurated': true,
-            'songs': _topChartsIndia,
-          },
-        ),
-      ),
-      HomeQuickAccessItem(
-        title: 'New Releases',
-        icon: Icons.album_rounded,
-        solidColor: const Color(0xFF1E382A),
-        iconGradient: const [Color(0xFF1E382A), Color(0xFF12241A)],
-        imageUrl: _newReleases.isNotEmpty
-            ? (MusicService.resolveArtworkUrl(_newReleases.first).isNotEmpty
-                  ? MusicService.resolveArtworkUrl(_newReleases.first)
-                  : null)
-            : null,
-        songs: _newReleases,
-        onTap: () => openCurated(
-          playlistId: 'new_releases',
-          title: 'New Releases',
-          subtitle: 'Fresh Music',
-          query:
-              '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
-          initialSongs: _newReleases,
-          gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
-          icon: Icons.album_rounded,
-          imageUrl: _newReleases.isNotEmpty
-              ? MusicService.resolveArtworkUrl(_newReleases.first)
-              : null,
-        ),
         onPlay: () {
-          if (_newReleases.isNotEmpty) {
-            _musicService.playPlaylist(_newReleases, 0);
-          } else {
-            openCurated(
-              playlistId: 'new_releases',
-              title: 'New Releases',
-              subtitle: 'Fresh Music',
-              query:
-                  '${_prefs.preferredLanguages.firstOrNull ?? 'Telugu'} Latest Songs',
-              initialSongs: _newReleases,
-              gradientColors: const [Color(0xFF1E382A), Color(0xFF12241A)],
-              icon: Icons.album_rounded,
-            );
+          HapticFeedback.lightImpact();
+          if (hasTopPlaylist && topPlaylistSongs.isNotEmpty) {
+            _musicService.playCustomPlaylist(topPlaylistId, 0);
+          } else if (_topChartsIndia.isNotEmpty) {
+            _musicService.playPlaylist(_topChartsIndia, 0);
           }
         },
-        onSecondaryTap: (pos) => showUnifiedPlaylistMenu(
-          context: context,
-          globalPosition: pos,
-          playlist: {
-            'id': 'new_releases',
-            'title': 'New Releases',
-            'isCurated': true,
-            'songs': _newReleases,
-          },
-        ),
+        onSecondaryTap: hasTopPlaylist
+            ? (pos) => showUnifiedPlaylistMenu(
+                context: context,
+                globalPosition: pos,
+                playlist: topCustomPlaylist!,
+              )
+            : null,
       ),
       HomeQuickAccessItem(
         title: 'Trending',

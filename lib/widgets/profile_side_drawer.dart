@@ -14,6 +14,8 @@ import '../screens/dilse_capsule_screen.dart';
 import '../screens/spotify_import_screen.dart';
 import '../screens/device_audio_screen.dart';
 import '../screens/settings_screen.dart';
+import '../services/update_service.dart';
+import 'interactive_update_dialog.dart';
 
 /// Layered Slide-Over Profile Drawer for mobile.
 /// Provides immediate, tactile access to User Profile, History, Stats, Capsule,
@@ -94,6 +96,119 @@ class ProfileSideDrawer extends StatelessWidget {
                       vertical: 12,
                     ),
                     children: [
+                      ValueListenableBuilder<AppUpdateInfo?>(
+                        valueListenable:
+                            UpdateService().latestUpdateInfoNotifier,
+                        builder: (context, updateInfo, _) {
+                          final info =
+                              updateInfo ??
+                              (prefs.pendingUpdateInfo != null
+                                  ? AppUpdateInfo.fromJson(
+                                      prefs.pendingUpdateInfo!,
+                                    )
+                                  : null);
+                          if (info == null || !info.hasUpdate) {
+                            return const SizedBox.shrink();
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: true,
+                                    barrierColor: Colors.black.withValues(
+                                      alpha: 0.75,
+                                    ),
+                                    builder: (ctx) =>
+                                        InteractiveUpdateDialog(info: info),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFE03E52),
+                                        Color(0xFF8B1228),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFFE03E52,
+                                        ).withValues(alpha: 0.35),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(7),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.rocket_launch_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Update Ready: ${info.tagName}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            const Text(
+                                              'Tap to install now',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        color: Colors.white70,
+                                        size: 13,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       _buildMenuItem(
                         context: context,
                         icon: Icons.history_rounded,

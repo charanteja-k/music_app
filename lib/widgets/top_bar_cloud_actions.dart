@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/cloud_sync_service.dart';
+import '../services/preferences_service.dart';
 import '../services/update_service.dart';
 import 'interactive_update_dialog.dart';
 
@@ -214,14 +215,22 @@ class AppUpdateTopBarButton extends StatelessWidget {
     return ValueListenableBuilder<AppUpdateInfo?>(
       valueListenable: UpdateService().latestUpdateInfoNotifier,
       builder: (context, updateInfo, _) {
-        if (updateInfo == null || !updateInfo.hasUpdate) {
+        final info =
+            updateInfo ??
+            (PreferencesService().pendingUpdateInfo != null
+                ? AppUpdateInfo.fromJson(
+                    PreferencesService().pendingUpdateInfo!,
+                  )
+                : null);
+
+        if (info == null || !info.hasUpdate) {
           return const SizedBox.shrink();
         }
 
         return Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: Tooltip(
-            message: 'New update available: ${updateInfo.tagName}',
+            message: 'New update available: ${info.tagName}',
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
@@ -229,7 +238,7 @@ class AppUpdateTopBarButton extends StatelessWidget {
                   context: context,
                   barrierDismissible: true,
                   barrierColor: Colors.black.withValues(alpha: 0.75),
-                  builder: (ctx) => InteractiveUpdateDialog(info: updateInfo),
+                  builder: (ctx) => InteractiveUpdateDialog(info: info),
                 );
               },
               child: Stack(

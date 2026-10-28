@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../screens/dilse_capsule_screen.dart';
 import 'desktop_search_dropdown.dart';
 import '../profile_avatar_helper.dart';
+import '../top_bar_cloud_actions.dart';
 
 /// Spotify-grade 64px Desktop Top Global Navigation Bar (#global-nav-bar).
 ///
@@ -552,6 +553,7 @@ class _DesktopTopNavBarState extends State<DesktopTopNavBar> {
                           ),
                         ),
 
+                        const AppUpdateTopBarButton(),
                         const SizedBox(width: 4.0),
 
                         // Settings Gear Button
