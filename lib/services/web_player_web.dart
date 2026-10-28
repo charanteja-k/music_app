@@ -41,6 +41,7 @@ class WebPlayerBridge {
   static Stream<int> get onError => _errorController.stream;
 
   static bool _initialized = false;
+  static String _lastReportedState = '';
 
   static void init() {
     if (_initialized) return;
@@ -58,10 +59,14 @@ class WebPlayerBridge {
             final durVal = jsObj.getProperty('duration'.toJS);
             final pos = (posVal as JSNumber?)?.toDartDouble ?? 0.0;
             final dur = (durVal as JSNumber?)?.toDartDouble ?? 0.0;
-            _currentPosition = Duration(milliseconds: (pos * 1000).toInt());
-            _currentDuration = Duration(milliseconds: (dur * 1000).toInt());
-            _positionController.add(_currentPosition);
-            _durationController.add(_currentDuration);
+            final newPos = Duration(milliseconds: (pos * 1000).toInt());
+            final newDur = Duration(milliseconds: (dur * 1000).toInt());
+            _currentPosition = newPos;
+            _positionController.add(newPos);
+            if (_currentDuration != newDur) {
+              _currentDuration = newDur;
+              _durationController.add(newDur);
+            }
           }
         } catch (_) {}
       }.toJS,
@@ -84,7 +89,10 @@ class WebPlayerBridge {
                 state == 'idle') {
               _isPlaying = false;
             }
-            _stateController.add(state);
+            if (_lastReportedState != state) {
+              _lastReportedState = state;
+              _stateController.add(state);
+            }
           }
         } catch (_) {}
       }.toJS,
@@ -294,7 +302,12 @@ class WebPlayerBridge {
     }
   }
 
-  static void setEqualizer(bool enabled, Map<int, double> bands) {
+  static void setEqualizer(
+    bool enabled,
+    Map<int, double> bands, {
+    double bassBoost = 0.0,
+    double virtualizer = 0.0,
+  }) {
     final globalWindow = web.window as JSObject;
     if (globalWindow.hasProperty('dilseSetEqualizer'.toJS).toDart) {
       final mapForJson = bands.map((k, v) => MapEntry(k.toString(), v));
@@ -303,6 +316,8 @@ class WebPlayerBridge {
         'dilseSetEqualizer'.toJS,
         enabled.toJS,
         bandsJson.toJS,
+        bassBoost.toJS,
+        virtualizer.toJS,
       );
     }
   }

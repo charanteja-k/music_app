@@ -7,6 +7,7 @@ import 'canonical_song_dedup.dart';
 import 'playlist_artist_filter.dart';
 import 'spotify_import_service.dart';
 import 'web_player_bridge.dart';
+import 'audio_effects_service.dart';
 
 export '../models/recent_search_item.dart';
 
@@ -1116,7 +1117,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Morning Melodies',
         subtitle: 'Soft acoustic & ambient vibes to start your day',
-        query: '$primaryLang Melodies',
+        query: '$primaryLang Morning Acoustic Hits',
         tag: 'MORNING',
         emoji: '🌅',
       );
@@ -1125,7 +1126,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Afternoon Energy',
         subtitle: 'High-tempo beats and chartbusters to keep you grooving',
-        query: '$primaryLang Fast Hits',
+        query: '$primaryLang Trending Hits',
         tag: 'AFTERNOON',
         emoji: '⚡',
       );
@@ -1134,7 +1135,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Evening Chill',
         subtitle: 'Trending relaxing tracks and chill evening vibes',
-        query: '$primaryLang Chill Melodies',
+        query: '$primaryLang Soulful Hits',
         tag: 'EVENING',
         emoji: '🌆',
       );
@@ -1142,7 +1143,7 @@ class PreferencesService extends ChangeNotifier {
     return CircadianContext(
       title: 'Late Night Vibes',
       subtitle: 'Dreamy lo-fi and slowed melodies for quiet hours',
-      query: '$primaryLang Slow Melodies',
+      query: '$primaryLang Midnight Melodies',
       tag: 'LATE NIGHT',
       emoji: '🌙',
     );
@@ -1471,12 +1472,30 @@ class PreferencesService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _syncAudioEffects() {
+    final compensatedBands = AudioEffectsService.computeAntiClippingBands(
+      rawBands: _equalizerBands,
+      bassBoost: _bassBoost,
+    );
+    WebPlayerBridge.setEqualizer(
+      _equalizerEnabled,
+      _equalizerBands,
+      bassBoost: _bassBoost,
+      virtualizer: _virtualizer,
+    );
+    AudioEffectsService.setBassBoost(_bassBoost, enabled: _equalizerEnabled);
+    AudioEffectsService.setVirtualizer(
+      _virtualizer,
+      enabled: _equalizerEnabled,
+    );
+    onEqualizerChanged?.call(_equalizerEnabled, compensatedBands);
+  }
+
   Future<void> setEqualizerEnabled(bool value) async {
     if (!_isInitialized) return;
     _equalizerEnabled = value;
     await _prefs.setBool('equalizerEnabled', value);
-    WebPlayerBridge.setEqualizer(_equalizerEnabled, _equalizerBands);
-    onEqualizerChanged?.call(_equalizerEnabled, _equalizerBands);
+    _syncAudioEffects();
     notifyListeners();
   }
 
@@ -1487,8 +1506,7 @@ class PreferencesService extends ChangeNotifier {
     await _prefs.setString('equalizerPreset', preset);
     final mapForJson = _equalizerBands.map((k, v) => MapEntry(k.toString(), v));
     await _prefs.setString('equalizerBandsJson', json.encode(mapForJson));
-    WebPlayerBridge.setEqualizer(_equalizerEnabled, _equalizerBands);
-    onEqualizerChanged?.call(_equalizerEnabled, _equalizerBands);
+    _syncAudioEffects();
     notifyListeners();
   }
 
@@ -1499,8 +1517,7 @@ class PreferencesService extends ChangeNotifier {
     await _prefs.setString('equalizerPreset', 'Custom');
     final mapForJson = _equalizerBands.map((k, v) => MapEntry(k.toString(), v));
     await _prefs.setString('equalizerBandsJson', json.encode(mapForJson));
-    WebPlayerBridge.setEqualizer(_equalizerEnabled, _equalizerBands);
-    onEqualizerChanged?.call(_equalizerEnabled, _equalizerBands);
+    _syncAudioEffects();
     notifyListeners();
   }
 
@@ -1508,6 +1525,7 @@ class PreferencesService extends ChangeNotifier {
     if (!_isInitialized) return;
     _bassBoost = value.clamp(0.0, 1.0);
     await _prefs.setDouble('bassBoost', _bassBoost);
+    _syncAudioEffects();
     notifyListeners();
   }
 
@@ -1515,6 +1533,7 @@ class PreferencesService extends ChangeNotifier {
     if (!_isInitialized) return;
     _virtualizer = value.clamp(0.0, 1.0);
     await _prefs.setDouble('virtualizer', _virtualizer);
+    _syncAudioEffects();
     notifyListeners();
   }
 
@@ -2225,5 +2244,7 @@ class PreferencesService extends ChangeNotifier {
     _manualCreatedPlaylistIds.clear();
     _pinnedPlaylistIds.clear();
     _savedAlbums.clear();
+    _bassBoost = 0.0;
+    _virtualizer = 0.0;
   }
 }

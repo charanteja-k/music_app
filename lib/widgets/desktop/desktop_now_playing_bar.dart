@@ -9,6 +9,7 @@ import '../../services/web_player_bridge.dart';
 import '../../screens/player_screen.dart';
 import 'desktop_fullscreen_helper.dart';
 import '../waveform_scrubber.dart';
+import '../../utils/artist_utils.dart';
 
 /// Spotify-grade 90px Edge-to-Edge Bottom Now Playing Deck (#now-playing-bar).
 ///
@@ -301,7 +302,7 @@ class _DesktopTrackInfoSection extends StatelessWidget {
                             ),
                             const SizedBox(height: 3.0),
                             Text(
-                              song.author,
+                              ArtistUtils.formatArtistName(song.author),
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.65),
                                 fontSize: 12.0,

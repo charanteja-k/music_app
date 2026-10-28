@@ -7,6 +7,7 @@ import 'api_config.dart';
 import 'canonical_song_dedup.dart';
 import 'music_service.dart';
 import 'preferences_service.dart';
+import '../utils/artist_utils.dart';
 
 /// Lightweight, keyless client for YouTube Music's InnerTube API (`WEB_REMIX`).
 /// Provides studio release songs, clean album art, and Google's 50-track radio mixes.
@@ -251,7 +252,9 @@ class YouTubeMusicClient {
             : 'Unknown Artist';
 
         final cleanA = CanonicalSongDedup.cleanArtist(rawAuthor);
-        final author = cleanA.isNotEmpty ? cleanA : rawAuthor;
+        final author = cleanA.isNotEmpty
+            ? ArtistUtils.formatArtistName(rawAuthor)
+            : rawAuthor;
         final title = CanonicalSongDedup.sanitizeDisplayTitle(
           rawTitle,
           artist: author,
@@ -298,6 +301,36 @@ class YouTubeMusicClient {
   /// directly from YouTube Music explore feeds (browseId: 'FEmusic_charts')
   /// without sending a text search query.
   Future<List<Video>> fetchCharts({String? language, int limit = 25}) async {
+    // 1. On Flutter Web: Route through Cloudflare Edge Worker to bypass browser CORS
+    if (kIsWeb) {
+      try {
+        final lang =
+            language ??
+            (PreferencesService().preferredLanguages.isNotEmpty
+                ? PreferencesService().preferredLanguages.first
+                : 'Hindi');
+        final edgeUri = Uri.parse(
+          '${ApiConfig.cloudflareWorkerUrl}/jio/trending?language=${Uri.encodeComponent(lang)}&limit=$limit',
+        );
+        final resp = await http
+            .get(edgeUri)
+            .timeout(const Duration(seconds: 8));
+        if (resp.statusCode == 200) {
+          final List<dynamic> list = json.decode(resp.body);
+          final parsed = _parseJsonTracks(list);
+          if (parsed.isNotEmpty) {
+            debugPrint(
+              '[YTM] Found ${parsed.length} trending chart tracks via Edge Worker for: "$lang"',
+            );
+            return parsed;
+          }
+        }
+      } catch (e) {
+        debugPrint('[YTM] Edge charts proxy failed: $e');
+      }
+      return [];
+    }
+
     try {
       final uri = Uri.parse('$_baseUrl/browse');
       final payload = {
@@ -485,7 +518,9 @@ class YouTubeMusicClient {
       }
 
       final cleanA = CanonicalSongDedup.cleanArtist(rawAuthor);
-      final author = cleanA.isNotEmpty ? cleanA : rawAuthor;
+      final author = cleanA.isNotEmpty
+          ? ArtistUtils.formatArtistName(rawAuthor)
+          : rawAuthor;
       final title = CanonicalSongDedup.sanitizeDisplayTitle(
         rawTitle,
         artist: author,
@@ -553,7 +588,9 @@ class YouTubeMusicClient {
       final rawTitle = item['title'] as String? ?? 'Unknown Title';
       final rawAuthor = item['author'] as String? ?? 'Unknown Artist';
       final cleanA = CanonicalSongDedup.cleanArtist(rawAuthor);
-      final author = cleanA.isNotEmpty ? cleanA : rawAuthor;
+      final author = cleanA.isNotEmpty
+          ? ArtistUtils.formatArtistName(rawAuthor)
+          : rawAuthor;
       final t = CanonicalSongDedup.sanitizeDisplayTitle(
         rawTitle,
         artist: author,
@@ -564,6 +601,10 @@ class YouTubeMusicClient {
       final thumb = (item['thumbnail'] ?? item['artwork']) as String?;
       if (thumb != null && thumb.isNotEmpty) {
         MusicService.registerArtwork(vid, thumb);
+      }
+      final streamUrl = item['streamUrl'] as String?;
+      if (streamUrl != null && streamUrl.isNotEmpty) {
+        MusicService.cacheWebStreamUrl(vid, streamUrl);
       }
       final track = Video(
         VideoId(vid),

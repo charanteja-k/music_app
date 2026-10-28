@@ -9,6 +9,7 @@ import 'canonical_song_dedup.dart';
 import 'music_service.dart';
 import 'preferences_service.dart';
 import 'youtube_music_client.dart';
+import '../utils/artist_utils.dart';
 
 /// Catalog discovery and trending ranking engine.
 /// Replaces naive keyword text searches with authentic chart velocity modules
@@ -124,7 +125,9 @@ class TrendingCatalogService {
           if (isSpamOrJunk(rawTitle) || isSpamOrJunk(rawAuthor)) continue;
 
           final cleanA = CanonicalSongDedup.cleanArtist(rawAuthor);
-          final author = cleanA.isNotEmpty ? cleanA : rawAuthor;
+          final author = cleanA.isNotEmpty
+              ? ArtistUtils.formatArtistName(rawAuthor)
+              : rawAuthor;
           final title = CanonicalSongDedup.sanitizeDisplayTitle(
             rawTitle,
             artist: author,

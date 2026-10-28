@@ -10,6 +10,7 @@ import '../../screens/player_screen.dart';
 import '../animated_lyrics.dart';
 import '../animated_equalizer.dart';
 import 'desktop_context_menu.dart';
+import '../../utils/artist_utils.dart';
 
 /// Spotify-grade 280px Adaptive Desktop Right Context Panel (#Desktop_PanelContainer_Id).
 ///
@@ -336,7 +337,7 @@ class _DesktopNowPlayingTab extends StatelessWidget {
                             DesktopLayoutState.openArtist(song.author);
                           },
                           child: Text(
-                            song.author,
+                            ArtistUtils.formatArtistName(song.author),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 13.0,

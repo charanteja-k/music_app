@@ -971,5 +971,76 @@ void main() {
             'Solo candidate must be penalized when resolving featured track',
       );
     });
+
+    test(
+      'deduplicates Duniyaa variants across different producer/singer credits',
+      () {
+        // Variant 1: Duniyaa by Abhijit Vaghani (producer credit)
+        // Variant 2: Duniyaa (From "Luka Chuppi") by Akhil (playback singer credit)
+        final isDup1 = CanonicalSongDedup.areDuplicateSongs(
+          titleA: 'Duniyaa',
+          artistA: 'abhijit vaghani',
+          titleB: 'Duniyaa (From "Luka Chuppi")',
+          artistB: 'akhil',
+        );
+        expect(
+          isDup1,
+          isTrue,
+          reason:
+              'Duniyaa movie version and single credit must match as duplicate',
+        );
+
+        // Variant 2 vs Variant 3: Duniyaa (From "Luka Chuppi") vs Duniyaa (Recreated) by Aarush
+        final isDup2 = CanonicalSongDedup.areDuplicateSongs(
+          titleA: 'Duniyaa (From "Luka Chuppi")',
+          artistA: 'akhil',
+          titleB: 'Duniyaa (Recreated)',
+          artistB: 'aarush',
+        );
+        expect(
+          isDup2,
+          isTrue,
+          reason: 'Recreated version must be collapsed with primary version',
+        );
+
+        // Variant 1 vs Variant 4: Duniyaa by abhijit vaghani vs DUNIYAA by jagdish kumar
+        final isDup3 = CanonicalSongDedup.areDuplicateSongs(
+          titleA: 'Duniyaa',
+          artistA: 'abhijit vaghani',
+          titleB: 'DUNIYAA',
+          artistB: 'jagdish kumar',
+        );
+        expect(
+          isDup3,
+          isTrue,
+          reason:
+              'Cover title variations of identical Indic song must collapse',
+        );
+      },
+    );
+
+    test('isGenuineSong rejects generic genre/language spam tracks', () {
+      final fakeSpamTrack = Video(
+        VideoId('abc12345678'),
+        'Hindi Melodic',
+        'Gaston Ramos',
+        ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+        DateTime.now(),
+        '',
+        null,
+        '',
+        const Duration(minutes: 3),
+        ThumbnailSet('abc12345678'),
+        null,
+        Engagement(0, null, null),
+        false,
+      );
+      expect(
+        CanonicalSongDedup.isGenuineSong(fakeSpamTrack),
+        isFalse,
+        reason:
+            'Generic genre name track "Hindi Melodic" must be flagged as non-genuine song',
+      );
+    });
   });
 }

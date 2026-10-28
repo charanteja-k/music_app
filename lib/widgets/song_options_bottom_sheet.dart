@@ -10,6 +10,7 @@ import '../services/preferences_service.dart';
 import '../layouts/desktop_layout_state.dart';
 import '../models/jio_album.dart';
 import 'desktop/desktop_context_menu.dart';
+import '../utils/artist_utils.dart';
 
 /// Converts a song Map representation into a youtube_explode Video instance
 /// for seamless interop across existing song action sheets.
@@ -24,7 +25,9 @@ Video songMapToVideo(Map<String, dynamic> songMap) {
   return Video(
     VideoId(safeId),
     (songMap['title'] as String?) ?? 'Unknown Title',
-    (songMap['author'] as String?) ?? 'Unknown Artist',
+    ArtistUtils.formatArtistName(
+      (songMap['author'] as String?) ?? 'Unknown Artist',
+    ),
     ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
     DateTime.now(),
     '',
@@ -82,9 +85,10 @@ void showSongOptionsBottomSheet(
 }) {
   HapticFeedback.lightImpact();
 
-  // DEFECT 1: In desktop mode, strictly route through DesktopContextMenu.
-  // The mobile bottom sheet modal must NEVER appear on desktop viewports.
-  if (kIsWeb || MediaQuery.of(context).size.width >= 1024) {
+  final isDesktopViewport =
+      MediaQuery.of(context).size.width >= 1024 ||
+      (kIsWeb && MediaQuery.of(context).size.width >= 768);
+  if (isDesktopViewport) {
     final size = MediaQuery.of(context).size;
     final pos = globalPosition ?? Offset(size.width / 2, size.height / 3);
     DesktopContextMenu.showSongMenu(
@@ -181,7 +185,7 @@ void showSongOptionsBottomSheet(
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            song.author,
+                            ArtistUtils.formatArtistName(song.author),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -217,14 +221,14 @@ void showSongOptionsBottomSheet(
                 icon: Icons.person_rounded,
                 iconColor: const Color(0xFF1DB954),
                 title: 'View Artist Profile',
-                subtitle: 'Explore full discography for ${song.author}',
+                subtitle:
+                    'Explore full discography for ${ArtistUtils.formatArtistName(song.author)}',
                 onTap: () {
                   Navigator.pop(ctx);
-                  if (MediaQuery.of(context).size.width >= 640) {
+                  if (MediaQuery.of(context).size.width >= 1024) {
                     DesktopLayoutState.openArtist(song.author);
                   } else {
-                    Navigator.push(
-                      context,
+                    Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(
                         builder: (_) =>
                             ArtistProfileScreen(artistName: song.author),
@@ -685,7 +689,7 @@ void _navigateToAlbum(
     return;
   }
 
-  if (MediaQuery.of(context).size.width >= 640) {
+  if (MediaQuery.of(context).size.width >= 1024) {
     DesktopLayoutState.openAlbum(
       album: album,
       albumId: albumId,
@@ -694,8 +698,7 @@ void _navigateToAlbum(
       albumArtist: albumArtist,
     );
   } else {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (_) => AlbumScreen(
           album: album,

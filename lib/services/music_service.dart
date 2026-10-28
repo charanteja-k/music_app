@@ -29,6 +29,7 @@ import 'device_audio_service.dart';
 import '../models/song_item.dart';
 import 'audio/favorites_repository.dart';
 import 'database_service.dart';
+import 'audio_effects_service.dart';
 
 enum SearchSuggestionType { artist, song, album, history, query }
 
@@ -880,6 +881,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  final Set<String> _inFlightEnrichmentIds = <String>{};
+
   /// Background artwork and stream enrichment pass.
   ///
   /// Iterates over [songs] and for any song whose current artwork is:
@@ -897,6 +900,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     final needsEnrich = <Video>[];
     for (final s in songs) {
       final id = s.id.value;
+      if (_inFlightEnrichmentIds.contains(id)) continue;
       final current = _artworkMap[id];
       final isCompilation =
           current != null && _compilationArtworks.contains(current);
@@ -911,6 +915,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           kIsWeb && (_webStreamUrls[id] == null || _webStreamUrls[id]!.isEmpty);
       if (isCompilation || isYtFallback || needsStream) {
         needsEnrich.add(s);
+        _inFlightEnrichmentIds.add(id);
         final maxEnrich = kIsWeb ? 2 : 6;
         if (needsEnrich.length >= maxEnrich) {
           break; // Concurrency cap: Never flood background requests
@@ -923,81 +928,89 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       '[ArtworkEnrich] Enriching artwork & streams for ${needsEnrich.length} songs...',
     );
 
-    for (final song in needsEnrich) {
-      try {
-        final cleanTitle = CanonicalSongDedup.cleanTitle(song.title);
-        final cleanArtist = CanonicalSongDedup.cleanArtist(song.author);
-        if (cleanTitle.isEmpty) continue;
+    try {
+      for (final song in needsEnrich) {
+        try {
+          final cleanTitle = CanonicalSongDedup.cleanTitle(song.title);
+          final cleanArtist = CanonicalSongDedup.cleanArtist(song.author);
+          if (cleanTitle.isEmpty) continue;
 
-        final uri = ApiConfig.jioSingleTrackUri(
-          cleanTitle,
-          artist: cleanArtist,
-        );
-        final resp = await http.get(uri).timeout(const Duration(seconds: 4));
+          final uri = ApiConfig.jioSingleTrackUri(
+            cleanTitle,
+            artist: cleanArtist,
+          );
+          final resp = await http.get(uri).timeout(const Duration(seconds: 4));
 
-        if (resp.statusCode == 200) {
-          final body = json.decode(resp.body);
-          if (body is Map && body['match'] == true) {
-            final data = body['data'] as Map<String, dynamic>?;
-            final artwork = data?['artwork'] as String? ?? '';
-            final album = data?['album'] as String? ?? '';
-            final albumId =
-                data?['album_id']?.toString() ??
-                data?['albumId']?.toString() ??
-                '';
-            final streamUrl = data?['streamUrl'] as String? ?? '';
+          if (resp.statusCode == 200) {
+            final body = json.decode(resp.body);
+            if (body is Map && body['match'] == true) {
+              final data = body['data'] as Map<String, dynamic>?;
+              final artwork = data?['artwork'] as String? ?? '';
+              final album = data?['album'] as String? ?? '';
+              final albumId =
+                  data?['album_id']?.toString() ??
+                  data?['albumId']?.toString() ??
+                  '';
+              final streamUrl = data?['streamUrl'] as String? ?? '';
 
-            if (album.isNotEmpty || albumId.isNotEmpty) {
-              registerSongAlbum(
-                song.id.value,
-                albumTitle: album,
-                albumId: albumId,
-              );
-            }
+              if (album.isNotEmpty || albumId.isNotEmpty) {
+                registerSongAlbum(
+                  song.id.value,
+                  albumTitle: album,
+                  albumId: albumId,
+                );
+              }
 
-            final current = _artworkMap[song.id.value];
-            final isYtFallback =
-                current == null ||
-                current.isEmpty ||
-                current.startsWith('https://i.ytimg.com/');
+              final current = _artworkMap[song.id.value];
+              final isYtFallback =
+                  current == null ||
+                  current.isEmpty ||
+                  current.startsWith('https://i.ytimg.com/');
 
-            // Accept artwork if not compilation, or if currently stuck with a raw YouTube video thumbnail
-            if (artwork.isNotEmpty &&
-                (!_compilationAlbumRegex.hasMatch(album) || isYtFallback)) {
-              _artworkMap[song.id.value] = artwork;
-              debugPrint('[ArtworkEnrich] ✓ ${song.title} → $album (artwork)');
-              notifyListeners();
-            }
+              // Accept artwork if not compilation, or if currently stuck with a raw YouTube video thumbnail
+              if (artwork.isNotEmpty &&
+                  (!_compilationAlbumRegex.hasMatch(album) || isYtFallback)) {
+                _artworkMap[song.id.value] = artwork;
+                debugPrint(
+                  '[ArtworkEnrich] ✓ ${song.title} → $album (artwork)',
+                );
+                notifyListeners();
+              }
 
-            // Register enriched language from JioSaavn response or artwork URL
-            final artworkLangMatch = RegExp(
-              r'-(Telugu|Hindi|Tamil|Kannada|Malayalam|Punjabi|Bengali|Marathi|Bhojpuri|Gujarati)-',
-              caseSensitive: false,
-            ).firstMatch(artwork);
-            final enrichedLang =
-                (data?['language'] as String?)?.isNotEmpty == true
-                ? (data!['language'] as String).toLowerCase()
-                : artworkLangMatch?.group(1)?.toLowerCase();
-            if (enrichedLang != null && enrichedLang.isNotEmpty) {
-              CanonicalSongDedup.registerSongLanguage(
-                song.id.value,
-                enrichedLang,
-              );
-            }
+              // Register enriched language from JioSaavn response or artwork URL
+              final artworkLangMatch = RegExp(
+                r'-(Telugu|Hindi|Tamil|Kannada|Malayalam|Punjabi|Bengali|Marathi|Bhojpuri|Gujarati)-',
+                caseSensitive: false,
+              ).firstMatch(artwork);
+              final enrichedLang =
+                  (data?['language'] as String?)?.isNotEmpty == true
+                  ? (data!['language'] as String).toLowerCase()
+                  : artworkLangMatch?.group(1)?.toLowerCase();
+              if (enrichedLang != null && enrichedLang.isNotEmpty) {
+                CanonicalSongDedup.registerSongLanguage(
+                  song.id.value,
+                  enrichedLang,
+                );
+              }
 
-            // Pre-warm direct 320k JioSaavn stream URL for immediate playback
-            if (streamUrl.isNotEmpty) {
-              cacheWebStreamUrl(song.id.value, streamUrl);
-              debugPrint(
-                '[ArtworkEnrich] ✓ ${song.title} → 320k stream pre-warmed',
-              );
+              // Pre-warm direct 320k JioSaavn stream URL for immediate playback
+              if (streamUrl.isNotEmpty) {
+                cacheWebStreamUrl(song.id.value, streamUrl);
+                debugPrint(
+                  '[ArtworkEnrich] ✓ ${song.title} → 320k stream pre-warmed',
+                );
+              }
             }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
 
-      // 80ms gap between requests to avoid hammering the edge worker
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+        // 80ms gap between requests to avoid hammering the edge worker
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+      }
+    } finally {
+      for (final song in needsEnrich) {
+        _inFlightEnrichmentIds.remove(song.id.value);
+      }
     }
   }
 
@@ -1235,9 +1248,21 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
           };
       if (Platform.isAndroid) {
         final prefs = PreferencesService();
+        final compensated = AudioEffectsService.computeAntiClippingBands(
+          rawBands: prefs.equalizerBands,
+          bassBoost: prefs.bassBoost,
+        );
         applyEqualizerNative(
           enabled: prefs.equalizerEnabled,
-          bands: prefs.equalizerBands,
+          bands: compensated,
+        );
+        AudioEffectsService.setBassBoost(
+          prefs.bassBoost,
+          enabled: prefs.equalizerEnabled,
+        );
+        AudioEffectsService.setVirtualizer(
+          prefs.virtualizer,
+          enabled: prefs.equalizerEnabled,
         );
       }
     }
@@ -1301,7 +1326,6 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
     for (final eq in [_equalizerA, _equalizerB]) {
       if (eq == null) continue;
       try {
-        await eq.setEnabled(enabled);
         if (enabled) {
           final params = await eq.parameters.timeout(
             const Duration(seconds: 2),
@@ -1315,6 +1339,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
             await params.bands[i].setGain(clampedGain);
           }
         }
+        await eq.setEnabled(enabled);
       } catch (e) {
         debugPrint('[AndroidEqualizer] Failed to apply: $e');
       }

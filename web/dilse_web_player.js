@@ -122,6 +122,40 @@
   window.addEventListener('pointerdown', unlockAudioContext, { passive: true, capture: true });
 
   let limiterNode = null;
+  let bassBoostFilter = null;
+  let bassBoostVal = 0.0;
+  let virtualizerVal = 0.0;
+  let spatialDry = null;
+  let spatialWet = null;
+  let spatialDelay = null;
+
+  function updateMasterHeadroom(ctx) {
+    if (!masterGainNode || !ctx) return;
+    let maxBoostDb = 0.0;
+    if (eqEnabled) {
+      for (let i = 0; i < eqFilters.length; i++) {
+        const val =
+          parseFloat(
+            eqBands[i] !== undefined ? eqBands[i] : eqBands[String(i)],
+          ) || 0.0;
+        if (val > maxBoostDb) maxBoostDb = val;
+      }
+      if (bassBoostVal > 0.0) {
+        maxBoostDb = Math.max(maxBoostDb, bassBoostVal * 8.0);
+      }
+    }
+    // Dynamic anti-clipping headroom: if maxBoost is +7dB, pre-cut by -3.5dB (0.67 multiplier).
+    // If flat (0dB boost), multiplier is exactly 1.0 (zero loss, pure transparency).
+    const headroom =
+      eqEnabled && maxBoostDb > 0.0
+        ? Math.pow(10, -(maxBoostDb * 0.55) / 20)
+        : 1.0;
+    try {
+      masterGainNode.gain.setTargetAtTime(headroom, ctx.currentTime, 0.04);
+    } catch (_) {
+      masterGainNode.gain.value = headroom;
+    }
+  }
 
   function initEqualizerDSP() {
     const ctx = getAudioContext();
@@ -131,35 +165,70 @@
     try {
       eqFilters = [];
       masterGainNode = ctx.createGain();
-      // +3.5 dB studio makeup gain to fully eliminate insertion loss & low volume
-      masterGainNode.gain.value = 1.48;
+      masterGainNode.gain.value = 1.0; // 1.0 default: transparent, zero artificial distortion
 
+      // Studio Safety Limiter (soft-knee brickwall protection, never pumping)
       limiterNode = ctx.createDynamicsCompressor();
-      limiterNode.threshold.value = -0.5;
-      limiterNode.knee.value = 12;
-      limiterNode.ratio.value = 12;
-      limiterNode.attack.value = 0.003;
-      limiterNode.release.value = 0.25;
+      limiterNode.threshold.value = -1.2;
+      limiterNode.knee.value = 24;
+      limiterNode.ratio.value = 4;
+      limiterNode.attack.value = 0.005;
+      limiterNode.release.value = 0.15;
 
+      // 5-band Equalizer
       for (let i = 0; i < EQ_FREQUENCIES.length; i++) {
         const filter = ctx.createBiquadFilter();
         filter.type = EQ_TYPES[i];
         filter.frequency.value = EQ_FREQUENCIES[i];
         filter.Q.value = 1.2;
-        const val = parseFloat(eqBands[i] !== undefined ? eqBands[i] : eqBands[String(i)]) || 0.0;
-        filter.gain.value = eqEnabled ? Math.max(-12.0, Math.min(12.0, val)) : 0.0;
+        const val =
+          parseFloat(
+            eqBands[i] !== undefined ? eqBands[i] : eqBands[String(i)],
+          ) || 0.0;
+        filter.gain.value = eqEnabled
+          ? Math.max(-12.0, Math.min(12.0, val))
+          : 0.0;
         eqFilters.push(filter);
       }
 
       for (let i = 0; i < eqFilters.length - 1; i++) {
         eqFilters[i].connect(eqFilters[i + 1]);
       }
-      eqFilters[eqFilters.length - 1].connect(masterGainNode);
+
+      // Dedicated Deep Bass Boost Shelf (80Hz)
+      bassBoostFilter = ctx.createBiquadFilter();
+      bassBoostFilter.type = 'lowshelf';
+      bassBoostFilter.frequency.value = 80;
+      bassBoostFilter.gain.value = eqEnabled ? bassBoostVal * 8.0 : 0.0;
+      eqFilters[eqFilters.length - 1].connect(bassBoostFilter);
+
+      // 3D Spatial Surround Widener
+      spatialDry = ctx.createGain();
+      spatialWet = ctx.createGain();
+      spatialDelay = ctx.createDelay();
+      spatialDelay.delayTime.value = 0.012; // 12ms interaural delay for wide 3D soundfield
+      spatialDry.gain.value = 1.0;
+      spatialWet.gain.value = eqEnabled ? virtualizerVal * 0.45 : 0.0;
+
+      bassBoostFilter.connect(spatialDry);
+      bassBoostFilter.connect(spatialDelay);
+      spatialDelay.connect(spatialWet);
+
+      spatialDry.connect(masterGainNode);
+      spatialWet.connect(masterGainNode);
+
       masterGainNode.connect(limiterNode);
       limiterNode.connect(ctx.destination);
-      console.log('[DilSe Web Player] Web Audio API Studio Equalizer connected (60Hz, 230Hz, 910Hz, 3.6kHz, 14kHz) with Studio Limiter');
+
+      updateMasterHeadroom(ctx);
+      console.log(
+        '[DilSe Web Player] Web Audio API Studio Equalizer connected with BassBoost & 3D Spatializer',
+      );
     } catch (e) {
-      console.warn('[DilSe Web Player] Equalizer DSP initialization warning:', e.message);
+      console.warn(
+        '[DilSe Web Player] Equalizer DSP initialization warning:',
+        e.message,
+      );
     }
   }
 
@@ -228,7 +297,12 @@
     }
   }
 
-  window.dilseSetEqualizer = function (enabled, bandsJson) {
+  window.dilseSetEqualizer = function (
+    enabled,
+    bandsJson,
+    bassBoost,
+    virtualizer,
+  ) {
     eqEnabled = Boolean(enabled);
     if (typeof bandsJson === 'string') {
       try {
@@ -236,6 +310,15 @@
       } catch (_) {}
     } else if (typeof bandsJson === 'object' && bandsJson !== null) {
       eqBands = bandsJson;
+    }
+    if (bassBoost !== undefined && bassBoost !== null) {
+      bassBoostVal = Math.max(0.0, Math.min(1.0, parseFloat(bassBoost) || 0.0));
+    }
+    if (virtualizer !== undefined && virtualizer !== null) {
+      virtualizerVal = Math.max(
+        0.0,
+        Math.min(1.0, parseFloat(virtualizer) || 0.0),
+      );
     }
 
     const ctx = getAudioContext();
@@ -245,8 +328,10 @@
 
       for (let i = 0; i < eqFilters.length; i++) {
         const val = eqEnabled
-            ? (parseFloat(eqBands[i] !== undefined ? eqBands[i] : eqBands[String(i)]) || 0.0)
-            : 0.0;
+          ? parseFloat(
+              eqBands[i] !== undefined ? eqBands[i] : eqBands[String(i)],
+            ) || 0.0
+          : 0.0;
         const targetGain = Math.max(-12.0, Math.min(12.0, val));
         try {
           eqFilters[i].gain.setTargetAtTime(targetGain, ctx.currentTime, 0.03);
@@ -255,10 +340,45 @@
         }
       }
 
+      if (bassBoostFilter) {
+        const targetBassGain = eqEnabled ? bassBoostVal * 8.0 : 0.0;
+        try {
+          bassBoostFilter.gain.setTargetAtTime(
+            targetBassGain,
+            ctx.currentTime,
+            0.03,
+          );
+        } catch (_) {
+          bassBoostFilter.gain.value = targetBassGain;
+        }
+      }
+
+      if (spatialWet) {
+        const targetSpatialGain = eqEnabled ? virtualizerVal * 0.45 : 0.0;
+        try {
+          spatialWet.gain.setTargetAtTime(
+            targetSpatialGain,
+            ctx.currentTime,
+            0.03,
+          );
+        } catch (_) {
+          spatialWet.gain.value = targetSpatialGain;
+        }
+      }
+
+      updateMasterHeadroom(ctx);
+
       if (deckA) connectDeckToDSP(deckA);
       if (deckB) connectDeckToDSP(deckB);
     }
-    console.log('[DilSe Web Player] Equalizer applied smoothly. Enabled:', eqEnabled, 'Bands:', eqBands);
+    console.log(
+      '[DilSe Web Player] Equalizer applied smoothly. Enabled:',
+      eqEnabled,
+      'Bass:',
+      bassBoostVal,
+      '3D:',
+      virtualizerVal,
+    );
   };
 
   // YouTube IFrame Player instance
@@ -757,33 +877,16 @@
     }
   }
 
-  // iOS Safari / PWA background playback & interruption watchdog
+  // Consolidated iOS Safari / PWA background playback & thermal watchdog
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') {
       attemptAutoResumeAfterInterruption();
-    } else if (document.visibilityState === 'hidden') {
-      if (activeEngine === ENGINE_IFRAME && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
-        const state = ytPlayer.getPlayerState();
-        if (state === 1 || state === 3) {
-          startBgAudio();
-          setTimeout(() => {
-            if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
-              ytPlayer.playVideo();
-            }
-          }, 120);
-        }
-      }
-    }
-  });
-
-  window.addEventListener('focus', attemptAutoResumeAfterInterruption);
-  window.addEventListener('pageshow', attemptAutoResumeAfterInterruption);
-
-  // Background tab CPU & thermal optimization: throttle background tickers, snap UI on focus
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
       // Immediately snap UI into sync
-      if (activeEngine === ENGINE_IFRAME && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+      if (
+        activeEngine === ENGINE_IFRAME &&
+        ytPlayer &&
+        typeof ytPlayer.getCurrentTime === 'function'
+      ) {
         const pos = ytPlayer.getCurrentTime() || 0;
         const dur = ytPlayer.getDuration() || 0;
         lastReportedPos = pos;
@@ -799,13 +902,31 @@
         broadcastTime(pos, dur);
         updateMediaSessionPosition(pos, dur);
       }
-    } else {
+    } else if (document.visibilityState === 'hidden') {
+      if (
+        activeEngine === ENGINE_IFRAME &&
+        ytPlayer &&
+        typeof ytPlayer.getPlayerState === 'function'
+      ) {
+        const state = ytPlayer.getPlayerState();
+        if (state === 1 || state === 3) {
+          startBgAudio();
+          setTimeout(() => {
+            if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+              ytPlayer.playVideo();
+            }
+          }, 120);
+        }
+      }
       // Background tab: re-trigger ticker to adopt throttled 2000ms interval
       if (ticker) {
         startTicker();
       }
     }
   });
+
+  window.addEventListener('focus', attemptAutoResumeAfterInterruption);
+  window.addEventListener('pageshow', attemptAutoResumeAfterInterruption);
 
   window.dilsePlayWithOptions = function (opts) {
     opts = opts || {};

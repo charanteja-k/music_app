@@ -1809,6 +1809,32 @@ function cleanString(str) {
 }
 
 /**
+ * Romanizes or extracts clean Romanized title if raw title is in native Indic Unicode script.
+ */
+function romanizeIndicTitle(title, item) {
+  if (!title) return '';
+  if (/[\u0900-\u0D7F]/.test(title)) {
+    const miAlbum = cleanString(item?.more_info?.album || item?.album || '');
+    if (miAlbum && !/[\u0900-\u0D7F]/.test(miAlbum)) {
+      return miAlbum;
+    }
+    if (item?.perma_url) {
+      const match = item.perma_url.match(/\/(?:album|song)\/([^\/]+)\//);
+      if (match && match[1]) {
+        return match[1].split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      }
+    }
+    if (item?.image) {
+      const imgMatch = item.image.match(/\/([A-Za-z0-9\-]+)-(Hindi|Telugu|Tamil|Kannada|Malayalam|Punjabi|Bengali|Bhojpuri|Gujarati|Marathi)-\d{4}-/i);
+      if (imgMatch && imgMatch[1]) {
+        return imgMatch[1].split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      }
+    }
+  }
+  return title;
+}
+
+/**
  * Fetches authentic JioSaavn trending songs using native chart/trending modules
  * without any keyword search stuffing.
  */
@@ -1816,7 +1842,7 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `L=${language}; DL=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03`,
+    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
   };
 
   const songs = [];
@@ -1825,10 +1851,21 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
   function addSong(r) {
     if (!r || !r.id || seenIds.has(String(r.id))) return;
     const mi = r.more_info || {};
-    const title = cleanString(r.title || r.song);
-    const album = cleanString(mi.album || r.album);
-    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).join(', ');
-    const artist = cleanString(primaryArtists || r.subtitle || r.primary_artists || mi.music || r.singers || 'DilSe Music');
+    let title = cleanString(r.title || r.song);
+    title = romanizeIndicTitle(title, r);
+    let album = cleanString(mi.album || r.album);
+    album = romanizeIndicTitle(album, r);
+
+    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).filter(Boolean);
+    const musicOnly = (mi.artistMap?.artists || [])
+      .filter((a) => a.role !== 'starring')
+      .map((a) => a.name)
+      .filter(Boolean);
+    const artistPool = primaryArtists.length > 0
+      ? primaryArtists
+      : (musicOnly.length > 0 ? musicOnly : [r.subtitle, r.primary_artists, mi.music, r.singers]);
+    const cleanArtists = [...new Set(artistPool.filter(Boolean))].slice(0, 3).join(', ');
+    const artist = cleanString(cleanArtists || 'DilSe Music');
 
     // Strict spam, 1-min reel cut, and compilation filter
     if (SPAM_AND_JUNK_FILTER.test(title) || SPAM_AND_JUNK_FILTER.test(album) || SPAM_AND_JUNK_FILTER.test(artist)) {
@@ -1859,7 +1896,7 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
 
   // 1. Fetch content.getTrending
   try {
-    const url = 'https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0';
+    const url = `https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
     const res = await fetch(url, { headers: geoHeaders });
     if (res.ok) {
       let text = await res.text();
@@ -1878,7 +1915,7 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
   // 2. Fetch content.getBrowseModules (new_trending and new_albums)
   if (songs.length < limit) {
     try {
-      const url = 'https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0';
+      const url = `https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
       const res = await fetch(url, { headers: geoHeaders });
       if (res.ok) {
         let text = await res.text();
@@ -1898,7 +1935,7 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
   // 3. Fallback to official top charts playlist if still low
   if (songs.length < 15) {
     try {
-      const chartUrl = 'https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0';
+      const chartUrl = `https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
       const chartRes = await fetch(chartUrl, { headers: geoHeaders });
       if (chartRes.ok) {
         let chartText = await chartRes.text();
@@ -1934,11 +1971,11 @@ async function getJioTopCharts(lang = 'hindi') {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `L=${language}; DL=${language}; country=IN`,
+    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
   };
 
   try {
-    const url = 'https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0';
+    const url = `https://www.jiosaavn.com/api.php?__call=content.getCharts&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
     const res = await fetch(url, { headers: geoHeaders });
     if (!res.ok) return [];
     let text = await res.text();
@@ -1969,7 +2006,7 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `L=${language}; DL=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03`,
+    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
   };
 
   const albums = [];
@@ -1978,9 +2015,19 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
   function addAlbum(r) {
     if (!r || !r.id || seenIds.has(String(r.id))) return;
     const mi = r.more_info || {};
-    const title = cleanString(r.title);
-    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).join(', ');
-    const artist = cleanString(primaryArtists || mi.music || r.subtitle || 'Various Artists');
+    let title = cleanString(r.title);
+    title = romanizeIndicTitle(title, r);
+
+    const primaryArtists = (mi.artistMap?.primary_artists || []).map((a) => a.name).filter(Boolean);
+    const musicOnly = (mi.artistMap?.artists || [])
+      .filter((a) => a.role !== 'starring')
+      .map((a) => a.name)
+      .filter(Boolean);
+    const artistPool = primaryArtists.length > 0
+      ? primaryArtists
+      : (musicOnly.length > 0 ? musicOnly : [mi.music, r.subtitle]);
+    const cleanArtistNames = [...new Set(artistPool.filter(Boolean))].slice(0, 3).join(', ');
+    const artist = cleanString(cleanArtistNames || 'Soundtrack Album');
 
     // Strict spam and compilation filter
     if (SPAM_AND_JUNK_FILTER.test(title) || SPAM_AND_JUNK_FILTER.test(artist)) {
@@ -2020,7 +2067,7 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
 
   // 1. Fetch from content.getBrowseModules
   try {
-    const url = 'https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0';
+    const url = `https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
     const res = await fetch(url, { headers: geoHeaders });
     if (res.ok) {
       let text = await res.text();
@@ -2039,7 +2086,7 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
   // 2. Fetch from content.getTrending
   if (albums.length < limit) {
     try {
-      const url = 'https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0';
+      const url = `https://www.jiosaavn.com/api.php?__call=content.getTrending&api_version=4&_format=json&ctx=web6dot0&languages=${encodeURIComponent(language)}`;
       const res = await fetch(url, { headers: geoHeaders });
       if (res.ok) {
         let text = await res.text();

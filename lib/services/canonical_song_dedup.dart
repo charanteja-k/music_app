@@ -76,6 +76,7 @@ class CanonicalSongDedup {
     r'jukebox|all\s+songs|audio\s+jukebox|video\s+jukebox|full\s+album|mega\s+jukebox|'
     r'slowed\s*(?:\+|\band\b)?\s*reverb|speed\s*up|sped\s*up|nightcore|8d\s+audio|bass\s+boosted|'
     r'acoustic\s+cover|guitar\s+cover|piano\s+cover|flute\s+cover|violin\s+cover|vocal\s+cover|cover\s+song|cover\s+version|cover\s+classics|female\s+cover|male\s+cover|'
+    r'recreated|recreation|fan\s*made|unplugged\s*cover|lo-?fi\s*version|lo-?fi\s*mix|'
     r'instrumental|karaoke|oye\s+lalii|'
     r'tabata|power\s+music|workout\s+(?:mix|music|version|track)?|fitness\s+beats|gym\s+(?:music|mix|workout)|'
     r'carnatic\s+mix|lo-?fi\s+mix|'
@@ -419,6 +420,15 @@ class CanonicalSongDedup {
       return false;
     }
 
+    // 1b. Reject generic search keyword / genre spam titles (e.g. "Hindi Melodic", "Telugu Melodies", "Tamil Chill")
+    final trimmedTitle = title.trim();
+    if (RegExp(
+      r'^(?:hindi|telugu|tamil|punjabi|malayalam|kannada|bengali|english|bollywood|tollywood|kollywood)\s+(?:melodic|melodies|chill|hits?|songs?|beats?|vibe|vibes|mix|music|sound|audio|track|tracks|bgm)$',
+      caseSensitive: false,
+    ).hasMatch(trimmedTitle)) {
+      return false;
+    }
+
     // 2. Blacklist DJ, wedding ritual, or ceremony channels
     final authorLower = author.toLowerCase().trim();
     if (authorLower.contains('varmala') ||
@@ -591,7 +601,8 @@ class CanonicalSongDedup {
     r'shankar\s+mahadevan|hariharan|karthik|armaan\s+malik|mickey\s+j\s+meyer|gopi\s+sundar|'
     r'santosh\s+narayanan|yuvan|ilaiyaraaja|harris\s+jayaraj|dhee|santhosh|sushin\s+shyam|'
     r'kasarla\s+shyam|jangi\s+reddy|penchal\s+das|bheems|vijay\s+prakash|sruthi\s+ranjani|'
-    r'kalyan\s+chakravarthy)\b',
+    r'kalyan\s+chakravarthy|vaghani|akhil|kumar|singh|sharma|patel|gupta|reddy|verma|mishra|'
+    r'bhattacharya|sachin|jigar|chatterjee|mukherjee|roy|das|nair|menon|pillai|rao|chaudhary|yadav|joshi|pandey|tiwari)\b',
     caseSensitive: false,
   );
 
@@ -911,7 +922,7 @@ class CanonicalSongDedup {
         }
       }
 
-      // In Indian cinema, one credit may list composer and the other playback singer
+      // In Indian cinema, one credit may list composer and the other playback singer or producer
       final langA = detectLanguage(artistA);
       final langB = detectLanguage(artistB);
       final isIndicA =
@@ -922,9 +933,31 @@ class CanonicalSongDedup {
           (langB != null && langB != 'english') ||
           isKnownIndicArtist(artistB) ||
           LyricsTransliterationService.isRomanizedTelugu(artistB);
-      if (isIndicA && isIndicB) {
+      // If one version explicitly indicates a recreation, cover, or fan-made version
+      final isExplicitCoverOrRecreation = RegExp(
+        r'[\(\[][^\)\]]*(?:recreated|recreation|fan\s*made|cover|lo-?fi|unplugged)[^\)\]]*[\)\]]',
+        caseSensitive: false,
+      );
+      if (isExplicitCoverOrRecreation.hasMatch(titleA) ||
+          isExplicitCoverOrRecreation.hasMatch(titleB)) {
         return true;
       }
+
+      // If one version has a movie tag, both artists must be Indic or compatible
+      final hasFilmTag = RegExp(
+        r'[\(\[][^\)\]]*(?:from|movie|soundtrack|ost)[^\)\]]*[\)\]]',
+        caseSensitive: false,
+      );
+      if ((hasFilmTag.hasMatch(titleA) || hasFilmTag.hasMatch(titleB)) &&
+          (isIndicA && isIndicB)) {
+        return true;
+      }
+
+      // If both artists are Indic and have identical clean title (composer vs singer variations)
+      if (isIndicA && isIndicB && cleanTA.length >= 4) {
+        return true;
+      }
+
       return false;
     }
 

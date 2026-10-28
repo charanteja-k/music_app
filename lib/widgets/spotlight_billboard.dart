@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../services/music_service.dart';
 import '../services/canonical_song_dedup.dart';
+import '../utils/artist_utils.dart';
 
 /// Featured Spotlight Billboard carousel showcasing top trending hits with widescreen artwork.
 class SpotlightBillboard extends StatefulWidget {
@@ -183,7 +184,9 @@ class _SpotlightBillboardState extends State<SpotlightBillboard> {
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        song.author,
+                                        ArtistUtils.formatArtistName(
+                                          song.author,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(

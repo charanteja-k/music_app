@@ -9,11 +9,16 @@ import android.os.Build
 import android.os.Bundle
 import com.ryanheise.audioservice.AudioServiceActivity
 
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Virtualizer
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private var widgetChannel: MethodChannel? = null
+    private var audioEffectsChannel: MethodChannel? = null
+    private var bassBoostEffect: BassBoost? = null
+    private var virtualizerEffect: Virtualizer? = null
 
     companion object {
         @Volatile
@@ -32,6 +37,7 @@ class MainActivity : AudioServiceActivity() {
         if (activeWidgetChannel == widgetChannel) {
             activeWidgetChannel = null
         }
+        releaseAudioEffects()
         super.onDestroy()
     }
 
@@ -94,8 +100,79 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        val effectsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.music_app/audio_effects")
+        audioEffectsChannel = effectsChannel
+        effectsChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setBassBoost" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    val strength = call.argument<Double>("strength") ?: 0.0
+                    val success = applyBassBoost(enabled, strength)
+                    result.success(success)
+                }
+                "setVirtualizer" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    val strength = call.argument<Double>("strength") ?: 0.0
+                    val success = applyVirtualizer(enabled, strength)
+                    result.success(success)
+                }
+                "releaseEffects" -> {
+                    releaseAudioEffects()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         // Deliver pending action if any was queued prior to engine setup
         handleWidgetIntent(intent)
+    }
+
+    private fun applyBassBoost(enabled: Boolean, strength: Double): Boolean {
+        return try {
+            if (bassBoostEffect == null) {
+                bassBoostEffect = BassBoost(0, 0)
+            }
+            bassBoostEffect?.let { bb ->
+                bb.enabled = enabled
+                if (enabled && bb.strengthSupported) {
+                    val targetStrength = (strength.coerceIn(0.0, 1.0) * 1000.0).toInt().toShort()
+                    bb.setStrength(targetStrength)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun applyVirtualizer(enabled: Boolean, strength: Double): Boolean {
+        return try {
+            if (virtualizerEffect == null) {
+                virtualizerEffect = Virtualizer(0, 0)
+            }
+            virtualizerEffect?.let { virt ->
+                virt.enabled = enabled
+                if (enabled && virt.strengthSupported) {
+                    val targetStrength = (strength.coerceIn(0.0, 1.0) * 1000.0).toInt().toShort()
+                    virt.setStrength(targetStrength)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun releaseAudioEffects() {
+        try {
+            bassBoostEffect?.release()
+            bassBoostEffect = null
+        } catch (_: Exception) {}
+        try {
+            virtualizerEffect?.release()
+            virtualizerEffect = null
+        } catch (_: Exception) {}
     }
 
     private fun keepAudioServiceDrawables() {

@@ -46,7 +46,12 @@ class WebPlayerBridge {
     int crossfadeSeconds = 4,
   }) {}
 
-  static void setEqualizer(bool enabled, Map<int, double> bands) {}
+  static void setEqualizer(
+    bool enabled,
+    Map<int, double> bands, {
+    double bassBoost = 0.0,
+    double virtualizer = 0.0,
+  }) {}
 
   static void setFallbackVideoId(String realYtId) {}
 }

@@ -8,6 +8,9 @@ import '../../services/music_service.dart';
 import '../../services/preferences_service.dart';
 import '../playlist_action_menu.dart';
 import '../song_options_bottom_sheet.dart';
+import '../../screens/album_screen.dart';
+import '../../screens/artist_profile_screen.dart';
+import '../../utils/artist_utils.dart';
 
 /// Item descriptor for unified Desktop Context Menus.
 class DesktopContextMenuItem {
@@ -152,6 +155,90 @@ class _DesktopPopupDividerEntryState extends State<_DesktopPopupDividerEntry> {
 /// Reuses existing public service abstractions with zero extra dependencies.
 class DesktopContextMenu {
   DesktopContextMenu._();
+
+  static void _navigateToArtist(BuildContext context, String artistName) {
+    final clean = ArtistUtils.formatArtistName(artistName.trim());
+    if (clean.isEmpty) return;
+
+    final isDesktopPlatform =
+        kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    final isDesktopLayout =
+        isDesktopPlatform && MediaQuery.sizeOf(context).width >= 1024;
+
+    final modalRoute = ModalRoute.of(context);
+    final isModalOrPlayerActive =
+        modalRoute != null &&
+        (modalRoute is! PageRoute || modalRoute.isCurrent == false);
+
+    if (isDesktopLayout && !isModalOrPlayerActive) {
+      DesktopLayoutState.openArtist(clean);
+    } else {
+      if (isDesktopLayout) {
+        DesktopLayoutState.openArtist(clean);
+      }
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => ArtistProfileScreen(artistName: clean),
+        ),
+      );
+    }
+  }
+
+  static void _navigateToAlbum(
+    BuildContext context, {
+    dynamic album,
+    String? albumId,
+    String? albumTitle,
+    String? albumArtwork,
+    String? albumArtist,
+  }) {
+    final isDesktopPlatform =
+        kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    final isDesktopLayout =
+        isDesktopPlatform && MediaQuery.sizeOf(context).width >= 1024;
+
+    final modalRoute = ModalRoute.of(context);
+    final isModalOrPlayerActive =
+        modalRoute != null &&
+        (modalRoute is! PageRoute || modalRoute.isCurrent == false);
+
+    if (isDesktopLayout && !isModalOrPlayerActive) {
+      DesktopLayoutState.openAlbum(
+        album: album,
+        albumId: albumId,
+        albumTitle: albumTitle,
+        albumArtwork: albumArtwork,
+        albumArtist: albumArtist,
+      );
+    } else {
+      if (isDesktopLayout) {
+        DesktopLayoutState.openAlbum(
+          album: album,
+          albumId: albumId,
+          albumTitle: albumTitle,
+          albumArtwork: albumArtwork,
+          albumArtist: albumArtist,
+        );
+      }
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => AlbumScreen(
+            album: album is JioAlbum ? album : null,
+            albumId: albumId,
+            albumTitle: albumTitle,
+            albumArtwork: albumArtwork,
+            albumArtist: albumArtist,
+          ),
+        ),
+      );
+    }
+  }
 
   /// Displays the contextual popup menu at the mouse coordinates.
   static Future<void> show({
@@ -644,7 +731,7 @@ class DesktopContextMenu {
           onTap: () async {
             final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
             if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
-              DesktopLayoutState.openAlbum(album: cachedAlbum);
+              _navigateToAlbum(context, album: cachedAlbum);
               return;
             }
             final cachedId = MusicService.getCachedAlbumId(song.id.value);
@@ -653,7 +740,8 @@ class DesktopContextMenu {
                 MusicService.extractMovieOrAlbumTitle(song.title);
             if ((cachedId != null && cachedId.isNotEmpty) ||
                 (cachedTitle != null && cachedTitle.isNotEmpty)) {
-              DesktopLayoutState.openAlbum(
+              _navigateToAlbum(
+                context,
                 albumId: cachedId,
                 albumTitle: cachedTitle,
                 albumArtwork: MusicService.getHdThumbnail(song.id.value),
@@ -663,7 +751,9 @@ class DesktopContextMenu {
             }
             final resolved = await musicService.resolveAlbumForSong(song);
             if (resolved != null && resolved.songs.isNotEmpty) {
-              DesktopLayoutState.openAlbum(album: resolved);
+              if (context.mounted) {
+                _navigateToAlbum(context, album: resolved);
+              }
             } else if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -678,7 +768,7 @@ class DesktopContextMenu {
           title: 'View Artist Profile',
           icon: Icons.person_rounded,
           onTap: () {
-            DesktopLayoutState.openArtist(song.author);
+            _navigateToArtist(context, song.author);
           },
         ),
         const DesktopContextMenuItem.divider(),
@@ -750,7 +840,7 @@ class DesktopContextMenu {
           onTap: () async {
             final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
             if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
-              DesktopLayoutState.openAlbum(album: cachedAlbum);
+              _navigateToAlbum(context, album: cachedAlbum);
               return;
             }
             final cachedId = MusicService.getCachedAlbumId(song.id.value);
@@ -759,7 +849,8 @@ class DesktopContextMenu {
                 MusicService.extractMovieOrAlbumTitle(song.title);
             if ((cachedId != null && cachedId.isNotEmpty) ||
                 (cachedTitle != null && cachedTitle.isNotEmpty)) {
-              DesktopLayoutState.openAlbum(
+              _navigateToAlbum(
+                context,
                 albumId: cachedId,
                 albumTitle: cachedTitle,
                 albumArtwork: MusicService.getHdThumbnail(song.id.value),
@@ -769,7 +860,9 @@ class DesktopContextMenu {
             }
             final resolved = await musicService.resolveAlbumForSong(song);
             if (resolved != null && resolved.songs.isNotEmpty) {
-              DesktopLayoutState.openAlbum(album: resolved);
+              if (context.mounted) {
+                _navigateToAlbum(context, album: resolved);
+              }
             } else if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -784,7 +877,7 @@ class DesktopContextMenu {
           title: 'View Artist Profile',
           icon: Icons.person_rounded,
           onTap: () {
-            DesktopLayoutState.openArtist(song.author);
+            _navigateToArtist(context, song.author);
           },
         ),
         const DesktopContextMenuItem.divider(),
@@ -893,7 +986,7 @@ class DesktopContextMenu {
         onTap: () async {
           final cachedAlbum = MusicService.getCachedAlbum(song.id.value);
           if (cachedAlbum != null && cachedAlbum.songs.isNotEmpty) {
-            DesktopLayoutState.openAlbum(album: cachedAlbum);
+            _navigateToAlbum(context, album: cachedAlbum);
             return;
           }
           final cachedId = MusicService.getCachedAlbumId(song.id.value);
@@ -902,7 +995,8 @@ class DesktopContextMenu {
               MusicService.extractMovieOrAlbumTitle(song.title);
           if ((cachedId != null && cachedId.isNotEmpty) ||
               (cachedTitle != null && cachedTitle.isNotEmpty)) {
-            DesktopLayoutState.openAlbum(
+            _navigateToAlbum(
+              context,
               albumId: cachedId,
               albumTitle: cachedTitle,
               albumArtwork: MusicService.getHdThumbnail(song.id.value),
@@ -912,7 +1006,9 @@ class DesktopContextMenu {
           }
           final resolved = await musicService.resolveAlbumForSong(song);
           if (resolved != null && resolved.songs.isNotEmpty) {
-            DesktopLayoutState.openAlbum(album: resolved);
+            if (context.mounted) {
+              _navigateToAlbum(context, album: resolved);
+            }
           } else if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -928,7 +1024,7 @@ class DesktopContextMenu {
         title: 'Go to artist',
         icon: Icons.person_rounded,
         onTap: () {
-          DesktopLayoutState.openArtist(song.author);
+          _navigateToArtist(context, song.author);
         },
       ),
       if (currentPlaylistId != null && currentPlaylistId != 'liked_songs')
@@ -1020,7 +1116,8 @@ class DesktopContextMenu {
               final videoList = loaded.songs.map(songMapToVideo).toList();
               musicService.playPlaylist(videoList, 0);
             } else if (context.mounted) {
-              DesktopLayoutState.openAlbum(
+              _navigateToAlbum(
+                context,
                 albumId: albumId,
                 albumTitle: albumTitle,
                 albumArtwork: albumArtwork,
@@ -1028,7 +1125,8 @@ class DesktopContextMenu {
               );
             }
           } else {
-            DesktopLayoutState.openAlbum(
+            _navigateToAlbum(
+              context,
               albumId: albumId,
               albumTitle: albumTitle,
               albumArtwork: albumArtwork,
@@ -1142,7 +1240,7 @@ class DesktopContextMenu {
           title: 'Go to artist',
           icon: Icons.person_rounded,
           onTap: () {
-            DesktopLayoutState.openArtist(albumArtist);
+            _navigateToArtist(context, albumArtist);
           },
         ),
       ],

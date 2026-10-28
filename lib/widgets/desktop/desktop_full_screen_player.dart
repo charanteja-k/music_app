@@ -12,6 +12,7 @@ import '../../services/web_player_bridge.dart';
 import '../../layouts/desktop_layout_state.dart';
 import '../animated_lyrics.dart';
 import '../vinyl_record_player.dart';
+import '../../utils/artist_utils.dart';
 
 enum DesktopPlayerTab { nowPlaying, lyrics, queue }
 
@@ -469,7 +470,7 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
                             );
                           },
                           child: Text(
-                            widget.song.author,
+                            ArtistUtils.formatArtistName(widget.song.author),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -560,7 +561,7 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.song.author,
+                  ArtistUtils.formatArtistName(widget.song.author),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -662,7 +663,7 @@ class _DesktopFullScreenPlayerState extends State<DesktopFullScreenPlayer> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.song.author,
+                  ArtistUtils.formatArtistName(widget.song.author),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
