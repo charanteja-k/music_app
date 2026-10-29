@@ -36,7 +36,7 @@ This workspace operates under the **Architectural Immutability + UI Transformati
 
 ---
 
-## 2. Six Absolute Architectural Invariants
+## 2. Eight Absolute Architectural Invariants
 
 1. **Rule #1: Audio Engine Immutability**  
    - Never rewrite `MusicService`, `_playerA`, `_playerB`, active/standby deck swapping, equal-power crossfade mathematics, or stream cascades to make UI code easier.
@@ -60,6 +60,19 @@ This workspace operates under the **Architectural Immutability + UI Transformati
 
 6. **Rule #6: No Backdoors**  
    - Widgets must interact exclusively through existing public service abstractions.
+
+7. **Rule #7: Sovereign Bootstrap & Recovery Invariant (Zero-Black-Screen Guarantee)**  
+   - `main()` must NEVER await unguarded native plugins, audio hardware drivers, or remote network services before calling `runApp()`. The Flutter framework must render its initial frame unconditionally.
+   - The Bootstrap & Emergency Recovery layer (Splash, Settings, Updates, Version Rollback, Data Snapshots) must remain completely decoupled and independent from `MusicService`, audio sessions, platform equalizer effects, and remote catalogs.
+   - If the core UI or audio engine encounters an unhandled exception or fails to mount, the app must activate a lightweight, engine-independent Safe Mode / Recovery Shell. Users must never be trapped on a dead screen and must always have access to:
+     - Version rollback to any prior release (`UpdateService.fetchAllReleases()`).
+     - Checking and installing hotfix updates (`UpdateService.checkForUpdate()`).
+     - Emergency snapshot backup & restore (`DataSnapshotService`).
+     - Resetting corrupt transient caches without wiping offline downloads or custom playlists.
+
+8. **Rule #8: Release Build & ProGuard Verification Gate**  
+   - Whenever dependencies in `pubspec.yaml` or `pubspec.lock` are upgraded (especially native plugins like `shared_preferences`, `path_provider`, `just_audio`), or whenever Android/iOS platform configurations are modified, a release compilation (`flutter build apk --release`) is mandatory before creating a git tag or publishing a release.
+   - Release APK builds verify that R8 code shrinking, bytecode obfuscation, JNI bindings, and ProGuard keep rules do not silently strip classes required at runtime.
 
 ---
 
@@ -104,6 +117,10 @@ The agent **MUST STOP IMPLEMENTATION**, explain why, prove that a presentation-o
 ```bash
 dart format lib/ test/       # Must yield 0 changed files
 flutter analyze lib/         # Must yield 0 errors, 0 warnings, 0 infos
-flutter test                 # Must pass 100% of tests (currently 219/219)
+flutter test                 # Must pass 100% of tests (currently 443/443)
 git checkout -- linux/ macos/ windows/ # Clean transient platform files
+
+# Mandatory whenever dependencies or platform build configs are modified:
+flutter build apk --release  # Must compile successfully with R8 shrinking
 ```
+
