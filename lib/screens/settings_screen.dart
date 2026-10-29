@@ -12,6 +12,7 @@ import '../widgets/interactive_update_dialog.dart';
 import '../widgets/equalizer_bottom_sheet.dart';
 import '../widgets/previous_versions_sheet.dart';
 import '../layouts/desktop_layout_state.dart';
+import 'recovery_shell_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -1485,6 +1486,40 @@ class _SettingsScreenState extends State<SettingsScreen>
                     color: Colors.white30,
                   ),
                   onTap: () => PreviousVersionsSheet.show(context),
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amberAccent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.shield_outlined,
+                      color: Colors.amberAccent,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'Safe Mode & Recovery Shell',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Tools for rollback, snapshot restore, and cache purge',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white30,
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const RecoveryShellScreen(),
+                    ),
+                  ),
                 ),
                 SwitchListTile(
                   title: const Text(

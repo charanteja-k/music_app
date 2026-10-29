@@ -1,10 +1,9 @@
 /* DilSe PWA Service Worker (Zero-Data Offline App Shell & Audio Engine) */
-const SHELL_CACHE = 'dilse-shell-v1';
+const SHELL_CACHE = 'dilse-shell-v2';
 const AUDIO_CACHE = 'dilse-offline-audio-v1';
 
 const PRECACHE_ASSETS = [
-  './',
-  'index.html',
+  '/',
   'manifest.json',
   'favicon.png',
   'dilse_web_player.js',
@@ -17,9 +16,29 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => {
-      console.log('[DilSe SW] Pre-caching app shell assets');
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      console.log('[DilSe SW] Pre-caching app shell assets (v2)');
+
+      // Fetch root HTML document and store clean, non-redirected copies for all root navigation paths.
+      // Critical for Safari iOS WebKit: Vercel clean URLs redirect /index.html -> / (HTTP 308).
+      // Storing an unredirected Response ensures response.redirected === false on offline launch.
+      try {
+        const rootResp = await fetch('/', { cache: 'reload' });
+        if (rootResp && rootResp.ok) {
+          const blob = await rootResp.blob();
+          const headers = new Headers(rootResp.headers);
+          headers.set('Content-Type', 'text/html; charset=utf-8');
+
+          await cache.put('/', new Response(blob, { status: 200, statusText: 'OK', headers }));
+          await cache.put('./', new Response(blob, { status: 200, statusText: 'OK', headers }));
+          await cache.put('index.html', new Response(blob, { status: 200, statusText: 'OK', headers }));
+        }
+      } catch (err) {
+        console.warn('[DilSe SW] Root index precache error:', err);
+      }
+
+      // Pre-cache secondary static assets
+      return cache.addAll(PRECACHE_ASSETS.filter((path) => path !== '/')).catch((err) => {
         console.warn('[DilSe SW] Pre-cache partial fail (will fetch dynamically):', err);
       });
     })
@@ -107,20 +126,67 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation requests: Network-first, fallback to cached index.html
+  // 2. Navigation requests: Network-first, fallback to clean cached index.html
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(async () => {
-        const cache = await caches.open(SHELL_CACHE);
-        const cachedIndex = await cache.match('index.html') || await cache.match('./');
-        if (cachedIndex) {
-          return cachedIndex;
-        }
-        return new Response('DilSe is offline. Open from Home Screen to play downloaded music.', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      })
+      fetch(req)
+        .then(async (networkResp) => {
+          if (networkResp && networkResp.status === 200) {
+            const cache = await caches.open(SHELL_CACHE);
+            // If Vercel or hosting redirected the request (e.g. trailing slash / clean URL),
+            // clean it before storing so offline navigation never receives redirected: true
+            if (networkResp.redirected) {
+              const blob = await networkResp.clone().blob();
+              const headers = new Headers(networkResp.headers);
+              headers.set('Content-Type', 'text/html; charset=utf-8');
+              const cleanResp = new Response(blob, {
+                status: 200,
+                statusText: 'OK',
+                headers
+              });
+              await cache.put(req, cleanResp);
+            } else {
+              await cache.put(req, networkResp.clone());
+            }
+          }
+          return networkResp;
+        })
+        .catch(async () => {
+          const cache = await caches.open(SHELL_CACHE);
+          const cachedIndex =
+            (await cache.match('/')) ||
+            (await cache.match('./')) ||
+            (await cache.match('index.html'));
+
+          if (cachedIndex) {
+            // CRITICAL FOR SAFARI / WEBKIT (Zero-Black-Screen PWA Invariant):
+            // Safari throws "Response served by service worker has redirections"
+            // if a response returned to respondWith() has redirected === true or opaqueredirect type.
+            // Creating a new Response from blob() strips the redirected flag completely.
+            const blob = await cachedIndex.blob();
+            const headers = new Headers(cachedIndex.headers);
+            headers.set('Content-Type', 'text/html; charset=utf-8');
+            return new Response(blob, {
+              status: 200,
+              statusText: 'OK',
+              headers
+            });
+          }
+
+          return new Response(
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>DilSe Offline</title>' +
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+            '<style>body{background:#000;color:#fff;font-family:sans-serif;display:flex;' +
+            'align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;' +
+            'text-align:center;box-sizing:border-box;}</style></head><body>' +
+            '<div><h2>DilSe is Offline</h2><p>Please open DilSe once while connected to the internet to initialize the offline player.</p></div>' +
+            '</body></html>',
+            {
+              status: 200,
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            }
+          );
+        })
     );
     return;
   }

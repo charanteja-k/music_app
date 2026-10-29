@@ -6,6 +6,7 @@ import '../services/music_service.dart';
 import '../services/bug_report_service.dart';
 import '../constants/app_theme_tokens.dart';
 import 'main_screen.dart';
+import 'recovery_shell_screen.dart';
 
 class IntroSplashScreen extends StatefulWidget {
   const IntroSplashScreen({super.key});
@@ -311,6 +312,45 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
                         ],
                       ),
                   ],
+                );
+              },
+            ),
+          ),
+
+          // Emergency Recovery entry point (Rule #7: Zero-Black-Screen Invariant)
+          Positioned(
+            left: 20,
+            bottom: 40,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                if (!kIsWeb && _controller.value < 0.25) {
+                  return const SizedBox.shrink();
+                }
+                return TextButton.icon(
+                  onPressed: () {
+                    _fallbackTimer?.cancel();
+                    _hardFallbackTimer?.cancel();
+                    _controller.stop();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const RecoveryShellScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.shield_outlined,
+                    size: 15,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  label: Text(
+                    'Recovery',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 );
               },
             ),

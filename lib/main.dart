@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'services/audio_handler.dart';
 import 'screens/intro_splash_screen.dart';
 import 'screens/main_screen.dart';
+import 'screens/recovery_shell_screen.dart';
 import 'services/preferences_service.dart';
 import 'services/bug_report_service.dart';
 import 'services/auth_service.dart';
@@ -16,6 +17,13 @@ void main() async {
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('[DilSe] Framework error caught: ${details.exception}');
+  };
+
+  // Rule #7: Sovereign Bootstrap & Recovery Invariant (Zero-Black-Screen Guarantee)
+  // Replaces the default grey/black error screen with an isolated Recovery Shell
+  // allowing version rollback, data restoration, and cache clearing.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return RecoveryShellScreen(errorDetails: details, isCrashRecovery: true);
   };
 
   if (kIsWeb) {
