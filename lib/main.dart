@@ -11,6 +11,13 @@ import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Guard release builds against blank black screens on unhandled framework errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('[DilSe] Framework error caught: ${details.exception}');
+  };
+
   if (kIsWeb) {
     BrowserContextMenu.disableContextMenu();
   } else {
@@ -20,9 +27,25 @@ void main() async {
       debugPrint('AudioService init warning: $e');
     }
   }
-  await PreferencesService().init();
-  await AuthService().initialize();
-  await BugReportService.instance.init();
+
+  try {
+    await PreferencesService().init();
+  } catch (e) {
+    debugPrint('PreferencesService init error: $e');
+  }
+
+  try {
+    await AuthService().initialize();
+  } catch (e) {
+    debugPrint('AuthService initialize error: $e');
+  }
+
+  try {
+    await BugReportService.instance.init();
+  } catch (e) {
+    debugPrint('BugReportService init error: $e');
+  }
+
   runApp(const MusicApp());
 }
 

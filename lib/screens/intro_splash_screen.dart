@@ -123,7 +123,13 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
           MaterialPageRoute(builder: (_) => const MainScreen()),
           (route) => false,
         );
-      } catch (_) {}
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _showMainFallback = true;
+          });
+        }
+      }
     }
   }
 

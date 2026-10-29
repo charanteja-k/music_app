@@ -110,6 +110,21 @@ class UpdateService {
         if (info.hasUpdate) {
           latestUpdateInfoNotifier.value = info;
         }
+        // Asynchronously verify against current package version to clear stale cached update info
+        PackageInfo.fromPlatform()
+            .then((pkg) {
+              if (!_isRemoteNewer(
+                remoteTag: info.tagName,
+                currentVersion: pkg.version,
+                currentBuild: pkg.buildNumber,
+              )) {
+                PreferencesService().clearPendingUpdateInfo();
+                if (latestUpdateInfoNotifier.value?.tagName == info.tagName) {
+                  latestUpdateInfoNotifier.value = null;
+                }
+              }
+            })
+            .catchError((_) {});
       } catch (_) {}
     }
   }

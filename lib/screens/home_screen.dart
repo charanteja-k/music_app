@@ -821,6 +821,20 @@ class _HomeScreenState extends State<HomeScreen>
     return json.encode(list);
   }
 
+  static VideoId _safeVideoId(String rawId) {
+    try {
+      return VideoId(rawId);
+    } catch (_) {
+      final sanitized = rawId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final padded = sanitized.padRight(11, '0').substring(0, 11);
+      try {
+        return VideoId(padded);
+      } catch (_) {
+        return VideoId('00000000000');
+      }
+    }
+  }
+
   List<Video> _deserializeCachedVideos(String? jsonStr) {
     if (jsonStr == null || jsonStr.isEmpty) return [];
     try {
@@ -835,8 +849,9 @@ class _HomeScreenState extends State<HomeScreen>
         if (thumb.isNotEmpty) {
           MusicService.registerArtwork(id, thumb);
         }
+        final safeId = _safeVideoId(id);
         return Video(
-          VideoId(id),
+          safeId,
           m['title'] as String,
           m['author'] as String,
           ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
@@ -845,7 +860,7 @@ class _HomeScreenState extends State<HomeScreen>
           null,
           '',
           Duration(milliseconds: (m['durationMs'] as num?)?.toInt() ?? 0),
-          ThumbnailSet(id),
+          ThumbnailSet(safeId.value),
           null,
           Engagement(0, null, null),
           false,
@@ -871,8 +886,9 @@ class _HomeScreenState extends State<HomeScreen>
         (m['durationMs'] as num?)?.toInt() ??
         (((m['duration'] as num?)?.toInt() ?? 0) * 1000);
 
+    final safeId = _safeVideoId(id);
     return Video(
-      VideoId(id),
+      safeId,
       (m['title'] as String?) ?? 'Unknown Title',
       (m['author'] as String?) ?? (m['artist'] as String?) ?? 'Unknown Artist',
       ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
@@ -881,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen>
       null,
       '',
       Duration(milliseconds: durMs),
-      ThumbnailSet(id),
+      ThumbnailSet(safeId.value),
       null,
       Engagement(0, null, null),
       false,
