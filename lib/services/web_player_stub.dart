@@ -54,4 +54,14 @@ class WebPlayerBridge {
   }) {}
 
   static void setFallbackVideoId(String realYtId) {}
+
+  static Future<bool> cacheAudioForOffline(
+    String songId,
+    String streamUrl, [
+    String? artworkUrl,
+  ]) async => false;
+
+  static Future<void> deleteCachedAudio(String songId) async {}
+
+  static Future<bool> isSongCached(String songId) async => false;
 }

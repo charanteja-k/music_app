@@ -95,6 +95,18 @@ class SearchScreenState extends State<SearchScreen>
   bool get _isDesktop =>
       widget.isDesktopView ??
       ((MediaQuery.maybeOf(context)?.size.width ?? 0) >= 1024);
+
+  bool get _isDesktopLayoutActive {
+    if (widget.isDesktopView == true) return true;
+    final isDesktopPlatform =
+        kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    final screenWidth = MediaQuery.maybeOf(context)?.size.width ?? 0;
+    return isDesktopPlatform && screenWidth >= 500.0;
+  }
+
   bool _isSubmittingSearch = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -1504,6 +1516,46 @@ class SearchScreenState extends State<SearchScreen>
     );
   }
 
+  void _openCategory(Map<String, dynamic> cat) {
+    HapticFeedback.lightImpact();
+    final isDesktop = _isDesktopLayoutActive;
+
+    final title = cat['title'] as String;
+    final subtitle = (cat['subtitle'] as String?) ?? 'Curated Playlist';
+    final query = (cat['query'] as String?) ?? title;
+    final colors = cat['colors'] as List<Color>?;
+    final icon = cat['icon'] as IconData?;
+    final imageUrl = cat['thumbnailUrl'] as String?;
+
+    if (isDesktop) {
+      DesktopLayoutState.openCuratedPlaylist(
+        'category_$title',
+        title: title,
+        subtitle: subtitle,
+        query: query,
+        gradientColors: colors,
+        icon: icon,
+        imageUrl: imageUrl,
+        fetchSongs: () => StudioSearchService().searchSongs(query),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CuratedPlaylistScreen(
+            title: title,
+            subtitle: subtitle,
+            query: query,
+            gradientColors: colors,
+            icon: icon,
+            imageUrl: imageUrl,
+            fetchSongs: () => StudioSearchService().searchSongs(query),
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildCategoriesGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1590,45 +1642,7 @@ class SearchScreenState extends State<SearchScreen>
                   colors: cat['colors'] as List<Color>?,
                   icon: cat['icon'] as IconData?,
                   thumbnailUrl: cat['thumbnailUrl'] as String?,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    final isDesktop = constraints.maxWidth >= 600 || kIsWeb;
-                    if (isDesktop &&
-                        (kIsWeb ||
-                            defaultTargetPlatform == TargetPlatform.windows ||
-                            defaultTargetPlatform == TargetPlatform.macOS ||
-                            defaultTargetPlatform == TargetPlatform.linux)) {
-                      DesktopLayoutState.openCuratedPlaylist(
-                        'category_${cat['title']}',
-                        title: cat['title'] as String,
-                        subtitle: cat['subtitle'] as String,
-                        query: cat['query'] as String,
-                        gradientColors: cat['colors'] as List<Color>?,
-                        icon: cat['icon'] as IconData?,
-                        imageUrl: cat['thumbnailUrl'] as String?,
-                        fetchSongs: () => StudioSearchService().searchSongs(
-                          cat['query'] as String,
-                        ),
-                      );
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CuratedPlaylistScreen(
-                            title: cat['title'] as String,
-                            subtitle: cat['subtitle'] as String,
-                            query: cat['query'] as String,
-                            gradientColors: cat['colors'] as List<Color>?,
-                            icon: cat['icon'] as IconData?,
-                            imageUrl: cat['thumbnailUrl'] as String?,
-                            fetchSongs: () => StudioSearchService().searchSongs(
-                              cat['query'] as String,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _openCategory(cat),
                 );
               },
             ),
@@ -1721,7 +1735,7 @@ class SearchScreenState extends State<SearchScreen>
                   artist: artist,
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    if (kIsWeb && MediaQuery.of(context).size.width >= 1024) {
+                    if (_isDesktopLayoutActive) {
                       DesktopLayoutState.openArtist(artist.name);
                     } else {
                       Navigator.push(
@@ -2061,7 +2075,7 @@ class SearchScreenState extends State<SearchScreen>
       onTap: () {
         HapticFeedback.lightImpact();
         _prefs.addToSearchHistory(album.title, type: 'album');
-        if (kIsWeb && MediaQuery.of(context).size.width >= 1024) {
+        if (_isDesktopLayoutActive) {
           DesktopLayoutState.openAlbum(
             album: album,
             albumId: album.id,

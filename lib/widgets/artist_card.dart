@@ -31,13 +31,14 @@ class _ArtistCardState extends State<ArtistCard> {
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTapDown: (_) => setState(() => _isPressed = true),
-          onTapUp: (_) {
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: () {
             setState(() => _isPressed = false);
             HapticFeedback.lightImpact();
             widget.onTap();
           },
-          onTapCancel: () => setState(() => _isPressed = false),
           child: AnimatedScale(
             scale: scale,
             duration: const Duration(milliseconds: 180),

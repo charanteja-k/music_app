@@ -65,6 +65,7 @@
   let isInterrupted = false;
   let wasPlayingBeforeInterruption = false;
   let streamNeedsReconnect = false;
+  let currentDirectStream = '';
 
   // Dual-Deck HTML5 Native Audio Elements (Deck A & Deck B for true overlapping crossfades)
   let deckA = null;
@@ -608,6 +609,10 @@
   function triggerFallback() {
     clearFallbackTimer();
     if (activeEngine === ENGINE_IFRAME) return; // already in fallback
+    if (!navigator.onLine || (currentDirectStream && (currentDirectStream.startsWith('/offline_audio') || currentDirectStream.startsWith('blob:')))) {
+      console.warn('[DilSe Web Player] Offline mode active; skipping YouTube online fallback');
+      return;
+    }
 
     console.warn('[DilSe Web Player] Activating Method 1 YouTube IFrame fallback for video:', currentVideoId);
     switchingEngines = true;
@@ -1007,9 +1012,11 @@
     // If direct stream URL is already provided (e.g. from native JioSaavn search), play instantly!
     const streamToPlay = directStreamUrl || window.dilseCurrentStreamUrl || '';
     window.dilseCurrentStreamUrl = '';
+    currentDirectStream = streamToPlay;
 
-    const isDirectAudio = streamToPlay && typeof streamToPlay === 'string' && streamToPlay.startsWith('http') &&
-      (streamToPlay.includes('.mp4') || streamToPlay.includes('.m4a') || streamToPlay.includes('saavncdn') || streamToPlay.includes('media-cdn') || streamToPlay.includes('workers.dev'));
+    const isDirectAudio = streamToPlay && typeof streamToPlay === 'string' &&
+      (streamToPlay.startsWith('http') || streamToPlay.startsWith('blob:') || streamToPlay.startsWith('/offline_audio') || streamToPlay.startsWith('data:')) &&
+      (streamToPlay.includes('.mp4') || streamToPlay.includes('.m4a') || streamToPlay.includes('saavncdn') || streamToPlay.includes('media-cdn') || streamToPlay.includes('workers.dev') || streamToPlay.startsWith('blob:') || streamToPlay.startsWith('/offline_audio'));
 
     if (isDirectAudio) {
       console.log('[DilSe Web Player] Direct 320k stream provided, playing immediately:', streamToPlay);
@@ -1035,7 +1042,9 @@
       if (startSeconds > 0) {
         audioEl.currentTime = startSeconds;
       }
-      armFallbackTimer(videoId, startSeconds);
+      if (!streamToPlay.startsWith('blob:') && !streamToPlay.startsWith('/offline_audio')) {
+        armFallbackTimer(videoId, startSeconds);
+      }
 
       audioEl.play().then(() => {
         unlockAudioContext();
@@ -1530,6 +1539,49 @@
       });
     } catch (e) {
       console.warn('[DilSe Web Player] MediaSession error:', e);
+    }
+  };
+
+  // Offline Audio Cache APIs for PWA zero-data playback
+  window.dilseCacheAudio = async function (songId, streamUrl, artworkUrl) {
+    if (!('caches' in window)) return false;
+    try {
+      const cache = await caches.open('dilse-offline-audio-v1');
+      const res = await fetch(streamUrl, { mode: 'cors' });
+      if (!res.ok) throw new Error('Audio fetch failed with status: ' + res.status);
+      await cache.put('/offline_audio/' + songId, res);
+      if (artworkUrl) {
+        try {
+          const artRes = await fetch(artworkUrl, { mode: 'no-cors' });
+          await cache.put('/offline_artwork/' + songId, artRes);
+        } catch (_) {}
+      }
+      console.log('[DilSe Web Player] Successfully cached offline audio for:', songId);
+      return true;
+    } catch (err) {
+      console.warn('[DilSe Web Player] Cache audio error for ' + songId + ':', err);
+      return false;
+    }
+  };
+
+  window.dilseDeleteCachedAudio = async function (songId) {
+    if (!('caches' in window)) return;
+    try {
+      const cache = await caches.open('dilse-offline-audio-v1');
+      await cache.delete('/offline_audio/' + songId);
+      await cache.delete('/offline_artwork/' + songId);
+      console.log('[DilSe Web Player] Deleted offline audio for:', songId);
+    } catch (_) {}
+  };
+
+  window.dilseIsCachedAudio = async function (songId) {
+    if (!('caches' in window)) return false;
+    try {
+      const cache = await caches.open('dilse-offline-audio-v1');
+      const match = await cache.match('/offline_audio/' + songId);
+      return Boolean(match);
+    } catch (_) {
+      return false;
     }
   };
 

@@ -63,13 +63,16 @@ class _DesktopTrackInfoSection extends StatelessWidget {
         final song = musicService.currentSong;
         if (song == null) {
           final history = prefs.listeningHistory;
-          final lastPlayed = history.isNotEmpty ? history.first : null;
+          final lastPlayedMap = prefs.lastPlayedSong;
+          final lastPlayed =
+              lastPlayedMap ?? (history.isNotEmpty ? history.first : null);
 
           if (lastPlayed != null) {
-            final title = lastPlayed['title'] ?? 'Unknown Track';
-            final author = lastPlayed['author'] ?? 'Unknown Artist';
-            final thumbnail = lastPlayed['thumbnail'] ?? '';
-            final id = lastPlayed['id'] ?? '';
+            final title = (lastPlayed['title'] as String?) ?? 'Unknown Track';
+            final author =
+                (lastPlayed['author'] as String?) ?? 'Unknown Artist';
+            final thumbnail = (lastPlayed['thumbnail'] as String?) ?? '';
+            final id = (lastPlayed['id'] as String?) ?? '';
             final isLiked = id.isNotEmpty && musicService.isLiked(id);
 
             return Row(
@@ -79,7 +82,13 @@ class _DesktopTrackInfoSection extends StatelessWidget {
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
                       onTap: () {
-                        musicService.playMostPlayedSong(lastPlayed);
+                        if (lastPlayedMap != null) {
+                          musicService.resumeLastPlaybackSession();
+                        } else {
+                          musicService.playMostPlayedSong(
+                            Map<String, String>.from(lastPlayed),
+                          );
+                        }
                       },
                       child: Row(
                         children: [

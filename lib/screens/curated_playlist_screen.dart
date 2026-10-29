@@ -76,6 +76,21 @@ class _CuratedPlaylistScreenState extends State<CuratedPlaylistScreen> {
   }
 
   @override
+  void didUpdateWidget(CuratedPlaylistScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.title != oldWidget.title ||
+        widget.query != oldWidget.query ||
+        widget.initialSongs != oldWidget.initialSongs ||
+        widget.fetchSongs != oldWidget.fetchSongs) {
+      _errorMessage = null;
+      _isLoading = true;
+      _tracks = [];
+      _relatedAlbums = [];
+      _loadTracks();
+    }
+  }
+
+  @override
   void dispose() {
     _musicService.removeListener(_onServiceChanged);
     _scrollController.dispose();

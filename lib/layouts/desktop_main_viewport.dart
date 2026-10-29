@@ -49,33 +49,39 @@ class DesktopMainViewport extends StatelessWidget {
             }
 
             if (activeTab == DesktopNavTab.customPlaylist) {
-              return ValueListenableBuilder<String?>(
-                valueListenable: DesktopLayoutState.activePlaylistId,
-                builder: (context, playlistId, _) {
-                  if (playlistId == null || playlistId.isEmpty) {
-                    return _buildIndexedStack(DesktopNavTab.home);
-                  }
-                  final curatedData =
-                      DesktopLayoutState.activeCuratedPlaylistData.value;
-                  if (curatedData != null) {
-                    return CuratedPlaylistScreen(
-                      key: ValueKey('desktop_curated_$playlistId'),
-                      title: curatedData['title'] as String,
-                      subtitle: curatedData['subtitle'] as String,
-                      query: curatedData['query'] as String?,
-                      initialSongs: curatedData['initialSongs'] as List<Video>?,
-                      fetchSongs:
-                          curatedData['fetchSongs']
-                              as Future<List<Video>> Function()?,
-                      gradientColors:
-                          curatedData['gradientColors'] as List<Color>?,
-                      icon: curatedData['icon'] as IconData?,
-                      imageUrl: curatedData['imageUrl'] as String?,
-                    );
-                  }
-                  return CustomPlaylistScreen(
-                    key: ValueKey('desktop_playlist_$playlistId'),
-                    playlistId: playlistId,
+              return ValueListenableBuilder<Map<String, dynamic>?>(
+                valueListenable: DesktopLayoutState.activeCuratedPlaylistData,
+                builder: (context, curatedData, _) {
+                  return ValueListenableBuilder<String?>(
+                    valueListenable: DesktopLayoutState.activePlaylistId,
+                    builder: (context, playlistId, _) {
+                      if (playlistId == null || playlistId.isEmpty) {
+                        return _buildIndexedStack(DesktopNavTab.home);
+                      }
+                      if (curatedData != null) {
+                        return CuratedPlaylistScreen(
+                          key: ValueKey(
+                            'desktop_curated_${playlistId}_${curatedData['title']}',
+                          ),
+                          title: curatedData['title'] as String,
+                          subtitle: curatedData['subtitle'] as String,
+                          query: curatedData['query'] as String?,
+                          initialSongs:
+                              curatedData['initialSongs'] as List<Video>?,
+                          fetchSongs:
+                              curatedData['fetchSongs']
+                                  as Future<List<Video>> Function()?,
+                          gradientColors:
+                              curatedData['gradientColors'] as List<Color>?,
+                          icon: curatedData['icon'] as IconData?,
+                          imageUrl: curatedData['imageUrl'] as String?,
+                        );
+                      }
+                      return CustomPlaylistScreen(
+                        key: ValueKey('desktop_playlist_$playlistId'),
+                        playlistId: playlistId,
+                      );
+                    },
                   );
                 },
               );

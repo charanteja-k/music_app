@@ -133,7 +133,8 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
       persistPlaybackSession(force: true);
     }
   }
@@ -4999,6 +5000,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     notifyListeners();
+    persistPlaybackSession(force: true);
 
     final mediaItem = MediaItem(
       id: song.id.value,
@@ -5202,7 +5204,16 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
       // 2. Web Mode (PWA / Browser):
       // Dual Engine: Cloudflare Edge Direct Stream (<audio>) + YouTube IFrame Fallback
       if (kIsWeb) {
-        final directStreamUrl = _webStreamUrls[song.id.value] ?? '';
+        String directStreamUrl = _webStreamUrls[song.id.value] ?? '';
+        final downloadedMatch = _downloadedSongs.firstWhere(
+          (s) => s['id'] == song.id.value,
+          orElse: () => {},
+        );
+        if (downloadedMatch.isNotEmpty &&
+            downloadedMatch['localPath'] != null &&
+            downloadedMatch['localPath']!.isNotEmpty) {
+          directStreamUrl = downloadedMatch['localPath']!;
+        }
         String webVideoId = song.id.value;
         final isSyntheticId = !CanonicalSongDedup.isLikelyYouTubeId(webVideoId);
 
@@ -5294,6 +5305,7 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
         _lastFailedSongId = null;
         _songRetryCount = 0;
         notifyListeners();
+        persistPlaybackSession(force: true);
         _prewarmUpcomingTracks(_currentIndex + 1, count: 3);
         _checkAndPreloadNextQueue();
         return;
@@ -6285,7 +6297,22 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isDownloading => _isDownloading;
 
   Future<void> loadDownloadedSongs() async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final content = prefs.getString('dilse_downloaded_songs_web');
+        if (content != null && content.isNotEmpty) {
+          final List<dynamic> jsonList = json.decode(content);
+          _downloadedSongs = jsonList
+              .map((e) => Map<String, String>.from(e))
+              .toList();
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Error loading downloaded songs on web: $e');
+      }
+      return;
+    }
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/downloads.json');
@@ -6303,7 +6330,74 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<bool> downloadSong(Video song) async {
-    if (kIsWeb) return false;
+    if (kIsWeb) {
+      _isDownloading = true;
+      notifyListeners();
+      try {
+        String? streamUrl = _webStreamUrls[song.id.value];
+        if (streamUrl == null || streamUrl.isEmpty) {
+          final cleanT = CanonicalSongDedup.cleanTitle(song.title);
+          final cleanA = CanonicalSongDedup.cleanArtist(song.author);
+          final q = cleanA.isNotEmpty ? '$cleanT $cleanA' : cleanT;
+          if (q.isNotEmpty) {
+            try {
+              final edgeUri = ApiConfig.jioSearchUri(q);
+              final resp = await http
+                  .get(edgeUri)
+                  .timeout(const Duration(seconds: 4));
+              if (resp.statusCode == 200) {
+                final List<dynamic> list = json.decode(resp.body);
+                for (final item in list) {
+                  final itemStream = item['streamUrl'] as String? ?? '';
+                  if (itemStream.isNotEmpty) {
+                    streamUrl = itemStream;
+                    _webStreamUrls[song.id.value] = itemStream;
+                    break;
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+        if (streamUrl == null || streamUrl.isEmpty) {
+          streamUrl = ApiConfig.cloudflareStreamUri(song.id.value).toString();
+        }
+
+        final artworkUrl = resolveArtworkUrl(song);
+        final success = await WebPlayerBridge.cacheAudioForOffline(
+          song.id.value,
+          streamUrl,
+          artworkUrl,
+        );
+
+        if (success) {
+          final songInfo = {
+            'id': song.id.value,
+            'title': song.title,
+            'author': song.author,
+            'thumbnail': artworkUrl,
+            'localPath': '/offline_audio/${song.id.value}',
+          };
+          _downloadedSongs.removeWhere((item) => item['id'] == song.id.value);
+          _downloadedSongs.add(songInfo);
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+            'dilse_downloaded_songs_web',
+            json.encode(_downloadedSongs),
+          );
+          notifyListeners();
+          return true;
+        }
+        return false;
+      } catch (e) {
+        debugPrint('Error downloading song on web: $e');
+        return false;
+      } finally {
+        _isDownloading = false;
+        notifyListeners();
+      }
+    }
     _isDownloading = true;
     notifyListeners();
 
@@ -6427,7 +6521,21 @@ class MusicService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> deleteDownloadedSong(String videoId) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      try {
+        await WebPlayerBridge.deleteCachedAudio(videoId);
+        _downloadedSongs.removeWhere((s) => s['id'] == videoId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'dilse_downloaded_songs_web',
+          json.encode(_downloadedSongs),
+        );
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error deleting downloaded song on web: $e');
+      }
+      return;
+    }
     try {
       final item = _downloadedSongs.firstWhere(
         (s) => s['id'] == videoId,

@@ -511,7 +511,7 @@ class ProfileSideDrawer extends StatelessWidget {
           FutureBuilder<PackageInfo>(
             future: PackageInfo.fromPlatform(),
             builder: (context, snapshot) {
-              final version = snapshot.data?.version ?? '3.9.11';
+              final version = snapshot.data?.version ?? '3.9.12';
               return Text(
                 'DilSe Music • v$version',
                 style: TextStyle(

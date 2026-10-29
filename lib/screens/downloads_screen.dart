@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_theme_tokens.dart';
@@ -36,6 +37,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Future<void> _loadFileSizes() async {
+    if (kIsWeb) return;
     final downloaded = _musicService.downloadedSongs;
     for (final song in downloaded) {
       final path = song['filePath'];

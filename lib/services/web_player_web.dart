@@ -328,4 +328,55 @@ class WebPlayerBridge {
       globalWindow.callMethod('dilseSetFallbackVideoId'.toJS, realYtId.toJS);
     }
   }
+
+  static Future<bool> cacheAudioForOffline(
+    String songId,
+    String streamUrl, [
+    String? artworkUrl,
+  ]) async {
+    final globalWindow = web.window as JSObject;
+    if (globalWindow.hasProperty('dilseCacheAudio'.toJS).toDart) {
+      try {
+        final jsPromise = globalWindow.callMethod(
+          'dilseCacheAudio'.toJS,
+          songId.toJS,
+          streamUrl.toJS,
+          (artworkUrl ?? '').toJS,
+        );
+        final promise = jsPromise as JSPromise<JSBoolean>;
+        final result = await promise.toDart;
+        return result.toDart;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  static Future<void> deleteCachedAudio(String songId) async {
+    final globalWindow = web.window as JSObject;
+    if (globalWindow.hasProperty('dilseDeleteCachedAudio'.toJS).toDart) {
+      try {
+        globalWindow.callMethod('dilseDeleteCachedAudio'.toJS, songId.toJS);
+      } catch (_) {}
+    }
+  }
+
+  static Future<bool> isSongCached(String songId) async {
+    final globalWindow = web.window as JSObject;
+    if (globalWindow.hasProperty('dilseIsCachedAudio'.toJS).toDart) {
+      try {
+        final jsPromise = globalWindow.callMethod(
+          'dilseIsCachedAudio'.toJS,
+          songId.toJS,
+        );
+        final promise = jsPromise as JSPromise<JSBoolean>;
+        final result = await promise.toDart;
+        return result.toDart;
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
 }

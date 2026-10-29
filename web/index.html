@@ -47,6 +47,17 @@
   <!-- DilSe Audio Engine (Method 1: Invisible YouTube Player + MediaSession) -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="dilse_web_player.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').then(function (reg) {
+          console.log('[DilSe ServiceWorker] Registered successfully (scope: ' + reg.scope + ')');
+        }).catch(function (err) {
+          console.warn('[DilSe ServiceWorker] Registration failed:', err);
+        });
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -217,7 +217,6 @@ class DesktopLayoutState {
     String? imageUrl,
     dynamic fetchSongs,
   }) {
-    activePlaylistId.value = playlistId;
     activeCuratedPlaylistData.value = {
       'title': title,
       'subtitle': subtitle,
@@ -228,6 +227,7 @@ class DesktopLayoutState {
       'imageUrl': imageUrl,
       'fetchSongs': fetchSongs,
     };
+    activePlaylistId.value = playlistId;
     activeArtistName.value = null;
     activeAlbumData.value = null;
     activeNavTab.value = DesktopNavTab.customPlaylist;
