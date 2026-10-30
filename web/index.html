@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -24,6 +11,7 @@
   <meta name="google-signin-client_id" content="130201428767-i1tt2et39of41d7mfs4j3d7fmnab5ug4.apps.googleusercontent.com">
 
   <!-- Mobile meta tags & icons -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -37,15 +25,395 @@
   <title>DilSe - Suno Dil Se</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    body {
-      background-color: #000000;
+    :root {
+      --bg-oled: #000000;
+      --card-bg: #141414;
+      --ruby-brand: #FA2D48;
+      --ruby-glow: rgba(250, 45, 72, 0.35);
+      --shimmer-line: rgba(255, 255, 255, 0.08);
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body, html {
+      background-color: var(--bg-oled);
+      color: #ffffff;
       margin: 0;
       padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Sovereign Failsafe Shell: 100% Decoupled from Flutter Engine */
+    #dilse-engine-fallback {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #000000;
+      z-index: 99999;
+      opacity: 1;
+      transition: opacity 0.35s ease-out;
+      pointer-events: auto;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    #dilse-engine-fallback.dismissed {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Keyframe Animations */
+    @keyframes dilseShimmer {
+      0% { opacity: 0.25; }
+      50% { opacity: 0.65; }
+      100% { opacity: 0.25; }
+    }
+    @keyframes dilsePulseGlow {
+      0% { transform: scale(1); box-shadow: 0 0 20px var(--ruby-glow); }
+      50% { transform: scale(1.04); box-shadow: 0 0 36px rgba(250, 45, 72, 0.6); }
+      100% { transform: scale(1); box-shadow: 0 0 20px var(--ruby-glow); }
+    }
+
+    /* Top Splash / Intro Hero */
+    .dilse-splash-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px 14px 20px;
+    }
+    .dilse-logo-badge {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FF4B63 0%, #FA2D48 60%, #B8001F 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: dilsePulseGlow 2.4s infinite ease-in-out;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .dilse-logo-badge svg {
+      width: 30px;
+      height: 30px;
+      fill: #ffffff;
+    }
+    .dilse-splash-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      margin: 0;
+      background: linear-gradient(180deg, #FFFFFF 30%, #FF758C 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      cursor: pointer;
+    }
+    .dilse-splash-tagline {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2.2px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Offline Connectivity Pill */
+    .dilse-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .dilse-status-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #1DB954;
+    }
+    .dilse-status-pill.offline .dot {
+      background: #FF9F0A;
+    }
+
+    /* App Skeleton Structure */
+    .dilse-skeleton-container {
+      flex: 1;
+      padding: 6px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       overflow: hidden;
     }
+    .skeleton-search {
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+    }
+    .skeleton-chips {
+      display: flex;
+      gap: 8px;
+    }
+    .skeleton-chip {
+      height: 26px;
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.06);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+    }
+    .skeleton-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 0;
+    }
+    .skeleton-thumb {
+      width: 46px;
+      height: 46px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+      flex-shrink: 0;
+    }
+    .skeleton-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .skeleton-line-title {
+      height: 13px;
+      width: 65%;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+    }
+    .skeleton-line-subtitle {
+      height: 9px;
+      width: 40%;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+    }
+
+    /* Sovereign Failsafe Card */
+    #dilse-offline-failsafe-card {
+      display: none;
+      margin: 8px 16px 14px 16px;
+      padding: 12px 14px;
+      background: #161616;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .failsafe-btn {
+      background: #242424;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      margin: 4px;
+      cursor: pointer;
+    }
+    .failsafe-btn.primary {
+      background: #FA2D48;
+      border-color: #FA2D48;
+    }
+
+    /* Bottom Dock Skeleton */
+    .dilse-dock-skeleton {
+      padding: 12px 16px;
+      background: rgba(14, 14, 14, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dock-tabs {
+      display: flex;
+      width: 100%;
+      justify-content: space-around;
+    }
+    .dock-tab-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.10);
+      animation: dilseShimmer 1.8s infinite ease-in-out;
+    }
   </style>
+</head>
+<body>
+  <!-- DilSe Engine-Independent Offline App Shell & Skeleton (Zero-Black-Screen) -->
+  <div id="dilse-engine-fallback">
+    <!-- Top Brand Hero -->
+    <div class="dilse-splash-hero">
+      <div class="dilse-logo-badge" onclick="handleLogoTap()">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </div>
+      <h1 class="dilse-splash-title" onclick="handleLogoTap()">DilSe</h1>
+      <span class="dilse-splash-tagline">Suno Dil Se.</span>
+      <div id="dilse-net-pill" class="dilse-status-pill">
+        <span class="dot"></span>
+        <span id="dilse-net-text">Initializing Library</span>
+      </div>
+    </div>
+
+    <!-- Decoupled App Skeleton (Search, Chips, Track Rows) -->
+    <div class="dilse-skeleton-container">
+      <div class="skeleton-search"></div>
+      <div class="skeleton-chips">
+        <div class="skeleton-chip" style="width: 72px;"></div>
+        <div class="skeleton-chip" style="width: 88px;"></div>
+        <div class="skeleton-chip" style="width: 64px;"></div>
+        <div class="skeleton-chip" style="width: 80px;"></div>
+      </div>
+      <div class="skeleton-row">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line-title"></div>
+          <div class="skeleton-line-subtitle"></div>
+        </div>
+      </div>
+      <div class="skeleton-row">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line-title" style="width: 52%;"></div>
+          <div class="skeleton-line-subtitle" style="width: 32%;"></div>
+        </div>
+      </div>
+      <div class="skeleton-row">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line-title" style="width: 70%;"></div>
+          <div class="skeleton-line-subtitle" style="width: 44%;"></div>
+        </div>
+      </div>
+      <div class="skeleton-row">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line-title" style="width: 58%;"></div>
+          <div class="skeleton-line-subtitle" style="width: 36%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Engine-Independent Failsafe Recovery Card (Revealed if Flutter takes >3.8s) -->
+    <div id="dilse-offline-failsafe-card">
+      <div style="font-size: 13px; font-weight: 700; margin-bottom: 3px; color: #ffffff;">Startup Watchdog Active</div>
+      <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 10px;">
+        Starting offline mode. If startup stalls, choose a recovery action:
+      </div>
+      <div style="display: flex; justify-content: center; gap: 8px;">
+        <button class="failsafe-btn primary" onclick="location.reload()">Reload App</button>
+        <button class="failsafe-btn" onclick="clearDilSeCache()">Reset Cache</button>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Dock Skeleton -->
+    <div class="dilse-dock-skeleton">
+      <div class="dock-tabs">
+        <div class="dock-tab-icon"></div>
+        <div class="dock-tab-icon"></div>
+        <div class="dock-tab-icon"></div>
+        <div class="dock-tab-icon"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Offline status detection
+    function updateOnlineStatus() {
+      var pill = document.getElementById('dilse-net-pill');
+      var text = document.getElementById('dilse-net-text');
+      if (!pill || !text) return;
+      if (navigator.onLine) {
+        pill.classList.remove('offline');
+        text.innerText = 'Initializing Library';
+      } else {
+        pill.classList.add('offline');
+        text.innerText = 'Offline Mode (Saved Music Ready)';
+      }
+    }
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
+    // Sovereign Engine Watchdog (3.8 seconds):
+    // If the Flutter engine takes > 3.8s to boot, reveal the decoupled HTML failsafe card
+    var dilseWatchdog = setTimeout(function () {
+      var card = document.getElementById('dilse-offline-failsafe-card');
+      if (card) {
+        card.style.display = 'block';
+      }
+    }, 3800);
+
+    // Global hook to dismiss the fallback shell smoothly
+    window.dismissDilSeFallback = function () {
+      clearTimeout(dilseWatchdog);
+      var fallback = document.getElementById('dilse-engine-fallback');
+      if (fallback) {
+        fallback.classList.add('dismissed');
+        setTimeout(function () {
+          fallback.remove();
+        }, 360);
+      }
+    };
+
+    // Watch for Flutter view attachment
+    var observer = new MutationObserver(function (mutations) {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane')) {
+        observer.disconnect();
+        setTimeout(window.dismissDilSeFallback, 80);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Triple-tap emergency gesture on Logo/Title
+    var logoTapCount = 0;
+    var logoTapTimer = null;
+    function handleLogoTap() {
+      logoTapCount++;
+      clearTimeout(logoTapTimer);
+      logoTapTimer = setTimeout(function () { logoTapCount = 0; }, 1800);
+      if (logoTapCount >= 3) {
+        var card = document.getElementById('dilse-offline-failsafe-card');
+        if (card) card.style.display = 'block';
+      }
+    }
+
+    function clearDilSeCache() {
+      if ('caches' in window) {
+        caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        }).then(function () {
+          location.reload(true);
+        });
+      } else {
+        location.reload();
+      }
+    }
+  </script>
+
   <!-- DilSe Audio Engine (Method 1: Invisible YouTube Player + MediaSession) -->
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://www.youtube.com/iframe_api" async defer onerror="console.warn('[DilSe] YouTube IFrame offline')"></script>
   <script src="dilse_web_player.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
@@ -61,4 +429,3 @@
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
-

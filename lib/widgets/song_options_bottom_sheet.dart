@@ -11,6 +11,7 @@ import '../layouts/desktop_layout_state.dart';
 import '../models/jio_album.dart';
 import 'desktop/desktop_context_menu.dart';
 import '../utils/artist_utils.dart';
+import 'dilse_notification.dart';
 
 /// Converts a song Map representation into a youtube_explode Video instance
 /// for seamless interop across existing song action sheets.
@@ -655,20 +656,39 @@ void _showNewPlaylistPrompt(BuildContext context, Video song) {
   );
 }
 
-void _showToast(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
+void _showToast(BuildContext context, String message, {String? subtitle}) {
+  final lower = message.toLowerCase();
+  if (message.contains('❤️') || lower.contains('liked')) {
+    DilSeNotification.heart(context, message, subtitle: subtitle);
+  } else if (lower.contains('download')) {
+    final isSuccess = lower.contains('complete') || lower.contains('saved');
+    final isFail = lower.contains('fail');
+    if (isSuccess) {
+      DilSeNotification.download(
+        context,
         message,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      backgroundColor: const Color(0xFF222230),
-      duration: const Duration(seconds: 2),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-  );
+        subtitle: subtitle ?? 'Available in Offline Library',
+      );
+    } else if (isFail) {
+      DilSeNotification.warning(
+        context,
+        kIsWeb ? 'Cannot Download on Web' : 'Download Failed',
+        subtitle: kIsWeb
+            ? 'Track not available for web caching due to browser DRM'
+            : subtitle ?? 'Check internet connection',
+      );
+    } else {
+      DilSeNotification.info(context, message, subtitle: subtitle);
+    }
+  } else if (lower.contains('radio') ||
+      lower.contains('queue') ||
+      lower.contains('next')) {
+    DilSeNotification.info(context, message, subtitle: subtitle);
+  } else if (lower.contains('copied') || lower.contains('added')) {
+    DilSeNotification.success(context, message, subtitle: subtitle);
+  } else {
+    DilSeNotification.show(context, message: message, subtitle: subtitle);
+  }
 }
 
 void _navigateToAlbum(

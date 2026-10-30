@@ -24,9 +24,13 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
   late AnimationController _controller;
   Timer? _fallbackTimer;
   Timer? _hardFallbackTimer;
+  Timer? _recoveryWatchdogTimer;
   bool _navigated = false;
   bool _showMainFallback = false;
+  bool _showRecoveryFailsafe = false;
   int _lastCharCount = 0;
+  int _emergencyTapCount = 0;
+  DateTime? _lastEmergencyTap;
 
   static const String _fullTitle = 'DilSe';
   static const String _fullTagline = 'Suno Dil Se.';
@@ -79,7 +83,41 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
       },
     );
 
+    // Watchdog timer: If app is still on splash after 2.4s, subtly reveal Recovery entry point
+    _recoveryWatchdogTimer = Timer(const Duration(milliseconds: 2400), () {
+      if (mounted && !_navigated) {
+        setState(() {
+          _showRecoveryFailsafe = true;
+        });
+      }
+    });
+
     _controller.forward();
+  }
+
+  void _onEmergencyTap() {
+    final now = DateTime.now();
+    if (_lastEmergencyTap == null ||
+        now.difference(_lastEmergencyTap!) > const Duration(seconds: 2)) {
+      _emergencyTapCount = 1;
+    } else {
+      _emergencyTapCount++;
+    }
+    _lastEmergencyTap = now;
+
+    if (_emergencyTapCount >= 3) {
+      _navigateToRecovery();
+    }
+  }
+
+  void _navigateToRecovery() {
+    _fallbackTimer?.cancel();
+    _hardFallbackTimer?.cancel();
+    _recoveryWatchdogTimer?.cancel();
+    _controller.stop();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const RecoveryShellScreen()),
+    );
   }
 
   int _calculateTotalChars(double t) {
@@ -138,6 +176,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
   void dispose() {
     _fallbackTimer?.cancel();
     _hardFallbackTimer?.cancel();
+    _recoveryWatchdogTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -218,29 +257,33 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Brand Heart Logo
-                    Opacity(
-                      opacity: logoOpacity,
-                      child: Transform.scale(
-                        scale: logoScale,
-                        child: Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppThemeTokens.brandRuby.withValues(
-                                  alpha: 0.5,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _onEmergencyTap,
+                      child: Opacity(
+                        opacity: logoOpacity,
+                        child: Transform.scale(
+                          scale: logoScale,
+                          child: Container(
+                            width: 88,
+                            height: 88,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppThemeTokens.brandRuby.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  blurRadius: 28,
+                                  spreadRadius: 4,
                                 ),
-                                blurRadius: 28,
-                                spreadRadius: 4,
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/dilse_logo.png',
+                                fit: BoxFit.cover,
                               ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/dilse_logo.png',
-                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
@@ -250,40 +293,44 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
 
                     // Typewriter Title
                     if (t >= 0.20)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          ShaderMask(
-                            shaderCallback: (bounds) {
-                              return const LinearGradient(
-                                colors: [
-                                  Colors.white,
-                                  Color(0xFFFF758C),
-                                  Color(0xFFFA2D48),
-                                ],
-                              ).createShader(bounds);
-                            },
-                            child: Text(
-                              currentTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 42,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1.0,
-                                height: 1.0,
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _onEmergencyTap,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            ShaderMask(
+                              shaderCallback: (bounds) {
+                                return const LinearGradient(
+                                  colors: [
+                                    Colors.white,
+                                    Color(0xFFFF758C),
+                                    Color(0xFFFA2D48),
+                                  ],
+                                ).createShader(bounds);
+                              },
+                              child: Text(
+                                currentTitle,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.0,
+                                  height: 1.0,
+                                ),
                               ),
                             ),
-                          ),
-                          if (t < 0.55 && isTyping && cursorBlink)
-                            Container(
-                              width: 3,
-                              height: 36,
-                              margin: const EdgeInsets.only(left: 4),
-                              color: AppThemeTokens.brandRuby,
-                            ),
-                        ],
+                            if (t < 0.55 && isTyping && cursorBlink)
+                              Container(
+                                width: 3,
+                                height: 36,
+                                margin: const EdgeInsets.only(left: 4),
+                                color: AppThemeTokens.brandRuby,
+                              ),
+                          ],
+                        ),
                       ),
 
                     const SizedBox(height: 8),
@@ -318,43 +365,35 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
           ),
 
           // Emergency Recovery entry point (Rule #7: Zero-Black-Screen Invariant)
-          Positioned(
-            left: 20,
-            bottom: 40,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                if (!kIsWeb && _controller.value < 0.25) {
-                  return const SizedBox.shrink();
-                }
-                return TextButton.icon(
-                  onPressed: () {
-                    _fallbackTimer?.cancel();
-                    _hardFallbackTimer?.cancel();
-                    _controller.stop();
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => const RecoveryShellScreen(),
-                      ),
-                    );
-                  },
+          // Emergency Recovery entry point (Rule #7: Zero-Black-Screen Invariant)
+          // Hidden by default for clean consumer UX. Revealed via 2.4s watchdog or 3-tap gesture.
+          if (_showRecoveryFailsafe)
+            Positioned(
+              left: 20,
+              bottom: 40,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 300),
+                builder: (context, opacity, child) =>
+                    Opacity(opacity: opacity, child: child),
+                child: TextButton.icon(
+                  onPressed: _navigateToRecovery,
                   icon: Icon(
                     Icons.shield_outlined,
                     size: 15,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Colors.white.withValues(alpha: 0.6),
                   ),
                   label: Text(
                     'Recovery',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-          ),
 
           // Subtle skip button in bottom right corner
           Positioned(

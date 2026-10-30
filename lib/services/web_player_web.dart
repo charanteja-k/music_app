@@ -334,6 +334,14 @@ class WebPlayerBridge {
     String streamUrl, [
     String? artworkUrl,
   ]) async {
+    // Guard against YouTube-only fallback endpoints returning JSON
+    if (streamUrl.isEmpty ||
+        streamUrl.contains('workers.dev') ||
+        streamUrl.contains('/stream?v=') ||
+        streamUrl.contains('fallback')) {
+      return false;
+    }
+
     final globalWindow = web.window as JSObject;
     if (globalWindow.hasProperty('dilseCacheAudio'.toJS).toDart) {
       try {

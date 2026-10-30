@@ -27,6 +27,7 @@ import '../widgets/animated_equalizer.dart';
 import '../services/auth_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../utils/artist_utils.dart';
+import '../widgets/dilse_notification.dart';
 
 enum LandscapeActiveTab { none, lyrics, queue, more }
 
@@ -202,16 +203,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _showSaveQueueDialog(BuildContext context, List<Video> playlist) {
     HapticFeedback.lightImpact();
     if (playlist.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Queue is empty'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      DilSeNotification.warning(context, 'Queue is empty');
       return;
     }
 
@@ -339,16 +331,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   unawaited(CloudSyncService().sync());
                 }
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Saved ${playlist.length} songs to "$name"!'),
-                    duration: const Duration(seconds: 2),
-                    backgroundColor: const Color(0xFF1DB954),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                DilSeNotification.success(
+                  context,
+                  'Saved ${playlist.length} songs to "$name"!',
                 );
               },
               child: const Text(
@@ -977,12 +962,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
 
     // 3. On-demand resolution for tracks without pre-cached album tags
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Finding album for this track...'),
-        duration: Duration(milliseconds: 1500),
-      ),
-    );
+    DilSeNotification.info(context, 'Finding album for this track...');
 
     final resolved = await _musicService.resolveAlbumForSong(song);
     if (!mounted) return;
@@ -1001,12 +981,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No album found for "${song.title}".'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      DilSeNotification.warning(context, 'No album found for "${song.title}".');
     }
   }
 
@@ -1314,34 +1289,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                   : null),
                         onTap: () async {
                           if (isDownloaded) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Song is already downloaded offline',
-                                ),
-                              ),
+                            DilSeNotification.warning(
+                              context,
+                              'Song is already downloaded offline',
                             );
                             return;
                           }
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Starting download...'),
-                            ),
+                          DilSeNotification.info(
+                            context,
+                            'Starting download...',
                           );
                           final success = await _musicService.downloadSong(
                             song,
                           );
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  success
-                                      ? 'Saved to Offline Library!'
-                                      : 'Download failed.',
-                                ),
-                              ),
-                            );
+                            if (success) {
+                              DilSeNotification.download(
+                                context,
+                                'Saved to Offline Library!',
+                                subtitle: 'Available for zero-data playback',
+                              );
+                            } else {
+                              DilSeNotification.warning(
+                                context,
+                                kIsWeb
+                                    ? 'Cannot Download on Web'
+                                    : 'Download failed.',
+                                subtitle: kIsWeb
+                                    ? 'Track not available for web caching due to browser DRM'
+                                    : 'Check connection and try again',
+                              );
+                            }
                           }
                         },
                       ),
@@ -1364,10 +1343,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                   '${song.title} - ${song.author}\n${song.url}',
                             ),
                           );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Song link copied to clipboard!'),
-                            ),
+                          DilSeNotification.success(
+                            context,
+                            'Song link copied to clipboard!',
                           );
                         },
                       ),
@@ -3797,27 +3775,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
             iconColor: isDownloaded ? const Color(0xFF1DB954) : Colors.white70,
             onTap: () async {
               if (isDownloaded) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Song is already downloaded offline'),
-                  ),
+                DilSeNotification.warning(
+                  context,
+                  'Song is already downloaded offline',
                 );
                 return;
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Starting download...')),
-              );
+              DilSeNotification.info(context, 'Starting download...');
               final success = await _musicService.downloadSong(song);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Saved to Offline Library!'
-                          : 'Download failed.',
-                    ),
-                  ),
-                );
+                if (success) {
+                  DilSeNotification.download(
+                    context,
+                    'Saved to Offline Library!',
+                    subtitle: 'Available for zero-data playback',
+                  );
+                } else {
+                  DilSeNotification.warning(
+                    context,
+                    kIsWeb ? 'Cannot Download on Web' : 'Download failed.',
+                    subtitle: kIsWeb
+                        ? 'Track not available for web caching due to browser DRM'
+                        : 'Check connection and try again',
+                  );
+                }
               }
               setState(() {});
             },

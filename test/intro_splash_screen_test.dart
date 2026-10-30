@@ -38,17 +38,47 @@ void main() {
   );
 
   testWidgets(
-    'IntroSplashScreen renders Recovery button and tapping it navigates to RecoveryShellScreen',
+    'IntroSplashScreen hides Recovery button on normal startup and navigates via 3-tap emergency gesture',
     (WidgetTester tester) async {
       IntroSplashScreen.hasCompletedSplash = false;
       await tester.pumpWidget(const MaterialApp(home: IntroSplashScreen()));
 
-      // Progress animation slightly to reveal recovery button
-      await tester.pump(const Duration(milliseconds: 1000));
+      // Progress animation slightly (500ms) - logo is visible, but recovery button remains hidden
+      await tester.pump(const Duration(milliseconds: 500));
 
+      expect(find.text('Recovery'), findsNothing);
+      expect(find.byType(Image), findsOneWidget);
+
+      // Tap logo 3 times to trigger emergency recovery
+      await tester.tap(find.byType(Image));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byType(Image));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byType(Image));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RecoveryShellScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'IntroSplashScreen reveals Recovery button after watchdog timeout when startup stalls',
+    (WidgetTester tester) async {
+      IntroSplashScreen.hasCompletedSplash = false;
+      await tester.pumpWidget(const MaterialApp(home: IntroSplashScreen()));
+
+      // Initially hidden
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.text('Recovery'), findsNothing);
+
+      // Pump past 2400ms watchdog threshold
+      await tester.pump(const Duration(milliseconds: 1500));
+
+      // Recovery button now revealed via watchdog
       expect(find.text('Recovery'), findsOneWidget);
 
-      // Tap recovery to navigate to RecoveryShellScreen immediately
       await tester.tap(find.text('Recovery'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
