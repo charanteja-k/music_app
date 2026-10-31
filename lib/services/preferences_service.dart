@@ -1112,12 +1112,16 @@ class PreferencesService extends ChangeNotifier {
     final primaryLang = _preferredLanguages.isNotEmpty
         ? _preferredLanguages.first
         : 'Telugu';
+    final topArtist = _mostPlayedArtist.isNotEmpty
+        ? _mostPlayedArtist
+        : (getTopPlayedArtists(limit: 1).firstOrNull?.key ?? '');
+    final seed = topArtist.isNotEmpty ? topArtist : primaryLang;
 
     if (hour >= 5 && hour < 12) {
       return CircadianContext(
         title: 'Morning Melodies',
         subtitle: 'Soft acoustic & ambient vibes to start your day',
-        query: '$primaryLang Morning Acoustic Hits',
+        query: '$seed Morning Acoustic Hits',
         tag: 'MORNING',
         emoji: '🌅',
       );
@@ -1126,7 +1130,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Afternoon Energy',
         subtitle: 'High-tempo beats and chartbusters to keep you grooving',
-        query: '$primaryLang Trending Hits',
+        query: '$seed Trending Hits',
         tag: 'AFTERNOON',
         emoji: '⚡',
       );
@@ -1135,7 +1139,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Evening Chill',
         subtitle: 'Trending relaxing tracks and chill evening vibes',
-        query: '$primaryLang Soulful Hits',
+        query: '$seed Soulful Hits',
         tag: 'EVENING',
         emoji: '🌆',
       );
@@ -1143,7 +1147,7 @@ class PreferencesService extends ChangeNotifier {
     return CircadianContext(
       title: 'Late Night Vibes',
       subtitle: 'Dreamy lo-fi and slowed melodies for quiet hours',
-      query: '$primaryLang Midnight Melodies',
+      query: '$seed Midnight Melodies',
       tag: 'LATE NIGHT',
       emoji: '🌙',
     );
