@@ -189,13 +189,14 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _scaleXAnimation;
+  late Animation<double> _scaleYAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    final enterMs = 280.0;
+    final enterMs = 320.0;
     final holdMs = widget.duration.inMilliseconds.toDouble();
     final exitMs = 220.0;
     final totalDuration = Duration(
@@ -209,7 +210,7 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
         tween: Tween<double>(
           begin: -1.0,
           end: 0.0,
-        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
         weight: enterMs,
       ),
       TweenSequenceItem(tween: ConstantTween<double>(0.0), weight: holdMs),
@@ -240,10 +241,12 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
       ),
     ]).animate(_controller);
 
-    _scaleAnimation = TweenSequence<double>([
+    // Dynamic Island Expanding Notification Effect:
+    // Starts as a compact notch pill and springs open horizontally and vertically
+    _scaleXAnimation = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(
-          begin: 0.88,
+          begin: 0.38,
           end: 1.0,
         ).chain(CurveTween(curve: Curves.easeOutBack)),
         weight: enterMs,
@@ -252,7 +255,25 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
       TweenSequenceItem(
         tween: Tween<double>(
           begin: 1.0,
-          end: 0.90,
+          end: 0.85,
+        ).chain(CurveTween(curve: Curves.easeInCubic)),
+        weight: exitMs,
+      ),
+    ]).animate(_controller);
+
+    _scaleYAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0.65,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: enterMs,
+      ),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: holdMs),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 0.85,
         ).chain(CurveTween(curve: Curves.easeInCubic)),
         weight: exitMs,
       ),
@@ -282,15 +303,17 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
     switch (widget.type) {
       case DilSeNotificationType.success:
       case DilSeNotificationType.download:
-        return const Color(0xFF1DB954); // Emerald Green
+        return const Color(0xFF1DB954); // Static Emerald Green
       case DilSeNotificationType.heart:
-        return AppThemeTokens.brandRuby; // Ruby Red
+        return AppThemeTokens.brandRuby; // Static Ruby Red (#FA2D48)
       case DilSeNotificationType.warning:
-        return const Color(0xFFFF9F0A); // Amber
+        return const Color(0xFFF59E0B); // Static Amber
       case DilSeNotificationType.error:
-        return const Color(0xFFFF453A); // Crimson Red
+        return const Color(0xFFEF4444); // Static Crimson Red
       case DilSeNotificationType.info:
-        return const Color(0xFF64D2FF); // Cyan Accent
+        return const Color(
+          0xFF94A3B8,
+        ); // Static Slate (Clean matte tone, no neon)
     }
   }
 
@@ -329,9 +352,11 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
           animation: _controller,
           builder: (context, child) {
             return Transform.translate(
-              offset: Offset(0, _slideAnimation.value * 40),
+              offset: Offset(0, _slideAnimation.value * 28),
               child: Transform.scale(
-                scale: _scaleAnimation.value,
+                scaleX: _scaleXAnimation.value,
+                scaleY: _scaleYAnimation.value,
+                alignment: Alignment.topCenter,
                 child: Opacity(
                   opacity: _fadeAnimation.value.clamp(0.0, 1.0),
                   child: child,
@@ -360,36 +385,31 @@ class _DilSeNotificationPillState extends State<_DilSeNotificationPill>
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF141414),
+                  color: const Color(0xFF161618), // Static matte dark obsidian
                   borderRadius: BorderRadius.circular(100), // Pill Shape
                   border: Border.all(
-                    color: _accentColor.withValues(alpha: 0.35),
+                    color: const Color(0xFF2E2E32), // Static matte border
                     width: 1.0,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      blurRadius: 20,
+                      color: Colors.black.withValues(alpha: 0.70),
+                      blurRadius: 24,
                       offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: _accentColor.withValues(alpha: 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Glowing Icon Container
+                    // Static Icon Badge (Zero Neon Halo)
                     Container(
                       padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: _accentColor.withValues(alpha: 0.16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF222226),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(_icon, color: _accentColor, size: 17),
+                      child: Icon(_icon, color: _accentColor, size: 16),
                     ),
                     const SizedBox(width: 12),
                     // Message / Subtitle

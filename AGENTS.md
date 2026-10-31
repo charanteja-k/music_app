@@ -36,7 +36,7 @@ This workspace operates under the **Architectural Immutability + UI Transformati
 
 ---
 
-## 2. Eight Absolute Architectural Invariants
+## 2. Nine Absolute Architectural Invariants
 
 1. **Rule #1: Audio Engine Immutability**  
    - Never rewrite `MusicService`, `_playerA`, `_playerB`, active/standby deck swapping, equal-power crossfade mathematics, or stream cascades to make UI code easier.
@@ -73,6 +73,11 @@ This workspace operates under the **Architectural Immutability + UI Transformati
 8. **Rule #8: Release Build & ProGuard Verification Gate**  
    - Whenever dependencies in `pubspec.yaml` or `pubspec.lock` are upgraded (especially native plugins like `shared_preferences`, `path_provider`, `just_audio`), or whenever Android/iOS platform configurations are modified, a release compilation (`flutter build apk --release`) is mandatory before creating a git tag or publishing a release.
    - Release APK builds verify that R8 code shrinking, bytecode obfuscation, JNI bindings, and ProGuard keep rules do not silently strip classes required at runtime.
+
+9. **Rule #9: Minimalist Matte & Solid Color Design Standard (Zero Neons, Zero Gradients)**  
+   - The application strictly enforces a minimalist, modern, matte visual design language using solid colors, clean borders, and OLED/obsidian tones.
+   - **Never** use bright neon glow effects, flashy radial/linear gradients, rainbow accents, or loud fluorescent lighting in widgets, cards, banners, notifications, or app chrome.
+   - All notifications, dynamic island pills, modal sheets, and dialogue surfaces must employ refined static flat/solid palette tones with crisp typography and subtle borders (e.g., solid emerald `#1DB954` for success/downloads, solid ruby `#FA2D48` for favorites/brand, solid amber `#F59E0B` for warnings, solid crimson `#EF4444` for errors, solid slate `#94A3B8` for info, solid dark obsidian `#18181B` / `#161618` for container backgrounds, and `#2E2E32` for clean matte borders).
 
 ---
 
