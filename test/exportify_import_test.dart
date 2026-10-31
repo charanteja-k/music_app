@@ -370,4 +370,247 @@ Spotify ID,Artist Name(s),Track Name,Album Name,Danceability,Energy,Valence,Temp
       expect(songs.first['id'], equals('vid_canc001'));
     });
   });
+
+  group('100% Accuracy Song Resolution & Derivative Rejection Tests', () {
+    Video makeVideo(
+      String title,
+      String author, {
+      String id = 'vid_acc_001',
+      Duration? duration,
+    }) {
+      return Video(
+        VideoId(id.padRight(11, '0').substring(0, 11)),
+        title,
+        author,
+        ChannelId('UC0WP5P-fwGlLyO4yOE76T8g'),
+        DateTime.now(),
+        '',
+        null,
+        '',
+        duration ?? const Duration(minutes: 3, seconds: 30),
+        ThumbnailSet(id.padRight(11, '0').substring(0, 11)),
+        null,
+        Engagement(0, null, null),
+        false,
+      );
+    }
+
+    test('Accepts exact authentic studio match', () {
+      final target = ExportifyTrack(
+        spotifyId: 'sp_1',
+        trackName: 'Kesariya',
+        artistName: 'Arijit Singh, Pritam',
+        albumName: 'Brahmastra',
+        durationMs: 268000,
+      );
+      final candidate = makeVideo(
+        'Kesariya',
+        'Arijit Singh, Pritam',
+        duration: const Duration(seconds: 268),
+      );
+      expect(
+        SpotifyImportService.isValidMatchCandidate(candidate, target),
+        isTrue,
+      );
+    });
+
+    test(
+      'Accepts track with movie/soundtrack tag in candidate matching album',
+      () {
+        final target = ExportifyTrack(
+          spotifyId: 'sp_2',
+          trackName: 'Kesariya',
+          artistName: 'Arijit Singh, Pritam',
+          albumName: 'Brahmastra',
+          durationMs: 268000,
+        );
+        final candidate = makeVideo(
+          'Kesariya (From "Brahmastra")',
+          'Arijit Singh',
+          duration: const Duration(seconds: 268),
+        );
+        expect(
+          SpotifyImportService.isValidMatchCandidate(candidate, target),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'Strictly rejects amateur derivatives reported by user (piano, oud, ambient, slowed)',
+      () {
+        final target = ExportifyTrack(
+          spotifyId: 'sp_after_hours',
+          trackName: 'After Hours',
+          artistName: 'The Weeknd',
+          albumName: 'After Hours',
+          durationMs: 361000,
+        );
+
+        final pianoCover = makeVideo(
+          'After Hours (Piano Version)',
+          'pianaura',
+          duration: const Duration(seconds: 165),
+        );
+        final oudCover = makeVideo(
+          'After Hours (Arabic Oud)',
+          'oud awwad',
+          duration: const Duration(seconds: 210),
+        );
+        final ambientEdit = makeVideo(
+          'after hours (ambient version)',
+          'stillsilent',
+          duration: const Duration(seconds: 360),
+        );
+        final slowedEdit = makeVideo(
+          'After Hours (slowed to perfection)',
+          'hollowhoney',
+          duration: const Duration(seconds: 400),
+        );
+
+        expect(
+          SpotifyImportService.isValidMatchCandidate(pianoCover, target),
+          isFalse,
+        );
+        expect(
+          SpotifyImportService.isValidMatchCandidate(oudCover, target),
+          isFalse,
+        );
+        expect(
+          SpotifyImportService.isValidMatchCandidate(ambientEdit, target),
+          isFalse,
+        );
+        expect(
+          SpotifyImportService.isValidMatchCandidate(slowedEdit, target),
+          isFalse,
+        );
+      },
+    );
+
+    test('Strictly rejects wrong song with partial common word in title', () {
+      final target = ExportifyTrack(
+        spotifyId: 'sp_stay',
+        trackName: 'Stay',
+        artistName: 'The Kid LAROI, Justin Bieber',
+        albumName: 'F*CK LOVE 3',
+        durationMs: 141000,
+      );
+      final wrongSong = makeVideo(
+        'Stay With Me',
+        'Sam Smith',
+        duration: const Duration(seconds: 172),
+      );
+      expect(
+        SpotifyImportService.isValidMatchCandidate(wrongSong, target),
+        isFalse,
+      );
+    });
+
+    test('Strictly rejects candidate with duration discrepancy > 35s', () {
+      final target = ExportifyTrack(
+        spotifyId: 'sp_blinding',
+        trackName: 'Blinding Lights',
+        artistName: 'The Weeknd',
+        albumName: 'After Hours',
+        durationMs: 200000, // 3:20 = 200s
+      );
+      final shortCut = makeVideo(
+        'Blinding Lights',
+        'The Weeknd',
+        duration: const Duration(seconds: 80), // 1:20 = 80s (diff = 120s > 35s)
+      );
+      expect(
+        SpotifyImportService.isValidMatchCandidate(shortCut, target),
+        isFalse,
+      );
+    });
+
+    test('Strictly rejects unrelated artist cover or upload', () {
+      final target = ExportifyTrack(
+        spotifyId: 'sp_shape',
+        trackName: 'Shape of You',
+        artistName: 'Ed Sheeran',
+        albumName: 'Divide',
+        durationMs: 233000,
+      );
+      final amateurCover = makeVideo(
+        'Shape of You',
+        'Unknown Bedroom Artist',
+        duration: const Duration(seconds: 233),
+      );
+      expect(
+        SpotifyImportService.isValidMatchCandidate(amateurCover, target),
+        isFalse,
+      );
+    });
+
+    test(
+      'findBestMatch selects authentic studio hit and rejects amateur noise',
+      () {
+        final target = ExportifyTrack(
+          spotifyId: 'sp_after_hours',
+          trackName: 'After Hours',
+          artistName: 'The Weeknd',
+          albumName: 'After Hours',
+          durationMs: 361000,
+        );
+
+        final candidates = [
+          makeVideo(
+            'After Hours (Piano Version)',
+            'pianaura',
+            duration: const Duration(seconds: 165),
+          ),
+          makeVideo(
+            'After Hours',
+            'The Weeknd',
+            id: 'jio_weeknd_ah',
+            duration: const Duration(seconds: 361),
+          ),
+          makeVideo(
+            'After Hours (slowed to perfection)',
+            'hollowhoney',
+            duration: const Duration(seconds: 400),
+          ),
+        ];
+
+        final match = SpotifyImportService.findBestMatch(candidates, target);
+        expect(match, isNotNull);
+        expect(match!.author, equals('The Weeknd'));
+        expect(match.title, equals('After Hours'));
+      },
+    );
+
+    test(
+      'findBestMatch returns null when no candidate meets 100% accuracy criteria',
+      () {
+        final target = ExportifyTrack(
+          spotifyId: 'sp_timeless',
+          trackName: 'Timeless',
+          artistName: 'The Weeknd, Playboi Carti',
+          albumName: 'Hurry Up Tomorrow',
+          durationMs: 256000,
+        );
+
+        final nonMatchingCandidates = [
+          makeVideo(
+            'Stay With Me',
+            'Sam Smith',
+            duration: const Duration(seconds: 172),
+          ),
+          makeVideo(
+            'Starboy',
+            'The Weeknd',
+            duration: const Duration(seconds: 230),
+          ),
+        ];
+
+        final match = SpotifyImportService.findBestMatch(
+          nonMatchingCandidates,
+          target,
+        );
+        expect(match, isNull); // Zero false positives guarantee!
+      },
+    );
+  });
 }
