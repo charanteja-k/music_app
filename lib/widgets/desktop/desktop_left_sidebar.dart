@@ -1,3 +1,4 @@
+import '../dilse_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -27,8 +28,16 @@ class DesktopLeftSidebar extends StatefulWidget {
   /// (`artworkUrl`, `thumbnail`, `thumbnailUrl`, `imageUrl`, `coverUrl`) or from
   /// the playlist's first track/song entry.
   static String resolveArtworkUrl(Map<String, dynamic> pl) {
+    final playlistId = pl['id']?.toString() ?? '';
+    if (playlistId.isNotEmpty) {
+      final prefCover = PreferencesService().getCustomPlaylistCover(playlistId);
+      if (prefCover != null && prefCover.isNotEmpty) {
+        return prefCover;
+      }
+    }
     final direct =
         (pl['artworkUrl'] ??
+                pl['customCoverUrl'] ??
                 pl['thumbnail'] ??
                 pl['thumbnailUrl'] ??
                 pl['imageUrl'] ??
@@ -1684,25 +1693,12 @@ class _CompactPlaylistTileState extends State<_CompactPlaylistTile> {
                       fit: StackFit.expand,
                       children: [
                         if (artworkUrl.isNotEmpty)
-                          Image.network(
-                            artworkUrl,
+                          DilSeImage(
+                            imageUrl: artworkUrl,
+                            width: 48,
+                            height: 48,
                             fit: BoxFit.cover,
-                            cacheWidth: 96,
-                            cacheHeight: 96,
-                            errorBuilder: (_, _, _) => _buildFallback(),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                color: const Color(0xFF181818),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.music_note_rounded,
-                                    size: 22.0,
-                                    color: Color(0xFF737373),
-                                  ),
-                                ),
-                              );
-                            },
+                            errorWidget: _buildFallback(),
                           )
                         else
                           _buildFallback(),

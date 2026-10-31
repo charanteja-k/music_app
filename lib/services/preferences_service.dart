@@ -330,6 +330,10 @@ class PreferencesService extends ChangeNotifier {
   static const String _pinnedPlaylistIdsKey = 'pinned_playlist_ids';
   final Set<String> _pinnedPlaylistIds = {};
 
+  // Custom Playlist Covers
+  static const String _customPlaylistCoversKey = 'custom_playlist_covers_json';
+  final Map<String, String> _customPlaylistCovers = {};
+
   // Listening History
   List<Map<String, String>> _listeningHistory = [];
 
@@ -723,6 +727,17 @@ class PreferencesService extends ChangeNotifier {
       _manualCreatedPlaylistIds = savedManualIds.toSet();
     }
 
+    final savedCoversStr = _prefs.getString(_customPlaylistCoversKey);
+    if (savedCoversStr != null && savedCoversStr.isNotEmpty) {
+      try {
+        final decoded = json.decode(savedCoversStr) as Map<String, dynamic>;
+        _customPlaylistCovers.clear();
+        for (final entry in decoded.entries) {
+          _customPlaylistCovers[entry.key] = entry.value.toString();
+        }
+      } catch (_) {}
+    }
+
     final savedAlbumsStr = _prefs.getString('saved_albums_json');
     if (savedAlbumsStr != null && savedAlbumsStr.isNotEmpty) {
       try {
@@ -1112,12 +1127,16 @@ class PreferencesService extends ChangeNotifier {
     final primaryLang = _preferredLanguages.isNotEmpty
         ? _preferredLanguages.first
         : 'Telugu';
+    final topArtist = _mostPlayedArtist.isNotEmpty
+        ? _mostPlayedArtist
+        : (getTopPlayedArtists(limit: 1).firstOrNull?.key ?? '');
+    final seed = topArtist.isNotEmpty ? topArtist : primaryLang;
 
     if (hour >= 5 && hour < 12) {
       return CircadianContext(
         title: 'Morning Melodies',
         subtitle: 'Soft acoustic & ambient vibes to start your day',
-        query: '$primaryLang Morning Acoustic Hits',
+        query: '$seed Morning Acoustic Hits',
         tag: 'MORNING',
         emoji: '🌅',
       );
@@ -1126,7 +1145,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Afternoon Energy',
         subtitle: 'High-tempo beats and chartbusters to keep you grooving',
-        query: '$primaryLang Trending Hits',
+        query: '$seed Trending Hits',
         tag: 'AFTERNOON',
         emoji: '⚡',
       );
@@ -1135,7 +1154,7 @@ class PreferencesService extends ChangeNotifier {
       return CircadianContext(
         title: 'Evening Chill',
         subtitle: 'Trending relaxing tracks and chill evening vibes',
-        query: '$primaryLang Soulful Hits',
+        query: '$seed Soulful Hits',
         tag: 'EVENING',
         emoji: '🌆',
       );
@@ -1143,7 +1162,7 @@ class PreferencesService extends ChangeNotifier {
     return CircadianContext(
       title: 'Late Night Vibes',
       subtitle: 'Dreamy lo-fi and slowed melodies for quiet hours',
-      query: '$primaryLang Midnight Melodies',
+      query: '$seed Midnight Melodies',
       tag: 'LATE NIGHT',
       emoji: '🌙',
     );
@@ -2128,6 +2147,31 @@ class PreferencesService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Map<String, String> get customPlaylistCovers =>
+      Map.unmodifiable(_customPlaylistCovers);
+
+  String? getCustomPlaylistCover(String playlistId) =>
+      _customPlaylistCovers[playlistId];
+
+  Future<void> setCustomPlaylistCover(
+    String playlistId,
+    String? coverPathOrUri,
+  ) async {
+    if (playlistId.isEmpty) return;
+    if (coverPathOrUri == null || coverPathOrUri.isEmpty) {
+      _customPlaylistCovers.remove(playlistId);
+    } else {
+      _customPlaylistCovers[playlistId] = coverPathOrUri;
+    }
+    if (_isInitialized) {
+      await _prefs.setString(
+        _customPlaylistCoversKey,
+        json.encode(_customPlaylistCovers),
+      );
+    }
+    notifyListeners();
+  }
+
   bool isAlbumSaved(String albumIdOrTitle) {
     final lower = albumIdOrTitle.toLowerCase().trim();
     return _savedAlbums.any((a) {
@@ -2243,6 +2287,7 @@ class PreferencesService extends ChangeNotifier {
     _spotifyImportedPlaylistIds.clear();
     _manualCreatedPlaylistIds.clear();
     _pinnedPlaylistIds.clear();
+    _customPlaylistCovers.clear();
     _savedAlbums.clear();
     _bassBoost = 0.0;
     _virtualizer = 0.0;

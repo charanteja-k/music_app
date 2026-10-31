@@ -8,6 +8,7 @@ import 'canonical_song_dedup.dart';
 import 'dynamic_artist_service.dart';
 import 'music_service.dart';
 import 'youtube_music_client.dart';
+import 'trending_catalog_service.dart';
 
 /// Next-Generation Studio Search Service.
 ///
@@ -65,9 +66,14 @@ class StudioSearchService {
 
         if (paginatedResp.statusCode == 200) {
           final results = _parseJioResults(paginatedResp.body, query: query);
-          return CanonicalSongDedup.deduplicateList(
-            results.where((v) => CanonicalSongDedup.isGenuineSong(v)).toList(),
-          );
+          final cleanPage = results
+              .where(
+                (v) =>
+                    CanonicalSongDedup.isGenuineSong(v) &&
+                    !isUnnecessaryOrAmateurResult(v, query),
+              )
+              .toList();
+          return CanonicalSongDedup.deduplicateList(cleanPage);
         }
         return [];
       }
@@ -75,7 +81,11 @@ class StudioSearchService {
       // STEP 2: Await YTM search results
       final rawYtm = await ytmFuture.catchError((_) => <Video>[]);
       final ytmResults = rawYtm
-          .where((v) => CanonicalSongDedup.isGenuineSong(v))
+          .where(
+            (v) =>
+                CanonicalSongDedup.isGenuineSong(v) &&
+                !isUnnecessaryOrAmateurResult(v, query),
+          )
           .toList();
 
       final Video? ytmAnchor = ytmResults.isNotEmpty ? ytmResults.first : null;
@@ -143,9 +153,12 @@ class StudioSearchService {
       final List<Video> remainingYtm = ytmResults.length > 1
           ? ytmResults.sublist(1)
           : [];
+      final cleanRemainingYtm = remainingYtm
+          .where((v) => !isUnnecessaryOrAmateurResult(v, query))
+          .toList();
       final dedupedYtm = CanonicalSongDedup.deduplicateList(
         genuineJio,
-        remainingYtm,
+        cleanRemainingYtm,
       );
 
       // STEP 6: Combine Studio 320k Audio + Similar Songs from YTM
@@ -267,7 +280,180 @@ class StudioSearchService {
     return list;
   }
 
-  /// High-accuracy ranking ensuring exact studio matches and canonical anchors appear at the very top.
+  /// Evaluates whether a track represents an unnecessary derivative,
+  /// amateur bedroom cover, instrumental rendition, or altered cut when the user
+  /// did not explicitly search for those keywords.
+  static bool isUnnecessaryOrAmateurResult(Video video, String query) {
+    final title = video.title.toLowerCase();
+    final author = video.author.toLowerCase();
+    final cleanQ = query.toLowerCase().trim();
+
+    // If the user explicitly searched for instrumental/cover/slowed terms, allow them
+    final userWantsCover = cleanQ.contains('cover');
+    final userWantsInstrumental =
+        cleanQ.contains('instrumental') ||
+        cleanQ.contains('piano') ||
+        cleanQ.contains('guitar') ||
+        cleanQ.contains('violin') ||
+        cleanQ.contains('flute') ||
+        cleanQ.contains('oud') ||
+        cleanQ.contains('karaoke');
+    final userWantsSlowed =
+        cleanQ.contains('slowed') ||
+        cleanQ.contains('reverb') ||
+        cleanQ.contains('sped') ||
+        cleanQ.contains('speed') ||
+        cleanQ.contains('nightcore');
+    final userWantsAmbient =
+        cleanQ.contains('ambient') ||
+        cleanQ.contains('lofi') ||
+        cleanQ.contains('lo-fi') ||
+        cleanQ.contains('chill');
+
+    // 1. Instrumental & Amateur Covers in Title
+    if (!userWantsInstrumental && !userWantsCover) {
+      if (RegExp(
+        r'\b(piano\s+(version|cover|rendition|tutorial|solo)|arabic\s+oud|oud\s+(version|cover|rendition)|guitar\s+(cover|version|rendition|solo)|acoustic\s+(cover|version|rendition)|violin\s+(cover|version|rendition|solo)|flute\s+(cover|version|rendition|solo)|harp\s+(cover|version)|cello\s+(cover|version)|saxophone?\s+(cover|version)|instrumental(\s+(cover|version|rendition))?|karaoke(\s+version)?|backing\s+track|minus\s+one|tribute\s+(to|band)|rendition|tutorial)\b',
+        caseSensitive: false,
+      ).hasMatch(title)) {
+        return true;
+      }
+      if (RegExp(
+        r'(\(|\[)(piano|guitar|violin|flute|oud|acoustic|instrumental|karaoke)(\)|\])',
+        caseSensitive: false,
+      ).hasMatch(title)) {
+        return true;
+      }
+    }
+
+    // 2. Slowed, Sped Up, Nightcore, Ambient, Social Media Alterations in Title
+    if (!userWantsSlowed) {
+      if (RegExp(
+        r'\b(slowed(\s+to\s+perfection|\s*\+\s*reverb|\s+and\s+reverb|\s+down)?|(speed|sped)(\s*up)?|nightcore|daycore|pitch(\s+shifted)?)\b',
+        caseSensitive: false,
+      ).hasMatch(title)) {
+        return true;
+      }
+    }
+
+    if (!userWantsAmbient) {
+      if (RegExp(
+        r'\b(ambient(\s+(version|mix|edit))?|lofi(\s+(version|mix|remix|beats?))?|lo-fi(\s+(version|mix|remix|beats?))?|8d\s+audio|bass\s+boosted|tiktok(\s+(version|remix|edit))?|reels?(\s+(version|cut|edit))?|1\s*min(\s*(version|cut|mix))?|shorts?|status\s+video|ringtone)\b',
+        caseSensitive: false,
+      ).hasMatch(title)) {
+        return true;
+      }
+    }
+
+    // 3. Amateur/UGC cover artist channels (e.g. "pianaura", "oud awwad", channels containing cover, karaoke, etc.)
+    if (!userWantsCover && !userWantsInstrumental) {
+      if (author.contains('piano') ||
+          author.contains('oud') ||
+          author.contains('cover') ||
+          author.contains('karaoke') ||
+          author.contains('instrumental') ||
+          author.contains('tribute')) {
+        if (!DynamicArtistService().isKnownArtist(video.author)) {
+          return true;
+        }
+      }
+    }
+
+    if (!userWantsSlowed) {
+      if (author.contains('slowed') ||
+          author.contains('reverb') ||
+          author.contains('nightcore') ||
+          author.contains('sped up')) {
+        return true;
+      }
+    }
+
+    if (!userWantsAmbient) {
+      if (author.contains('ambient') ||
+          author.contains('lofi') ||
+          author.contains('lo-fi')) {
+        return true;
+      }
+    }
+
+    // 4. TrendingCatalogService general spam/junk regex (compilations, reels, 1-min mixes, etc.)
+    if ((!userWantsSlowed &&
+            TrendingCatalogService.isSpamOrJunk(video.title)) ||
+        TrendingCatalogService.isSpamOrJunk(video.author)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Calculates a popularity and relevance score for ranking authentic studio hits first.
+  int _computePopularityScore(
+    Video video,
+    String rawQuery, {
+    Video? anchorVideo,
+  }) {
+    int score = 0;
+    final titleLower = video.title.toLowerCase().trim();
+    final cleanT = CanonicalSongDedup.cleanTitle(video.title);
+    final cleanQ = CanonicalSongDedup.cleanTitle(rawQuery);
+    final cleanAuthor = CanonicalSongDedup.cleanArtist(
+      video.author,
+    ).toLowerCase();
+    final authorLower = video.author.toLowerCase().trim();
+
+    // 1. Title Alignment with Query
+    if (titleLower == rawQuery.toLowerCase().trim()) {
+      score += 600;
+    } else if (cleanT == cleanQ) {
+      score += 500;
+    } else if (cleanT.startsWith(cleanQ) || cleanQ.startsWith(cleanT)) {
+      score += 250;
+    } else if (cleanT.contains(cleanQ)) {
+      score += 150;
+    }
+
+    // 2. Canonical Anchor Match (The primary hit entity identified for this search)
+    if (anchorVideo != null) {
+      final anchorArtist = CanonicalSongDedup.cleanArtist(
+        anchorVideo.author,
+      ).toLowerCase();
+      final anchorTitle = CanonicalSongDedup.cleanTitle(anchorVideo.title);
+
+      // Exact canonical hit match: Title AND Artist align with Google anchor
+      if (cleanT == anchorTitle &&
+          (cleanAuthor == anchorArtist || authorLower.contains(anchorArtist))) {
+        score += 1000;
+      } else if (anchorArtist.isNotEmpty &&
+          (cleanAuthor == anchorArtist || authorLower.contains(anchorArtist))) {
+        // Same artist as the canonical hit (e.g. other official songs from the same artist/album)
+        score += 350;
+      }
+    }
+
+    // 3. Studio 320k Catalog Audio Bonus (Official distributor commercial release)
+    final isJioStudio =
+        video.id.value.startsWith('jio_') ||
+        video.id.value.length < 11 ||
+        MusicService.getCachedWebStreamUrl(video.id.value) != null;
+    if (isJioStudio) {
+      score += 250;
+    }
+
+    // 4. Known Verified Artist Bonus
+    if (DynamicArtistService().isKnownArtist(video.author) ||
+        DynamicArtistService().isKnownArtist(cleanAuthor)) {
+      score += 200;
+    }
+
+    // 5. Query matching artist name directly
+    if (authorLower.contains(cleanQ) || cleanAuthor.contains(cleanQ)) {
+      score += 400;
+    }
+
+    return score;
+  }
+
+  /// High-accuracy ranking ensuring authentic, popular studio releases appear strictly at the top.
   List<Video> _rankSearchResults(
     List<Video> songs,
     String rawQuery, {
@@ -276,42 +462,29 @@ class StudioSearchService {
     if (songs.isEmpty || rawQuery.trim().isEmpty) return songs;
 
     final cleanPool = songs
-        .where((s) => CanonicalSongDedup.isGenuineSong(s))
+        .where(
+          (s) =>
+              CanonicalSongDedup.isGenuineSong(s) &&
+              !isUnnecessaryOrAmateurResult(s, rawQuery),
+        )
         .toList();
     final dedupedSongs = CanonicalSongDedup.deduplicateList(cleanPool);
 
-    final q = rawQuery.trim().toLowerCase();
-    final cleanQ = CanonicalSongDedup.cleanTitle(rawQuery);
-
-    final cleanAnchorT = anchorVideo != null
-        ? CanonicalSongDedup.cleanTitle(anchorVideo.title)
-        : '';
-
     final pool = List<Video>.from(dedupedSongs);
     pool.sort((a, b) {
-      final aLower = a.title.toLowerCase().trim();
-      final bLower = b.title.toLowerCase().trim();
-      final aExact = aLower == q ? 1 : 0;
-      final bExact = bLower == q ? 1 : 0;
-      if (aExact != bExact) return bExact.compareTo(aExact);
-
-      final cleanAT = CanonicalSongDedup.cleanTitle(a.title);
-      final cleanBT = CanonicalSongDedup.cleanTitle(b.title);
-      final aCleanExact = cleanAT == cleanQ ? 1 : 0;
-      final bCleanExact = cleanBT == cleanQ ? 1 : 0;
-      if (aCleanExact != bCleanExact) return bCleanExact.compareTo(aCleanExact);
-
-      // Anchor boost
-      if (cleanAnchorT.isNotEmpty) {
-        final aAnchorMatch =
-            (cleanAT == cleanAnchorT || cleanAT.contains(cleanAnchorT)) ? 1 : 0;
-        final bAnchorMatch =
-            (cleanBT == cleanAnchorT || cleanBT.contains(cleanAnchorT)) ? 1 : 0;
-        if (aAnchorMatch != bAnchorMatch) {
-          return bAnchorMatch.compareTo(aAnchorMatch);
-        }
+      final scoreA = _computePopularityScore(
+        a,
+        rawQuery,
+        anchorVideo: anchorVideo,
+      );
+      final scoreB = _computePopularityScore(
+        b,
+        rawQuery,
+        anchorVideo: anchorVideo,
+      );
+      if (scoreA != scoreB) {
+        return scoreB.compareTo(scoreA); // Highest popularity score first
       }
-
       return 0;
     });
 

@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/music_service.dart';
 import '../services/preferences_service.dart';
 import '../services/auth_service.dart';
+import '../services/app_file_picker.dart';
+import '../widgets/dilse_image_cropper_dialog.dart';
 import '../utils/image_utils.dart';
 import '../widgets/animated_equalizer.dart';
 import '../widgets/mini_player.dart';
@@ -48,6 +54,122 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
 
   void _onServiceChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _pickAndCropCoverPhoto() async {
+    if (widget.playlistId == 'liked_songs') return;
+    try {
+      final picked = await pickImageFile();
+      if (picked == null || picked.bytes.isEmpty) return;
+      if (!mounted) return;
+
+      final croppedBytes = await showDialog<Uint8List>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withValues(alpha: 0.85),
+        builder: (ctx) => DilSeImageCropperDialog(
+          imageBytes: picked.bytes,
+          fileName: picked.name,
+        ),
+      );
+
+      if (croppedBytes == null || croppedBytes.isEmpty) return;
+
+      String savedPath;
+      if (kIsWeb) {
+        final b64 = base64Encode(croppedBytes);
+        savedPath = 'data:image/png;base64,$b64';
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        final coversDir = Directory('${dir.path}/playlist_covers');
+        if (!await coversDir.exists()) {
+          await coversDir.create(recursive: true);
+        }
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final file = File(
+          '${coversDir.path}/cover_${widget.playlistId}_$timestamp.png',
+        );
+        await file.writeAsBytes(croppedBytes);
+        savedPath = file.path;
+      }
+
+      final playlistIndex = _musicService.customPlaylists.indexWhere(
+        (p) => p['id'] == widget.playlistId,
+      );
+      if (playlistIndex != -1) {
+        _musicService.customPlaylists[playlistIndex]['customCoverUrl'] =
+            savedPath;
+        _musicService.customPlaylists[playlistIndex]['coverUrl'] = savedPath;
+        _musicService.customPlaylists[playlistIndex]['imageUrl'] = savedPath;
+        await _musicService.saveCustomPlaylists();
+      }
+
+      await PreferencesService().setCustomPlaylistCover(
+        widget.playlistId,
+        savedPath,
+      );
+
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF161618),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Color(0xFF2E2E32)),
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            content: const Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF1DB954),
+                  size: 20,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Playlist cover updated',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[CustomPlaylistScreen] Error picking/cropping cover: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF161618),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Color(0xFFEF4444)),
+            ),
+            behavior: SnackBarBehavior.floating,
+            content: const Row(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFEF4444),
+                  size: 20,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Could not update cover photo',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showEditDetailsModal(
@@ -266,11 +388,15 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     final displayedSongs = _getDisplayedSongs(songs);
     final themeColor = Theme.of(context).primaryColor;
     final description = (playlist['description'] as String?) ?? '';
-    final customCoverUrl =
-        (playlist['customCoverUrl'] ??
-                playlist['coverUrl'] ??
-                playlist['imageUrl'])
-            as String?;
+    final prefCover = PreferencesService().getCustomPlaylistCover(
+      widget.playlistId,
+    );
+    final customCoverUrl = (prefCover != null && prefCover.isNotEmpty)
+        ? prefCover
+        : ((playlist['customCoverUrl'] ??
+                  playlist['coverUrl'] ??
+                  playlist['imageUrl'])
+              as String?);
     final isSpotifyImport = PreferencesService().isSpotifyImportedPlaylist(
       widget.playlistId,
     );
@@ -350,6 +476,13 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
                           children: [
                             if (isLikedSongs)
                               _buildLikedSongsArtwork()
+                            else if (customCoverUrl != null &&
+                                customCoverUrl.isNotEmpty)
+                              _buildSingleCover(
+                                context: context,
+                                url: customCoverUrl,
+                                size: 500.0,
+                              )
                             else if (firstThumbnail != null &&
                                 firstThumbnail.isNotEmpty)
                               Image.network(
@@ -1537,23 +1670,67 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
     required String url,
     required double size,
   }) {
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    final targetCache = (size * dpr).round().clamp(232, 2048);
+    final clean = url.trim();
+    if (clean.isEmpty) {
+      return _buildDefaultArtwork(width: size, height: size);
+    }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6.0),
-      child: Image.network(
-        ImageUtils.toHighResUrl(url),
-        width: size,
-        height: size,
+    final double? imageW = size.isFinite ? size : null;
+    final double? imageH = size.isFinite ? size : null;
+    final int? targetCache = size.isFinite
+        ? (size * MediaQuery.devicePixelRatioOf(context)).round().clamp(
+            232,
+            2048,
+          )
+        : null;
+
+    Widget content;
+    if (clean.startsWith('data:image/') || clean.startsWith('base64:')) {
+      final commaIndex = clean.indexOf(',');
+      final base64Data = commaIndex != -1
+          ? clean.substring(commaIndex + 1)
+          : clean;
+      try {
+        final bytes = base64Decode(base64Data);
+        content = Image.memory(
+          bytes,
+          width: imageW,
+          height: imageH,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) =>
+              _buildDefaultArtwork(width: size, height: size),
+        );
+      } catch (_) {
+        content = _buildDefaultArtwork(width: size, height: size);
+      }
+    } else if (!kIsWeb &&
+        (clean.startsWith('/') ||
+            clean.startsWith('file://') ||
+            (clean.length > 2 && clean[1] == ':'))) {
+      final path = clean.replaceFirst('file://', '');
+      content = Image.file(
+        File(path),
+        width: imageW,
+        height: imageH,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            _buildDefaultArtwork(width: size, height: size),
+      );
+    } else {
+      content = Image.network(
+        ImageUtils.toHighResUrl(clean),
+        width: imageW,
+        height: imageH,
         fit: BoxFit.cover,
         cacheWidth: targetCache,
         cacheHeight: targetCache,
         filterQuality: FilterQuality.high,
         errorBuilder: (context, error, stackTrace) =>
             _buildDefaultArtwork(width: size, height: size),
-      ),
-    );
+      );
+    }
+
+    return ClipRRect(borderRadius: BorderRadius.circular(6.0), child: content);
   }
 
   Widget _buildMosaicCover({
@@ -1739,7 +1916,7 @@ class _CustomPlaylistScreenState extends State<CustomPlaylistScreen> {
           children: [
             _DesktopHeroCoverBox(
               canEdit: !isLikedSongs,
-              onEdit: () => _showEditDetailsModal(context, name),
+              onEdit: () => _pickAndCropCoverPhoto(),
               size: 232.0,
               child: _buildHeroArtwork(
                 context: context,
