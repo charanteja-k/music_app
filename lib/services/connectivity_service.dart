@@ -54,7 +54,7 @@ class ConnectivityService extends ChangeNotifier {
 
     unawaited(checkConnectivity());
 
-    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    final isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
     if (!isTest) {
       _timer = Timer.periodic(const Duration(seconds: 12), (_) {
         unawaited(checkConnectivity());
@@ -96,7 +96,7 @@ class ConnectivityService extends ChangeNotifier {
 
   Future<void> checkConnectivity() async {
     if (_isChecking) return;
-    if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) return;
 
     _isChecking = true;
     try {
@@ -108,7 +108,9 @@ class ConnectivityService extends ChangeNotifier {
 
         final stopwatch = Stopwatch()..start();
         try {
-          final uri = Uri.parse('https://1.1.1.1/cdn-cgi/trace');
+          final uri = Uri.base.resolve(
+            'favicon.png?t=${DateTime.now().millisecondsSinceEpoch}',
+          );
           final response = await http
               .get(uri)
               .timeout(const Duration(milliseconds: 2500));

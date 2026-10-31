@@ -1,5 +1,5 @@
 /* DilSe PWA Service Worker (Zero-Data Offline App Shell & Audio Engine) */
-const SHELL_CACHE = 'dilse-shell-v4';
+const SHELL_CACHE = 'dilse-shell-v5';
 const AUDIO_CACHE = 'dilse-offline-audio-v1';
 
 const PRECACHE_ASSETS = [
@@ -20,7 +20,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
-      console.log('[DilSe SW] Pre-caching app shell assets (v4)');
+      console.log('[DilSe SW] Pre-caching app shell assets (v5)');
 
       // Fetch root HTML document and store clean, non-redirected copies for all root navigation paths.
       // Critical for Safari iOS WebKit: Vercel clean URLs redirect /index.html -> / (HTTP 308).
@@ -32,9 +32,9 @@ self.addEventListener('install', (event) => {
           const headers = new Headers(rootResp.headers);
           headers.set('Content-Type', 'text/html; charset=utf-8');
 
-          await cache.put('/', new Response(blob, { status: 200, statusText: 'OK', headers }));
-          await cache.put('./', new Response(blob, { status: 200, statusText: 'OK', headers }));
-          await cache.put('index.html', new Response(blob, { status: 200, statusText: 'OK', headers }));
+          await cache.put('/', new Response(blob, { status: 200, statusText: 'OK', headers: new Headers(headers) }));
+          await cache.put('./', new Response(blob, { status: 200, statusText: 'OK', headers: new Headers(headers) }));
+          await cache.put('index.html', new Response(blob, { status: 200, statusText: 'OK', headers: new Headers(headers) }));
         }
       } catch (err) {
         console.warn('[DilSe SW] Root index precache error:', err);
@@ -45,7 +45,13 @@ self.addEventListener('install', (event) => {
         try {
           const resp = await fetch(path);
           if (resp && (resp.ok || resp.type === 'opaque')) {
-            await cache.put(path, resp);
+            if (resp.redirected) {
+              const blob = await resp.blob();
+              const headers = new Headers(resp.headers);
+              await cache.put(path, new Response(blob, { status: resp.status, statusText: resp.statusText, headers }));
+            } else {
+              await cache.put(path, resp);
+            }
           }
         } catch (e) {
           // Non-critical optional asset on cold start
@@ -137,50 +143,54 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation requests: Network-first, fallback to clean cached index.html
+  // 2. Navigation requests: Network-first with synthetic clean Response (Safari WebKit fix)
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
-        .then(async (networkResp) => {
-          if (networkResp && networkResp.status === 200) {
+      (async () => {
+        try {
+          const networkResp = await fetch(req);
+          if (networkResp && (networkResp.status === 200 || networkResp.ok)) {
+            // CRITICAL FOR SAFARI IOS WEBKIT:
+            // Safari throws "Response served by service worker has redirections" if response.redirected === true.
+            // When hosting (like Vercel) normalizes URLs (e.g., redirecting / to / or HTTP->HTTPS),
+            // fetch() sets networkResp.redirected = true.
+            // Returning or caching a response with redirected === true causes Safari WebKit
+            // to abort navigation with that error.
+            // Constructing a new synthetic Response guarantees response.redirected === false.
+            const blob = await networkResp.blob();
+            const headers = new Headers(networkResp.headers);
+            headers.set('Content-Type', 'text/html; charset=utf-8');
+            const cleanResp = new Response(blob, {
+              status: 200,
+              statusText: 'OK',
+              headers: headers
+            });
+
+            // Pre-populate shell cache for offline launches
             const cache = await caches.open(SHELL_CACHE);
-            // If Vercel or hosting redirected the request (e.g. trailing slash / clean URL),
-            // clean it before storing so offline navigation never receives redirected: true
-            if (networkResp.redirected) {
-              const blob = await networkResp.clone().blob();
-              const headers = new Headers(networkResp.headers);
-              headers.set('Content-Type', 'text/html; charset=utf-8');
-              const cleanResp = new Response(blob, {
-                status: 200,
-                statusText: 'OK',
-                headers
-              });
-              await cache.put(req, cleanResp);
-            } else {
-              await cache.put(req, networkResp.clone());
-            }
+            await cache.put(req, cleanResp.clone());
+            await cache.put('/', cleanResp.clone());
+
+            return cleanResp;
           }
           return networkResp;
-        })
-        .catch(async () => {
+        } catch (fetchErr) {
+          // Offline fallback
           const cache = await caches.open(SHELL_CACHE);
           const cachedIndex =
+            (await cache.match(req)) ||
             (await cache.match('/')) ||
             (await cache.match('./')) ||
             (await cache.match('index.html'));
 
           if (cachedIndex) {
-            // CRITICAL FOR SAFARI / WEBKIT (Zero-Black-Screen PWA Invariant):
-            // Safari throws "Response served by service worker has redirections"
-            // if a response returned to respondWith() has redirected === true or opaqueredirect type.
-            // Creating a new Response from blob() strips the redirected flag completely.
             const blob = await cachedIndex.blob();
             const headers = new Headers(cachedIndex.headers);
             headers.set('Content-Type', 'text/html; charset=utf-8');
             return new Response(blob, {
               status: 200,
               statusText: 'OK',
-              headers
+              headers: headers
             });
           }
 
@@ -190,14 +200,15 @@ self.addEventListener('fetch', (event) => {
             '<style>body{background:#000;color:#fff;font-family:sans-serif;display:flex;' +
             'align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;' +
             'text-align:center;box-sizing:border-box;}</style></head><body>' +
-            '<div><h2>DilSe is Offline</h2><p>Please open DilSe once while connected to the internet to initialize the offline player.</p></div>' +
+            '<div><h2>DilSe is Offline</h2><p>Please connect to the internet to load DilSe.</p></div>' +
             '</body></html>',
             {
               status: 200,
               headers: { 'Content-Type': 'text/html; charset=utf-8' }
             }
           );
-        })
+        }
+      })()
     );
     return;
   }
@@ -212,34 +223,72 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.ttf') ||
     url.pathname.endsWith('.woff2') ||
     url.pathname.endsWith('.json') ||
-    url.origin === self.location.origin;
+    (url.origin === self.location.origin && url.pathname !== '/');
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(req).then((cachedResp) => {
+      (async () => {
+        const cache = await caches.open(SHELL_CACHE);
+        let cachedResp = await cache.match(req);
+
         if (cachedResp) {
-          // Return cache immediately (0ms instant startup) and revalidate in background if online
-          fetch(req).then((networkResp) => {
+          // If cachedResp from a legacy or buggy cache has redirected === true, strip it
+          let safeResp = cachedResp;
+          if (cachedResp.redirected) {
+            const blob = await cachedResp.blob();
+            safeResp = new Response(blob, {
+              status: cachedResp.status,
+              statusText: cachedResp.statusText,
+              headers: cachedResp.headers
+            });
+          }
+
+          // Background revalidation (stale-while-revalidate)
+          fetch(req).then(async (networkResp) => {
             if (networkResp && networkResp.status === 200) {
-              caches.open(SHELL_CACHE).then((cache) => cache.put(req, networkResp));
+              if (networkResp.redirected) {
+                const blob = await networkResp.blob();
+                await cache.put(req, new Response(blob, {
+                  status: 200,
+                  statusText: 'OK',
+                  headers: networkResp.headers
+                }));
+              } else {
+                await cache.put(req, networkResp);
+              }
             }
           }).catch(() => {});
-          return cachedResp;
+
+          return safeResp;
         }
 
-        // If not in cache, fetch from network and populate cache
-        return fetch(req).then((networkResp) => {
+        // Cache miss -> Fetch from network
+        try {
+          const networkResp = await fetch(req);
           if (networkResp && networkResp.status === 200) {
-            const respClone = networkResp.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(req, respClone));
+            if (networkResp.redirected) {
+              const blob = await networkResp.blob();
+              const cleanResp = new Response(blob, {
+                status: 200,
+                statusText: 'OK',
+                headers: networkResp.headers
+              });
+              await cache.put(req, cleanResp.clone());
+              return cleanResp;
+            } else {
+              await cache.put(req, networkResp.clone());
+              return networkResp;
+            }
           }
           return networkResp;
-        });
-      })
+        } catch (fetchErr) {
+          return new Response('', { status: 408, statusText: 'Request Timeout' });
+        }
+      })()
     );
     return;
   }
 
-  // Default passthrough for other requests
+  // Default passthrough for other requests (external APIs, Cloudflare Worker, JioSaavn CDN, YouTube)
   event.respondWith(fetch(req));
 });
