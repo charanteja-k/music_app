@@ -4,6 +4,7 @@ import 'package:music_app/constants/app_theme_tokens.dart';
 import 'package:music_app/screens/intro_splash_screen.dart';
 import 'package:music_app/screens/main_screen.dart';
 import 'package:music_app/screens/recovery_shell_screen.dart';
+import 'package:music_app/services/connectivity_service.dart';
 import 'package:music_app/services/preferences_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -87,4 +88,24 @@ void main() {
       expect(find.byType(RecoveryShellScreen), findsOneWidget);
     },
   );
+
+  testWidgets('IntroSplashScreen routes to Library (Tab 2) when offline', (
+    WidgetTester tester,
+  ) async {
+    IntroSplashScreen.hasCompletedSplash = false;
+    ConnectivityService().setOfflineForTesting(true);
+
+    await tester.pumpWidget(const MaterialApp(home: IntroSplashScreen()));
+
+    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    final mainScreen = tester.widget<MainScreen>(find.byType(MainScreen));
+    expect(mainScreen.initialIndex, 2);
+
+    ConnectivityService().setOfflineForTesting(false);
+  });
 }

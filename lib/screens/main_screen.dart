@@ -20,9 +20,11 @@ import '../widgets/offline_indicator_banner.dart';
 import '../widgets/dilse_notification.dart';
 import '../services/connectivity_service.dart';
 import '../layouts/desktop_app_shell.dart';
+import '../layouts/desktop_layout_state.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+  const MainScreen({super.key, this.initialIndex = 0});
 
   static _MainScreenState? _instance;
 
@@ -36,7 +38,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
   late final PageController _pageController;
   final GlobalKey<SearchScreenState> _searchScreenKey =
       GlobalKey<SearchScreenState>();
@@ -46,12 +48,25 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     MainScreen._instance = this;
+    _selectedIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _selectedIndex);
+    if (_selectedIndex != 0) {
+      DesktopLayoutState.activeNavTab.value = _selectedIndex == 2
+          ? DesktopNavTab.library
+          : DesktopNavTab.home;
+    }
     MusicService().addListener(_onMusicServiceChanged);
     ConnectivityService().init();
     ConnectivityService.qualityNotifier.addListener(_onNetworkQualityChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        if (_selectedIndex == 2 && ConnectivityService().isOffline) {
+          DilSeNotification.info(
+            context,
+            'Offline Mode Active',
+            subtitle: 'Showing your saved music & local library',
+          );
+        }
         _checkAutoRestore();
         _checkFirstTimeNamePrompt();
         NotificationPermissionService.promptIfNeeded(context);

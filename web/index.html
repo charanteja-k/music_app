@@ -75,7 +75,7 @@
       100% { transform: scale(1); box-shadow: 0 0 24px var(--ruby-glow); }
     }
 
-    /* Centered Splash Hero */
+    /* Centered Minimal Boot Placeholder */
     .dilse-splash-hero {
       display: flex;
       flex-direction: column;
@@ -85,67 +85,24 @@
       pointer-events: none;
     }
     .dilse-logo-badge {
-      width: 72px;
-      height: 72px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
       background: linear-gradient(135deg, #FF4B63 0%, #FA2D48 60%, #B8001F 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       animation: dilsePulseGlow 2.2s infinite ease-in-out;
-      margin-bottom: 14px;
       cursor: pointer;
       pointer-events: auto;
     }
     .dilse-logo-badge svg {
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       fill: #ffffff;
     }
-    .dilse-splash-title {
-      font-size: 32px;
-      font-weight: 900;
-      letter-spacing: -0.8px;
-      margin: 0;
-      background: linear-gradient(180deg, #FFFFFF 30%, #FF758C 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-    .dilse-splash-tagline {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 2.4px;
-      color: rgba(255, 255, 255, 0.65);
-      margin-top: 5px;
-      text-transform: uppercase;
-    }
 
-    /* Offline Connectivity Pill */
-    .dilse-status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 14px;
-      padding: 5px 14px;
-      border-radius: 20px;
-      font-size: 11.5px;
-      font-weight: 600;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.75);
-    }
-    .dilse-status-pill .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #1DB954;
-    }
-    .dilse-status-pill.offline .dot {
-      background: #FF9F0A;
-    }
-
-    /* Sovereign Failsafe Card (Only shown if engine watchdog fires) */
+    /* Sovereign Failsafe Card (Only shown if engine watchdog fires after 8s) */
     #dilse-offline-failsafe-card {
       display: none;
       margin-top: 24px;
@@ -176,7 +133,7 @@
   </style>
 </head>
 <body>
-  <!-- DilSe Engine-Independent Offline App Shell (Zero-Black-Screen) -->
+  <!-- DilSe Minimal Pre-Flutter Boot Shell (Pitch Black with Center Glow) -->
   <div id="dilse-engine-fallback">
     <div class="dilse-splash-hero">
       <div class="dilse-logo-badge" onclick="handleLogoTap()">
@@ -184,17 +141,11 @@
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
       </div>
-      <h1 class="dilse-splash-title" onclick="handleLogoTap()">DilSe</h1>
-      <span class="dilse-splash-tagline">Suno Dil Se.</span>
-      <div id="dilse-net-pill" class="dilse-status-pill">
-        <span class="dot"></span>
-        <span id="dilse-net-text">Initializing Library</span>
-      </div>
     </div>
 
-    <!-- Engine-Independent Failsafe Recovery Card (Revealed if Flutter takes >3.8s) -->
+    <!-- Sovereign Failsafe Card (Only revealed if engine bootstrap stalls >8s) -->
     <div id="dilse-offline-failsafe-card">
-      <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 4px; color: #ffffff;">Startup Watchdog Active</div>
+      <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 4px; color: #ffffff;">Startup Stalled</div>
       <div style="font-size: 11.5px; color: rgba(255,255,255,0.65); margin-bottom: 12px; line-height: 1.4;">
         If startup is taking longer than expected, reload or reset the offline cache.
       </div>
@@ -206,30 +157,13 @@
   </div>
 
   <script>
-    // Offline status detection
-    function updateOnlineStatus() {
-      var pill = document.getElementById('dilse-net-pill');
-      var text = document.getElementById('dilse-net-text');
-      if (!pill || !text) return;
-      if (navigator.onLine) {
-        pill.classList.remove('offline');
-        text.innerText = 'Initializing Library';
-      } else {
-        pill.classList.add('offline');
-        text.innerText = 'Offline Mode (Saved Music Ready)';
-      }
-    }
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    updateOnlineStatus();
-
-    // Sovereign Engine Watchdog (3.8 seconds):
+    // Sovereign Engine Watchdog (8.0 seconds timeout for emergency recovery):
     var dilseWatchdog = setTimeout(function () {
       var card = document.getElementById('dilse-offline-failsafe-card');
       if (card) {
         card.style.display = 'block';
       }
-    }, 3800);
+    }, 8000);
 
     // Global hook to dismiss the fallback shell smoothly
     window.dismissDilSeFallback = function () {

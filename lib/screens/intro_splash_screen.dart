@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/music_service.dart';
+import '../services/connectivity_service.dart';
 import '../services/bug_report_service.dart';
 import '../constants/app_theme_tokens.dart';
+import '../layouts/desktop_layout_state.dart';
 import 'main_screen.dart';
 import 'recovery_shell_screen.dart';
 
@@ -41,7 +43,10 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     // 1. Kick off concurrent background preloading of Home data immediately
     MusicService().preloadHomeData();
 
-    // 2. Setup 60-120 FPS animation controller
+    // 2. Concurrently run connectivity check to determine initial feed route
+    ConnectivityService().init();
+
+    // 3. Setup 60-120 FPS animation controller
     _controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: kIsWeb ? 900 : 2500),
@@ -132,6 +137,13 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
     if (!mounted || _navigated) return;
     _navigated = true;
     IntroSplashScreen.hasCompletedSplash = true;
+
+    final isOffline = ConnectivityService().isOffline;
+    final initialIndex = isOffline ? 2 : 0;
+    if (initialIndex != 0) {
+      DesktopLayoutState.activeNavTab.value = DesktopNavTab.library;
+    }
+
     try {
       final nav =
           BugReportService.instance.rootNavKey.currentState ??
@@ -140,7 +152,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 300),
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const MainScreen(),
+              MainScreen(initialIndex: initialIndex),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: CurvedAnimation(
@@ -156,7 +168,9 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
       debugPrint('[IntroSplashScreen] Navigation error: $e');
       try {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainScreen()),
+          MaterialPageRoute(
+            builder: (_) => MainScreen(initialIndex: initialIndex),
+          ),
           (route) => false,
         );
       } catch (_) {}
