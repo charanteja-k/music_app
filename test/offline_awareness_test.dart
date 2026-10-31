@@ -18,13 +18,45 @@ void main() {
       connectivity.setOfflineForTesting(true);
       expect(connectivity.isOffline, isTrue);
       expect(connectivity.isOnline, isFalse);
+      expect(connectivity.quality, equals(NetworkQuality.offline));
       expect(notified, isTrue);
 
       notified = false;
       connectivity.setOfflineForTesting(false);
       expect(connectivity.isOffline, isFalse);
       expect(connectivity.isOnline, isTrue);
+      expect(connectivity.quality, equals(NetworkQuality.good));
       expect(notified, isTrue);
+    });
+
+    test('updates network quality states and notifies qualityNotifier', () {
+      final connectivity = ConnectivityService();
+
+      connectivity.setQualityForTesting(NetworkQuality.poor);
+      expect(connectivity.quality, equals(NetworkQuality.poor));
+      expect(connectivity.isLowConnectivity, isTrue);
+      expect(connectivity.isOffline, isFalse);
+      expect(
+        ConnectivityService.qualityNotifier.value,
+        equals(NetworkQuality.poor),
+      );
+
+      connectivity.setQualityForTesting(NetworkQuality.offline);
+      expect(connectivity.quality, equals(NetworkQuality.offline));
+      expect(connectivity.isOffline, isTrue);
+      expect(
+        ConnectivityService.qualityNotifier.value,
+        equals(NetworkQuality.offline),
+      );
+
+      connectivity.setQualityForTesting(NetworkQuality.good);
+      expect(connectivity.quality, equals(NetworkQuality.good));
+      expect(connectivity.isOffline, isFalse);
+      expect(connectivity.isLowConnectivity, isFalse);
+      expect(
+        ConnectivityService.qualityNotifier.value,
+        equals(NetworkQuality.good),
+      );
     });
   });
 

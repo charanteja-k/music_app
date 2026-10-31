@@ -64,4 +64,6 @@ class WebPlayerBridge {
   static Future<void> deleteCachedAudio(String songId) async {}
 
   static Future<bool> isSongCached(String songId) async => false;
+
+  static void dismissFallback() {}
 }

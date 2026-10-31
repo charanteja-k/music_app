@@ -26,7 +26,6 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
   Timer? _hardFallbackTimer;
   Timer? _recoveryWatchdogTimer;
   bool _navigated = false;
-  bool _showMainFallback = false;
   bool _showRecoveryFailsafe = false;
   int _lastCharCount = 0;
   int _emergencyTapCount = 0;
@@ -71,15 +70,11 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
       if (mounted) _navigateToMain();
     });
 
-    // Ultimate hard failsafe: if still mounted after 2.5s on web (or 3.5s on mobile), switch internal state to render MainScreen directly
+    // Ultimate hard failsafe: if still mounted after 2.5s on web (or 3.5s on mobile), navigate to MainScreen
     _hardFallbackTimer = Timer(
       Duration(milliseconds: kIsWeb ? 2500 : 3500),
       () {
-        if (mounted && !_showMainFallback) {
-          setState(() {
-            _showMainFallback = true;
-          });
-        }
+        if (mounted) _navigateToMain();
       },
     );
 
@@ -132,6 +127,8 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
 
   void _navigateToMain() {
     _fallbackTimer?.cancel();
+    _hardFallbackTimer?.cancel();
+    _recoveryWatchdogTimer?.cancel();
     if (!mounted || _navigated) return;
     _navigated = true;
     IntroSplashScreen.hasCompletedSplash = true;
@@ -162,13 +159,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
           MaterialPageRoute(builder: (_) => const MainScreen()),
           (route) => false,
         );
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _showMainFallback = true;
-          });
-        }
-      }
+      } catch (_) {}
     }
   }
 
@@ -183,9 +174,6 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_showMainFallback) {
-      return const MainScreen();
-    }
     return Scaffold(
       backgroundColor: AppThemeTokens.oledBackground,
       body: Stack(
@@ -407,15 +395,7 @@ class _IntroSplashScreenState extends State<IntroSplashScreen>
                 }
                 return TextButton(
                   onPressed: () {
-                    _navigated = false;
                     _navigateToMain();
-                    Future.delayed(const Duration(milliseconds: 350), () {
-                      if (mounted && !_showMainFallback) {
-                        setState(() {
-                          _showMainFallback = true;
-                        });
-                      }
-                    });
                   },
                   child: Text(
                     'Skip',

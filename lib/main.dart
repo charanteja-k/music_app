@@ -9,6 +9,7 @@ import 'screens/recovery_shell_screen.dart';
 import 'services/preferences_service.dart';
 import 'services/bug_report_service.dart';
 import 'services/auth_service.dart';
+import 'services/web_player_bridge.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,8 +58,23 @@ void main() async {
   runApp(const MusicApp());
 }
 
-class MusicApp extends StatelessWidget {
+class MusicApp extends StatefulWidget {
   const MusicApp({super.key});
+
+  @override
+  State<MusicApp> createState() => _MusicAppState();
+}
+
+class _MusicAppState extends State<MusicApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (kIsWeb) {
+        WebPlayerBridge.dismissFallback();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

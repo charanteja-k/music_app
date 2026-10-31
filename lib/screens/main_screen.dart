@@ -17,10 +17,19 @@ import '../services/spotify_import_service.dart';
 import '../services/data_snapshot_service.dart';
 import '../widgets/responsive_wrapper.dart';
 import '../widgets/offline_indicator_banner.dart';
+import '../widgets/dilse_notification.dart';
+import '../services/connectivity_service.dart';
 import '../layouts/desktop_app_shell.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
+
+  static _MainScreenState? _instance;
+
+  /// Programmatically switch active navigation tab (0: Home, 1: Search, 2: Library, 3: Downloads).
+  static void switchToTab(int index) {
+    _instance?._switchToTab(index);
+  }
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -31,12 +40,16 @@ class _MainScreenState extends State<MainScreen> {
   late final PageController _pageController;
   final GlobalKey<SearchScreenState> _searchScreenKey =
       GlobalKey<SearchScreenState>();
+  DateTime? _lastPoorNetworkNotif;
 
   @override
   void initState() {
     super.initState();
+    MainScreen._instance = this;
     _pageController = PageController(initialPage: _selectedIndex);
     MusicService().addListener(_onMusicServiceChanged);
+    ConnectivityService().init();
+    ConnectivityService.qualityNotifier.addListener(_onNetworkQualityChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _checkAutoRestore();
@@ -45,6 +58,42 @@ class _MainScreenState extends State<MainScreen> {
         _checkAutoAppUpdate();
       }
     });
+  }
+
+  void _onNetworkQualityChanged() {
+    if (!mounted) return;
+    final quality = ConnectivityService.qualityNotifier.value;
+    if (quality == NetworkQuality.good) return;
+
+    final now = DateTime.now();
+    if (_lastPoorNetworkNotif != null &&
+        now.difference(_lastPoorNetworkNotif!) < const Duration(seconds: 45)) {
+      return;
+    }
+    _lastPoorNetworkNotif = now;
+
+    final isOffline = quality == NetworkQuality.offline;
+    DilSeNotification.warning(
+      context,
+      isOffline ? 'You are Offline' : 'Weak Internet Connection',
+      subtitle: kIsWeb
+          ? 'Tap to open Offline Library'
+          : 'Tap to switch to Downloads',
+      onTap: () {
+        _switchToTab(3);
+      },
+    );
+  }
+
+  void _switchToTab(int index) {
+    if (mounted && _selectedIndex != index) {
+      setState(() => _selectedIndex = index);
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Future<void> _checkAutoRestore() async {
@@ -114,6 +163,12 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    if (MainScreen._instance == this) {
+      MainScreen._instance = null;
+    }
+    ConnectivityService.qualityNotifier.removeListener(
+      _onNetworkQualityChanged,
+    );
     _pageController.dispose();
     MusicService().removeListener(_onMusicServiceChanged);
     super.dispose();
@@ -192,12 +247,7 @@ class _MainScreenState extends State<MainScreen> {
                       FloatingNavDock(
                         selectedIndex: _selectedIndex,
                         onTabSelected: (index) {
-                          setState(() => _selectedIndex = index);
-                          _pageController.animateToPage(
-                            index,
-                            duration: const Duration(milliseconds: 320),
-                            curve: Curves.easeOutCubic,
-                          );
+                          _switchToTab(index);
                         },
                       ),
                     ],
@@ -210,12 +260,7 @@ class _MainScreenState extends State<MainScreen> {
                   right: 0,
                   child: OfflineIndicatorBanner(
                     onGoToDownloads: () {
-                      setState(() => _selectedIndex = 3);
-                      _pageController.animateToPage(
-                        3,
-                        duration: const Duration(milliseconds: 320),
-                        curve: Curves.easeOutCubic,
-                      );
+                      _switchToTab(3);
                     },
                   ),
                 ),

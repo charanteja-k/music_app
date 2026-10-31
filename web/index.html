@@ -27,10 +27,8 @@
   <style>
     :root {
       --bg-oled: #000000;
-      --card-bg: #141414;
       --ruby-brand: #FA2D48;
-      --ruby-glow: rgba(250, 45, 72, 0.35);
-      --shimmer-line: rgba(255, 255, 255, 0.08);
+      --ruby-glow: rgba(250, 45, 72, 0.45);
     }
     * {
       box-sizing: border-box;
@@ -56,73 +54,71 @@
       height: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
+      align-items: center;
       background: #000000;
       z-index: 99999;
       opacity: 1;
-      transition: opacity 0.35s ease-out;
-      pointer-events: auto;
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
+      transition: opacity 0.25s ease-out;
+      pointer-events: none; /* CRITICAL: Never block touches from reaching Flutter */
+      padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px) 20px;
     }
     #dilse-engine-fallback.dismissed {
       opacity: 0;
       pointer-events: none;
+      display: none !important;
     }
 
-    /* Keyframe Animations */
-    @keyframes dilseShimmer {
-      0% { opacity: 0.25; }
-      50% { opacity: 0.65; }
-      100% { opacity: 0.25; }
-    }
     @keyframes dilsePulseGlow {
-      0% { transform: scale(1); box-shadow: 0 0 20px var(--ruby-glow); }
-      50% { transform: scale(1.04); box-shadow: 0 0 36px rgba(250, 45, 72, 0.6); }
-      100% { transform: scale(1); box-shadow: 0 0 20px var(--ruby-glow); }
+      0% { transform: scale(1); box-shadow: 0 0 24px var(--ruby-glow); }
+      50% { transform: scale(1.06); box-shadow: 0 0 44px rgba(250, 45, 72, 0.7); }
+      100% { transform: scale(1); box-shadow: 0 0 24px var(--ruby-glow); }
     }
 
-    /* Top Splash / Intro Hero */
+    /* Centered Splash Hero */
     .dilse-splash-hero {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 30px 20px 14px 20px;
+      text-align: center;
+      pointer-events: none;
     }
     .dilse-logo-badge {
-      width: 60px;
-      height: 60px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
       background: linear-gradient(135deg, #FF4B63 0%, #FA2D48 60%, #B8001F 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: dilsePulseGlow 2.4s infinite ease-in-out;
-      margin-bottom: 10px;
+      animation: dilsePulseGlow 2.2s infinite ease-in-out;
+      margin-bottom: 14px;
       cursor: pointer;
+      pointer-events: auto;
     }
     .dilse-logo-badge svg {
-      width: 30px;
-      height: 30px;
+      width: 36px;
+      height: 36px;
       fill: #ffffff;
     }
     .dilse-splash-title {
-      font-size: 26px;
+      font-size: 32px;
       font-weight: 900;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.8px;
       margin: 0;
       background: linear-gradient(180deg, #FFFFFF 30%, #FF758C 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       cursor: pointer;
+      pointer-events: auto;
     }
     .dilse-splash-tagline {
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 600;
-      letter-spacing: 2.2px;
-      color: rgba(255, 255, 255, 0.6);
-      margin-top: 3px;
+      letter-spacing: 2.4px;
+      color: rgba(255, 255, 255, 0.65);
+      margin-top: 5px;
       text-transform: uppercase;
     }
 
@@ -131,17 +127,17 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin-top: 10px;
-      padding: 4px 12px;
+      margin-top: 14px;
+      padding: 5px 14px;
       border-radius: 20px;
-      font-size: 11px;
+      font-size: 11.5px;
       font-weight: 600;
       background: rgba(255, 255, 255, 0.08);
       color: rgba(255, 255, 255, 0.75);
     }
     .dilse-status-pill .dot {
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #1DB954;
     }
@@ -149,83 +145,26 @@
       background: #FF9F0A;
     }
 
-    /* App Skeleton Structure */
-    .dilse-skeleton-container {
-      flex: 1;
-      padding: 6px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      overflow: hidden;
-    }
-    .skeleton-search {
-      height: 38px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.06);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-    }
-    .skeleton-chips {
-      display: flex;
-      gap: 8px;
-    }
-    .skeleton-chip {
-      height: 26px;
-      border-radius: 13px;
-      background: rgba(255, 255, 255, 0.06);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-    }
-    .skeleton-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 4px 0;
-    }
-    .skeleton-thumb {
-      width: 46px;
-      height: 46px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.06);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-      flex-shrink: 0;
-    }
-    .skeleton-lines {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .skeleton-line-title {
-      height: 13px;
-      width: 65%;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-    }
-    .skeleton-line-subtitle {
-      height: 9px;
-      width: 40%;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.04);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-    }
-
-    /* Sovereign Failsafe Card */
+    /* Sovereign Failsafe Card (Only shown if engine watchdog fires) */
     #dilse-offline-failsafe-card {
       display: none;
-      margin: 8px 16px 14px 16px;
-      padding: 12px 14px;
+      margin-top: 24px;
+      padding: 14px 18px;
       background: #161616;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
       text-align: center;
+      max-width: 320px;
+      pointer-events: auto; /* Active for recovery buttons */
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
     }
     .failsafe-btn {
       background: #242424;
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 8px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 9px 16px;
       border-radius: 8px;
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 600;
       margin: 4px;
       cursor: pointer;
@@ -234,34 +173,11 @@
       background: #FA2D48;
       border-color: #FA2D48;
     }
-
-    /* Bottom Dock Skeleton */
-    .dilse-dock-skeleton {
-      padding: 12px 16px;
-      background: rgba(14, 14, 14, 0.95);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .dock-tabs {
-      display: flex;
-      width: 100%;
-      justify-content: space-around;
-    }
-    .dock-tab-icon {
-      width: 22px;
-      height: 22px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.10);
-      animation: dilseShimmer 1.8s infinite ease-in-out;
-    }
   </style>
 </head>
 <body>
-  <!-- DilSe Engine-Independent Offline App Shell & Skeleton (Zero-Black-Screen) -->
+  <!-- DilSe Engine-Independent Offline App Shell (Zero-Black-Screen) -->
   <div id="dilse-engine-fallback">
-    <!-- Top Brand Hero -->
     <div class="dilse-splash-hero">
       <div class="dilse-logo-badge" onclick="handleLogoTap()">
         <svg viewBox="0 0 24 24">
@@ -276,64 +192,15 @@
       </div>
     </div>
 
-    <!-- Decoupled App Skeleton (Search, Chips, Track Rows) -->
-    <div class="dilse-skeleton-container">
-      <div class="skeleton-search"></div>
-      <div class="skeleton-chips">
-        <div class="skeleton-chip" style="width: 72px;"></div>
-        <div class="skeleton-chip" style="width: 88px;"></div>
-        <div class="skeleton-chip" style="width: 64px;"></div>
-        <div class="skeleton-chip" style="width: 80px;"></div>
-      </div>
-      <div class="skeleton-row">
-        <div class="skeleton-thumb"></div>
-        <div class="skeleton-lines">
-          <div class="skeleton-line-title"></div>
-          <div class="skeleton-line-subtitle"></div>
-        </div>
-      </div>
-      <div class="skeleton-row">
-        <div class="skeleton-thumb"></div>
-        <div class="skeleton-lines">
-          <div class="skeleton-line-title" style="width: 52%;"></div>
-          <div class="skeleton-line-subtitle" style="width: 32%;"></div>
-        </div>
-      </div>
-      <div class="skeleton-row">
-        <div class="skeleton-thumb"></div>
-        <div class="skeleton-lines">
-          <div class="skeleton-line-title" style="width: 70%;"></div>
-          <div class="skeleton-line-subtitle" style="width: 44%;"></div>
-        </div>
-      </div>
-      <div class="skeleton-row">
-        <div class="skeleton-thumb"></div>
-        <div class="skeleton-lines">
-          <div class="skeleton-line-title" style="width: 58%;"></div>
-          <div class="skeleton-line-subtitle" style="width: 36%;"></div>
-        </div>
-      </div>
-    </div>
-
     <!-- Engine-Independent Failsafe Recovery Card (Revealed if Flutter takes >3.8s) -->
     <div id="dilse-offline-failsafe-card">
-      <div style="font-size: 13px; font-weight: 700; margin-bottom: 3px; color: #ffffff;">Startup Watchdog Active</div>
-      <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 10px;">
-        Starting offline mode. If startup stalls, choose a recovery action:
+      <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 4px; color: #ffffff;">Startup Watchdog Active</div>
+      <div style="font-size: 11.5px; color: rgba(255,255,255,0.65); margin-bottom: 12px; line-height: 1.4;">
+        If startup is taking longer than expected, reload or reset the offline cache.
       </div>
       <div style="display: flex; justify-content: center; gap: 8px;">
-        <button class="failsafe-btn primary" onclick="location.reload()">Reload App</button>
+        <button class="failsafe-btn primary" onclick="location.reload()">Reload</button>
         <button class="failsafe-btn" onclick="clearDilSeCache()">Reset Cache</button>
-      </div>
-    </div>
-
-    <!-- Bottom Navigation Dock Skeleton -->
-    <div class="dilse-dock-skeleton">
-      <div class="dock-tabs">
-        <div class="dock-tab-icon"></div>
-        <div class="dock-tab-icon"></div>
-        <div class="dock-tab-icon"></div>
-        <div class="dock-tab-icon"></div>
       </div>
     </div>
   </div>
@@ -357,7 +224,6 @@
     updateOnlineStatus();
 
     // Sovereign Engine Watchdog (3.8 seconds):
-    // If the Flutter engine takes > 3.8s to boot, reveal the decoupled HTML failsafe card
     var dilseWatchdog = setTimeout(function () {
       var card = document.getElementById('dilse-offline-failsafe-card');
       if (card) {
@@ -373,7 +239,7 @@
         fallback.classList.add('dismissed');
         setTimeout(function () {
           fallback.remove();
-        }, 360);
+        }, 260);
       }
     };
 
@@ -381,7 +247,7 @@
     var observer = new MutationObserver(function (mutations) {
       if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane')) {
         observer.disconnect();
-        setTimeout(window.dismissDilSeFallback, 80);
+        window.dismissDilSeFallback();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });

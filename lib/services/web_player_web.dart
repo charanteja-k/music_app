@@ -387,4 +387,13 @@ class WebPlayerBridge {
     }
     return false;
   }
+
+  static void dismissFallback() {
+    try {
+      final globalWindow = web.window as JSObject;
+      if (globalWindow.hasProperty('dismissDilSeFallback'.toJS).toDart) {
+        globalWindow.callMethod('dismissDilSeFallback'.toJS);
+      }
+    } catch (_) {}
+  }
 }

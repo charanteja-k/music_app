@@ -1,13 +1,15 @@
 /* DilSe PWA Service Worker (Zero-Data Offline App Shell & Audio Engine) */
-const SHELL_CACHE = 'dilse-shell-v3';
+const SHELL_CACHE = 'dilse-shell-v4';
 const AUDIO_CACHE = 'dilse-offline-audio-v1';
 
 const PRECACHE_ASSETS = [
   '/',
+  'index.html',
   'manifest.json',
   'favicon.png',
   'dilse_web_player.js',
   'flutter_bootstrap.js',
+  'main.dart.js',
   'icons/Icon-192.png',
   'icons/Icon-512.png',
   'icons/Icon-maskable-192.png',
@@ -18,7 +20,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
-      console.log('[DilSe SW] Pre-caching app shell assets (v3)');
+      console.log('[DilSe SW] Pre-caching app shell assets (v4)');
 
       // Fetch root HTML document and store clean, non-redirected copies for all root navigation paths.
       // Critical for Safari iOS WebKit: Vercel clean URLs redirect /index.html -> / (HTTP 308).
@@ -39,14 +41,14 @@ self.addEventListener('install', (event) => {
       }
 
       // Pre-cache secondary static assets with Promise.allSettled so one miss never fails the cache
-      const precacheJobs = PRECACHE_ASSETS.filter((path) => path !== '/').map(async (path) => {
+      const precacheJobs = PRECACHE_ASSETS.filter((p) => p !== '/' && p !== 'index.html').map(async (path) => {
         try {
           const resp = await fetch(path);
           if (resp && (resp.ok || resp.type === 'opaque')) {
             await cache.put(path, resp);
           }
         } catch (e) {
-          console.warn('[DilSe SW] Pre-cache skip for optional asset:', path);
+          // Non-critical optional asset on cold start
         }
       });
       await Promise.allSettled(precacheJobs);
@@ -200,7 +202,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Static assets (JS, WASM, CSS, Images, Fonts) -> Stale-while-revalidate / Cache-First
+  // 3. Static assets (JS, WASM, CSS, Images, Fonts) -> Cache-first with background revalidation
   const isStaticAsset =
     url.pathname.endsWith('.js') ||
     url.pathname.endsWith('.wasm') ||
@@ -215,15 +217,24 @@ self.addEventListener('fetch', (event) => {
   if (isStaticAsset) {
     event.respondWith(
       caches.match(req).then((cachedResp) => {
-        const fetchPromise = fetch(req).then((networkResp) => {
+        if (cachedResp) {
+          // Return cache immediately (0ms instant startup) and revalidate in background if online
+          fetch(req).then((networkResp) => {
+            if (networkResp && networkResp.status === 200) {
+              caches.open(SHELL_CACHE).then((cache) => cache.put(req, networkResp));
+            }
+          }).catch(() => {});
+          return cachedResp;
+        }
+
+        // If not in cache, fetch from network and populate cache
+        return fetch(req).then((networkResp) => {
           if (networkResp && networkResp.status === 200) {
             const respClone = networkResp.clone();
             caches.open(SHELL_CACHE).then((cache) => cache.put(req, respClone));
           }
           return networkResp;
-        }).catch(() => null);
-
-        return cachedResp || fetchPromise;
+        });
       })
     );
     return;
