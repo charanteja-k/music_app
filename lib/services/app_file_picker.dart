@@ -15,3 +15,7 @@ class AppPickedFile {
 /// and file_picker on Android / iOS / Desktop.
 Future<AppPickedFile?> pickMusicArchiveOrCsv() =>
     picker.pickMusicArchiveOrCsv();
+
+/// Cross-platform picker for images (jpg, jpeg, png, webp).
+/// Uses native browser HTML5 File API on Web / PWA and file_picker on Desktop / Mobile.
+Future<AppPickedFile?> pickImageFile() => picker.pickImageFile();
