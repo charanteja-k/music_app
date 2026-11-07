@@ -5,6 +5,8 @@ import 'package:music_app/screens/artist_profile_screen.dart';
 import 'package:music_app/widgets/artist_card.dart';
 import 'package:music_app/services/preferences_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:music_app/services/trending_catalog_service.dart';
+import 'package:music_app/models/jio_album.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -95,6 +97,41 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Soundtracks & Albums'), findsOneWidget);
       expect(find.text('Telugu'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'SearchScreen Albums tab strictly filters out cross-language albums for Telugu',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await PreferencesService().setPreferredLanguages(['Telugu']);
+
+      // Seed catalog cache with 1 Telugu album and 1 Hindi album
+      TrendingCatalogService().setCachedAlbums('telugu', [
+        const JioAlbum(
+          id: 't1',
+          title: 'Pushpa 2 The Rule [Telugu]',
+          artist: 'Devi Sri Prasad',
+          artwork: 'https://c.saavncdn.com/pushpa-telugu.jpg',
+          year: '2024',
+          songCount: 6,
+          language: 'telugu',
+        ),
+      ]);
+
+      await tester.pumpWidget(const MaterialApp(home: SearchScreen()));
+      await tester.pumpAndSettle();
+
+      final albumsTabFinder = find.widgetWithText(InkWell, 'Albums');
+      await tester.tap(albumsTabFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pushpa 2 The Rule [Telugu]'), findsOneWidget);
+      expect(find.text('Udta Teer'), findsNothing);
+      expect(find.text("Namit Malhotra's Ramayana [Hindi]"), findsNothing);
     },
   );
 

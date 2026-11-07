@@ -1842,7 +1842,7 @@ async function getJioTrendingSongs(lang = 'hindi', limit = 30) {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
+    Cookie: `L=${language}; DL=${language}; language=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03; gdpr_acceptance=true`,
   };
 
   const songs = [];
@@ -1971,7 +1971,7 @@ async function getJioTopCharts(lang = 'hindi') {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
+    Cookie: `L=${language}; DL=${language}; language=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03; gdpr_acceptance=true`,
   };
 
   try {
@@ -2006,7 +2006,7 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
   const language = lang.toLowerCase().trim();
   const geoHeaders = {
     ...JIO_GEO_HEADERS,
-    Cookie: `country=IN; CH=G03%2CA07%2CO00%2CL03; language=${language}`,
+    Cookie: `L=${language}; DL=${language}; language=${language}; country=IN; CH=G03%2CA07%2CO00%2CL03; gdpr_acceptance=true`,
   };
 
   const albums = [];
@@ -2049,8 +2049,9 @@ async function getJioFeaturedAlbums(lang = 'hindi', limit = 20) {
       artwork = '';
     }
 
+    const itemLang = (r.language || mi.language || '').toLowerCase().trim();
+    if (itemLang && itemLang !== language) return;
     const songCount = parseInt(mi.song_count || r.song_count || '8', 10) || 8;
-    const itemLang = (r.language || mi.language || language).toLowerCase();
 
     seenIds.add(String(r.id));
     albums.push({

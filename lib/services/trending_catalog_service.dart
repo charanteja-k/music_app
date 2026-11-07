@@ -48,6 +48,89 @@ class TrendingCatalogService {
     return true;
   }
 
+  /// Known regional and global languages supported by DilSe music catalog.
+  static const Set<String> supportedLanguages = {
+    'telugu',
+    'hindi',
+    'tamil',
+    'kannada',
+    'malayalam',
+    'punjabi',
+    'bengali',
+    'marathi',
+    'bhojpuri',
+    'gujarati',
+    'english',
+  };
+
+  /// Validates whether an album matches the requested [targetLanguage].
+  /// Strictly prevents cross-language leakage (e.g. Hindi albums showing under Telugu filter).
+  static bool isAlbumMatchingLanguage(JioAlbum album, String targetLanguage) {
+    final target = targetLanguage.toLowerCase().trim();
+    if (target.isEmpty) return true;
+
+    // 1. Direct album language metadata check
+    final albumLang = album.language.toLowerCase().trim();
+    if (albumLang.isNotEmpty) {
+      if (albumLang == target) return true;
+      if (supportedLanguages.contains(albumLang) && albumLang != target) {
+        return false;
+      }
+    }
+
+    // 2. Explicit language brackets or suffix in album title
+    // Examples: "Namit Malhotra's Ramayana [Hindi]", "Nayyi Navelli [Hindi]",
+    // "Jailer (Tamil)", "Ranabaali - Telugu", "Animal [Telugu]"
+    final title = album.title;
+    final titleLangMatch = RegExp(
+      r'\[(Hindi|Telugu|Tamil|Kannada|Malayalam|Punjabi|Bengali|Bhojpuri|Gujarati|Marathi|English)\]'
+      r'|\((Hindi|Telugu|Tamil|Kannada|Malayalam|Punjabi|Bengali|Bhojpuri|Gujarati|Marathi|English)\)'
+      r'|\b-\s*(Hindi|Telugu|Tamil|Kannada|Malayalam|Punjabi|Bengali|Bhojpuri|Gujarati|Marathi|English)\b',
+      caseSensitive: false,
+    ).firstMatch(title);
+
+    if (titleLangMatch != null) {
+      final tag =
+          (titleLangMatch.group(1) ??
+                  titleLangMatch.group(2) ??
+                  titleLangMatch.group(3) ??
+                  '')
+              .toLowerCase();
+      if (tag.isNotEmpty) {
+        if (tag == target) return true;
+        if (supportedLanguages.contains(tag) && tag != target) return false;
+      }
+    }
+
+    // 3. Artwork URL slug language indicator
+    // Examples: https://c.saavncdn.com/845/Udta-Teer-Hindi-2026-202610151750...
+    // https://c.saavncdn.com/929/Ramayana-Telugu-Telugu-2026-20261...
+    if (album.artwork.isNotEmpty) {
+      final artMatch = RegExp(
+        r'-(Hindi|Telugu|Tamil|Kannada|Malayalam|Punjabi|Bengali|Bhojpuri|Gujarati|Marathi|English)-\d{4}-',
+        caseSensitive: false,
+      ).firstMatch(album.artwork);
+      if (artMatch != null) {
+        final artLang = (artMatch.group(1) ?? '').toLowerCase();
+        if (artLang.isNotEmpty) {
+          if (artLang == target) return true;
+          if (supportedLanguages.contains(artLang) && artLang != target) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // If album language was empty or unrecognized, but no conflicting indicators were found:
+    if (albumLang.isEmpty) {
+      final text = '${album.title} ${album.artist}'.toLowerCase();
+      if (text.contains(target)) return true;
+      return false;
+    }
+
+    return albumLang == target;
+  }
+
   /// In-memory cache for trending songs keyed by language.
   final Map<String, List<Video>> _trendingCache = {};
 
@@ -211,7 +294,13 @@ class TrendingCatalogService {
     if (!forceRefresh &&
         _albumCache.containsKey(lang) &&
         _albumCache[lang]!.isNotEmpty) {
-      return _albumCache[lang]!;
+      final cached = _albumCache[lang]!;
+      // Verify cache integrity: drop corrupt or cross-language cache entries
+      if (cached.every((a) => isAlbumMatchingLanguage(a, lang))) {
+        return cached;
+      } else {
+        _albumCache.remove(lang);
+      }
     }
 
     final List<JioAlbum> albums = [];
@@ -232,6 +321,7 @@ class TrendingCatalogService {
           final album = JioAlbum.fromJson(Map<String, dynamic>.from(item));
           if (seenIds.contains(album.id)) continue;
           if (!isGenuineModernAlbum(album)) continue;
+          if (!isAlbumMatchingLanguage(album, lang)) continue;
           seenIds.add(album.id);
           albums.add(album);
         }
@@ -241,7 +331,7 @@ class TrendingCatalogService {
     }
 
     // 2. Direct fallback to JioSaavn content.getBrowseModules
-    if (albums.isEmpty) {
+    if (albums.length < limit) {
       try {
         final directUri = Uri.parse(
           'https://www.jiosaavn.com/api.php?__call=content.getBrowseModules&api_version=4&_format=json&ctx=web6dot0',
@@ -251,7 +341,7 @@ class TrendingCatalogService {
               directUri,
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Cookie': 'L=$lang; DL=$lang; country=IN',
+                'Cookie': 'L=$lang; DL=$lang; language=$lang; country=IN',
               },
             )
             .timeout(const Duration(seconds: 8));
@@ -270,12 +360,53 @@ class TrendingCatalogService {
             final album = JioAlbum.fromJson(Map<String, dynamic>.from(item));
             if (seenIds.contains(album.id)) continue;
             if (!isGenuineModernAlbum(album)) continue;
+            if (!isAlbumMatchingLanguage(album, lang)) continue;
             seenIds.add(album.id);
             albums.add(album);
+            if (albums.length >= limit) break;
           }
         }
       } catch (e) {
         debugPrint('[TrendingCatalog] Direct albums fetch: $e');
+      }
+    }
+
+    // 3. Fallback/Supplement with JioSaavn search.getAlbumResults for [lang]
+    if (albums.length < limit) {
+      try {
+        final searchUri = Uri.parse(
+          'https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&api_version=4&_format=json&ctx=web6dot0&q=${Uri.encodeComponent(lang)}&p=1&n=${limit * 2}',
+        );
+        final resp = await http
+            .get(
+              searchUri,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Cookie': 'L=$lang; DL=$lang; language=$lang; country=IN',
+              },
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (resp.statusCode == 200) {
+          var body = resp.body.trim();
+          if (body.startsWith('\uFEFF')) body = body.substring(1);
+          final data = json.decode(body);
+          final results = data['results'];
+          if (results is List) {
+            for (final item in results) {
+              if (item is! Map) continue;
+              final album = JioAlbum.fromJson(Map<String, dynamic>.from(item));
+              if (seenIds.contains(album.id)) continue;
+              if (!isGenuineModernAlbum(album)) continue;
+              if (!isAlbumMatchingLanguage(album, lang)) continue;
+              seenIds.add(album.id);
+              albums.add(album);
+              if (albums.length >= limit) break;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[TrendingCatalog] Search albums fallback: $e');
       }
     }
 

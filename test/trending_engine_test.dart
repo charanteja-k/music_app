@@ -213,6 +213,196 @@ void main() {
     );
   });
 
+  group('Album Language Filtering & Cross-Language Anti-Leakage Tests', () {
+    test('Strictly rejects Hindi albums when Telugu is the target language', () {
+      const hindiAlbum1 = JioAlbum(
+        id: '401',
+        title: 'Udta Teer',
+        artist: 'Sachin-Jigar',
+        artwork:
+            'https://c.saavncdn.com/845/Udta-Teer-Hindi-2026-202610151750.jpg',
+        year: '2026',
+        songCount: 8,
+        language: 'hindi',
+      );
+
+      const hindiAlbum2 = JioAlbum(
+        id: '402',
+        title: "Namit Malhotra's Ramayana [Hindi]",
+        artist: 'A.R. Rahman',
+        artwork: 'https://c.saavncdn.com/013/Ramayana-Hindi-Hindi-2026.jpg',
+        year: '2026',
+        songCount: 8,
+        language: 'hindi',
+      );
+
+      const hindiAlbum3 = JioAlbum(
+        id: '403',
+        title: 'Nayyi Navelli (Original Motion Picture Soundtrack)',
+        artist: 'G.V. Prakash Kumar',
+        artwork:
+            'https://c.saavncdn.com/339/Nayyi-Navelli-Original-Motion-Picture-Soundtrack-Hindi-2026.jpg',
+        year: '2026',
+        songCount: 8,
+        language: 'hindi',
+      );
+
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum1, 'telugu'),
+        isFalse,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum2, 'telugu'),
+        isFalse,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum3, 'telugu'),
+        isFalse,
+      );
+
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum1, 'hindi'),
+        isTrue,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum2, 'hindi'),
+        isTrue,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(hindiAlbum3, 'hindi'),
+        isTrue,
+      );
+    });
+
+    test('Strictly accepts genuine Telugu albums for Telugu filter', () {
+      const teluguAlbum1 = JioAlbum(
+        id: '501',
+        title: 'Aadarsha Kutumbam - Telugu',
+        artist: 'Kalyan Keys',
+        artwork:
+            'https://c.saavncdn.com/528/Aadarsha-Kutumbam-AK47-Telugu-2026.jpg',
+        year: '2026',
+        songCount: 6,
+        language: 'telugu',
+      );
+
+      const teluguAlbum2 = JioAlbum(
+        id: '502',
+        title: 'Ramayana [Telugu]',
+        artist: 'A.R. Rahman',
+        artwork: 'https://c.saavncdn.com/929/Ramayana-Telugu-Telugu-2026.jpg',
+        year: '2026',
+        songCount: 8,
+        language: 'telugu',
+      );
+
+      const teluguAlbum3 = JioAlbum(
+        id: '503',
+        title: 'Devara Part 1',
+        artist: 'Anirudh Ravichander',
+        artwork: 'https://c.saavncdn.com/097/Devara-Telugu-2024.jpg',
+        year: '2024',
+        songCount: 6,
+        language: 'telugu',
+      );
+
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum1, 'telugu'),
+        isTrue,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum2, 'telugu'),
+        isTrue,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum3, 'telugu'),
+        isTrue,
+      );
+
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum1, 'hindi'),
+        isFalse,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum2, 'hindi'),
+        isFalse,
+      );
+      expect(
+        TrendingCatalogService.isAlbumMatchingLanguage(teluguAlbum3, 'hindi'),
+        isFalse,
+      );
+    });
+
+    test(
+      'Detects title language tags and artwork URL slugs even if language field is missing',
+      () {
+        const albumWithTitleTag = JioAlbum(
+          id: '601',
+          title: 'Jailer 2 [Tamil]',
+          artist: 'Anirudh Ravichander',
+          artwork: '',
+          year: '2026',
+          songCount: 6,
+          language: '',
+        );
+
+        const albumWithArtworkSlug = JioAlbum(
+          id: '602',
+          title: 'Ranabaali',
+          artist: 'Unknown',
+          artwork: 'https://c.saavncdn.com/123/Ranabaali-Kannada-2026-xyz.jpg',
+          year: '2026',
+          songCount: 5,
+          language: '',
+        );
+
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithTitleTag,
+            'tamil',
+          ),
+          isTrue,
+        );
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithTitleTag,
+            'telugu',
+          ),
+          isFalse,
+        );
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithTitleTag,
+            'hindi',
+          ),
+          isFalse,
+        );
+
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithArtworkSlug,
+            'kannada',
+          ),
+          isTrue,
+        );
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithArtworkSlug,
+            'telugu',
+          ),
+          isFalse,
+        );
+        expect(
+          TrendingCatalogService.isAlbumMatchingLanguage(
+            albumWithArtworkSlug,
+            'hindi',
+          ),
+          isFalse,
+        );
+      },
+    );
+  });
+
   group('YouTube Music Charts InnerTube Integration Tests', () {
     test('fetchCharts runs safely without unhandled exceptions', () async {
       final client = YouTubeMusicClient();

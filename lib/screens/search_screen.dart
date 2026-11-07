@@ -1880,8 +1880,14 @@ class SearchScreenState extends State<SearchScreen>
         limit: 24,
       );
       if (mounted) {
+        if (_selectedAlbumBrowseLang != lang) return;
+        final filtered = albums
+            .where(
+              (a) => TrendingCatalogService.isAlbumMatchingLanguage(a, lang),
+            )
+            .toList();
         setState(() {
-          _browseAlbums = albums;
+          _browseAlbums = filtered;
           _isLoadingBrowseAlbums = false;
         });
       }
@@ -1898,6 +1904,15 @@ class SearchScreenState extends State<SearchScreen>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final crossAxisCount = width > 900 ? 5 : (width > 600 ? 4 : 2);
+
+        final displayAlbums = _browseAlbums
+            .where(
+              (a) => TrendingCatalogService.isAlbumMatchingLanguage(
+                a,
+                _selectedAlbumBrowseLang,
+              ),
+            )
+            .toList();
 
         return ListView(
           key: const PageStorageKey('albums_browse_grid_view'),
@@ -2010,7 +2025,7 @@ class SearchScreenState extends State<SearchScreen>
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 ),
               )
-            else if (_browseAlbums.isEmpty)
+            else if (displayAlbums.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Center(
@@ -2030,10 +2045,10 @@ class SearchScreenState extends State<SearchScreen>
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
-                itemCount: _browseAlbums.length,
+                itemCount: displayAlbums.length,
                 itemBuilder: (context, i) {
                   return _buildAlbumItemCard(
-                    _browseAlbums[i],
+                    displayAlbums[i],
                     heroPrefix: 'browse',
                   );
                 },

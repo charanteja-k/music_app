@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,7 @@ import 'package:flutter/material.dart';
 /// Industrial-grade, memory-capped, disk-cached image renderer.
 ///
 /// Automatically uses [CachedNetworkImage] for HTTP/HTTPS endpoints,
-/// falling back safely to local disk files or asset bundles.
+/// falling back safely to local disk files, memory (base64 data URIs), or asset bundles.
 class DilSeImage extends StatelessWidget {
   final String imageUrl;
   final double? width;
@@ -36,6 +37,24 @@ class DilSeImage extends StatelessWidget {
     Widget content;
     if (cleanUrl.isEmpty) {
       content = errorWidget ?? _buildErrorWidget();
+    } else if (cleanUrl.startsWith('data:image/') ||
+        cleanUrl.startsWith('base64:')) {
+      final commaIndex = cleanUrl.indexOf(',');
+      final base64Data = commaIndex != -1
+          ? cleanUrl.substring(commaIndex + 1)
+          : cleanUrl;
+      try {
+        final bytes = base64Decode(base64Data);
+        content = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, _, _) => errorWidget ?? _buildErrorWidget(),
+        );
+      } catch (_) {
+        content = errorWidget ?? _buildErrorWidget();
+      }
     } else if (cleanUrl.startsWith('http://') ||
         cleanUrl.startsWith('https://')) {
       if (kIsWeb) {

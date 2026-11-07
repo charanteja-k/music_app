@@ -851,6 +851,75 @@ class DynamicArtistService {
   }
 
   /// Returns whether a search query matches a known artist in the catalog or alias map
+  static final Set<String> _verifiedGlobalArtists = {
+    // Curated & Major Pop
+    'the weeknd', 'taylor swift', 'ed sheeran', 'dua lipa', 'billie eilish',
+    'bruno mars', 'ariana grande', 'justin bieber', 'drake', 'rihanna',
+    'beyonce', 'adele', 'post malone', 'maroon 5', 'katy perry',
+    'lady gaga', 'selena gomez', 'charlie puth', 'shawn mendes',
+    'camila cabello', 'halsey', 'sza', 'olivia rodrigo', 'sabrina carpenter',
+    'chappell roan', 'lana del rey', 'sia', 'bebe rexha', 'ellie goulding',
+    'zara larsson', 'sam smith', 'harry styles', 'zayn', 'miley cyrus',
+    'lorde', 'troye sivan', 'conan gray', 'lauv', 'jeremy zucker',
+    'alec benjamin', 'khalid', 'frank ocean', 'daniel caesar', 'giveon',
+    'chris brown', 'usher', 'justin timberlake', 'pitbull', 'the kid laroi',
+    'lil nas x', 'benson boone', 'teddy swims', 'tate mcrae', 'gracie abrams',
+    // EDM / Electronic / Remixers
+    'david guetta',
+    'calvin harris',
+    'avicii',
+    'the chainsmokers',
+    'chainsmokers',
+    'alan walker', 'marshmello', 'kygo', 'martin garrix', 'dj snake',
+    'tiesto', 'zedd', 'skrillex', 'steve aoki', 'major lazer',
+    'swedish house mafia', 'alesso', 'axwell', 'sebastian ingrosso',
+    'deadmau5', 'daft punk', 'robin schulz', 'lost frequencies', 'felix jaehn',
+    'alok', 'kshmr', 'r3hab', 'afrojack', 'hardwell', 'armin van buuren',
+    'galantis', 'disclosure', 'flume', 'illenium', 'gryffin', 'clean bandit',
+    'jonas blue', 'meduza', 'sigala', 'jax jones', 'regard', 'imanbek',
+    'joel corry', 'topic', 'fred again', 'peggy gou', 'fisher', 'dom dolla',
+    'john summit', 'the blaze', 'blessed madonna', 'the blessed madonna',
+    'don diablo', 'funtcase', 'blasterjaxx', 'timmy trumpet', 'w&w', 'kura',
+    // Bands & Rock
+    'coldplay', 'imagine dragons', 'onerepublic', 'linkin park', 'queen',
+    'the beatles', 'michael jackson', 'green day', 'twenty one pilots',
+    'the neighbourhood', 'arctic monkeys', 'the 1975', 'panic at the disco',
+    'fall out boy', '5 seconds of summer', 'bastille', 'glass animals',
+    'hozier', 'vance joy', 'dean lewis', 'james arthur', 'lewis capaldi',
+    // Hip-hop / Rap
+    'kendrick lamar', 'travis scott', 'j cole', 'kanye west',
+    'eminem', 'nicki minaj', 'cardi b', 'megan thee stallion', 'doja cat',
+    'future', 'metro boomin', '21 savage', 'lil baby', 'gunna', 'playboi carti',
+    'juice wrld', 'xxxtentacion', 'asap rocky', 'tyler the creator',
+    'jack harlow', 'central cee',
+    // Indic & Regional
+    'devi sri prasad', 'dsp', 'thaman s', 'thaman', 'sid sriram',
+    'anurag kulkarni', 'ram miriyala', 'mm keeravaani', 'keeravani',
+    'mickey j meyer', 'sp balasubrahmanyam', 'spb', 'ks chithra', 'chithra',
+    'mangli', 'sunitha', 'karthik', 'haricharan', 'anirudh ravichander',
+    'anirudh', 'ar rahman', 'a r rahman', 'rahman', 'sai abhyankkar',
+    'yuvan shankar raja', 'yuvan', 'santhosh narayanan', 'harris jayaraj',
+    'ilaiyaraaja', 'gv prakash kumar', 'gv prakash', 'arijit singh', 'pritam',
+    'shreya ghoshal',
+    'badshah',
+    'atif aslam',
+    'sonu nigam',
+    'shankar mahadevan',
+    'armaan malik', 'neha kakkar', 'jubin nautiyal', 'diljit dosanjh',
+    'karan aujla', 'ap dhillon', 'sidhu moose wala', 'guru randhawa',
+    'sushin shyam', 'kj yesudas', 'hesham abdul wahab', 'darshan raval',
+    'b praak', 'jasleen royal', 'prateek kuhad', 'anuv jain', 'ritviz',
+    'nucleya', 'yo yo honey singh', 'honey singh', 'raftaar', 'divine',
+    'mc stan', 'king', 'shubh', 'dhee', 'jonita gandhi', 'mohit chauhan',
+    'kk', 'lucky ali', 'javed ali', 'neeti mohan', 'shilpa rao', 'amit trivedi',
+    'vishal shekhar', 'vishal dadlani', 'shekhar ravjiani', 'sachin jigar',
+    'shankar ehsaan loy', 'ajay atul', 'himesh reshammiya', 'vijay prakash',
+    'sanjith hegde', 'raghu dixit', 'benny dayal', 'neeraj shridhar',
+    'mika singh', 'sukhwinder singh', 'udit narayan', 'kumar sanu',
+    'alka yagnik', 'kavita krishnamurthy', 'asha bhosle', 'lata mangeshkar',
+  };
+
+  /// Returns whether a search query matches a known artist in the catalog or alias map
   bool isKnownArtist(String query) {
     final norm = PlaylistArtistFilter.normalize(query);
     if (norm.isEmpty) return false;
@@ -860,6 +929,35 @@ class DynamicArtistService {
       final aNorm = PlaylistArtistFilter.normalize(artist.name);
       if (aNorm == norm) return true;
     }
+    return false;
+  }
+
+  /// Returns whether a query corresponds to a recognized, verified recording artist in DilSe,
+  /// checking the curated catalog, known Indic composers/singers, verified global artist registry,
+  /// or multi-credit collaborative tokens.
+  bool isVerifiedArtist(String query) {
+    if (query.trim().isEmpty) return false;
+    final norm = PlaylistArtistFilter.normalize(query);
+    if (norm.isEmpty) return false;
+
+    if (isKnownArtist(query)) return true;
+    if (_verifiedGlobalArtists.contains(norm)) return true;
+
+    // Check individual artist tokens if separated by commas / feat / with / &
+    final parts = query.split(
+      RegExp(
+        r'[,/;&]|(?:\s+feat\.?\s+)|\s+ft\.?\s+|(?:\s+with\s+)',
+        caseSensitive: false,
+      ),
+    );
+    for (final p in parts) {
+      final pNorm = PlaylistArtistFilter.normalize(p);
+      if (pNorm.isNotEmpty &&
+          (isKnownArtist(p) || _verifiedGlobalArtists.contains(pNorm))) {
+        return true;
+      }
+    }
+
     return false;
   }
 
